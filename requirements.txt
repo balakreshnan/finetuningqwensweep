@@ -1,0 +1,37 @@
+# Core ML
+torch>=2.8.0
+torchvision>=0.23.0
+torchaudio>=2.8.0
+
+# Hugging Face
+transformers>=4.56.0
+datasets>=4.0.0
+accelerate>=1.10.0
+huggingface_hub>=0.34.0
+tokenizers>=0.22.0
+safetensors>=0.6.0
+
+# PEFT / Fine-tuning
+peft>=0.17.0
+trl>=0.21.0
+bitsandbytes>=0.47.0
+
+# Scientific
+numpy>=2.3.0
+scipy>=1.16.0
+
+# Tokenizers
+sentencepiece>=0.2.0
+protobuf>=6.31.0
+
+# Logging
+tqdm>=4.67.0
+tensorboard>=2.20.0
+
+# Notebook
+jupyter
+ipykernel
+
+# Optional
+evaluate
+wandb
