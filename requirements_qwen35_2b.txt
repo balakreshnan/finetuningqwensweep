@@ -1,0 +1,13 @@
+# Qwen3.5 currently needs the latest Transformers implementation.
+torch
+torchvision
+transformers @ git+https://github.com/huggingface/transformers.git@main
+trl
+peft
+accelerate
+datasets
+bitsandbytes
+wandb
+huggingface_hub
+sentencepiece
+pillow
