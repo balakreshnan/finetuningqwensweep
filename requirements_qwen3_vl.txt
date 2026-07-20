@@ -1,0 +1,14 @@
+# Recommended Python: 3.11 or 3.12
+torch
+torchvision
+transformers @ git+https://github.com/huggingface/transformers.git@main
+trl
+peft
+accelerate
+datasets
+bitsandbytes
+wandb
+huggingface_hub
+pillow
+sentencepiece
+hf_xet
