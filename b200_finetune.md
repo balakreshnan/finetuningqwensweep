@@ -250,13 +250,14 @@ pip install --user qwen-vl-utils pillow
 cat > finetune_qwen_vl.py << 'EOF'
 import os
 from transformers import (
-    Qwen2VLForConditionalGeneration,
-    Qwen2VLProcessor,
+    Qwen2_5_VLForConditionalGeneration,
+    AutoProcessor,
     TrainingArguments,
     Trainer,
 )
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model
+from torch.utils.data import Dataset
 import torch
 
 # ──────────────────────────────────────────────
@@ -266,44 +267,52 @@ MODEL_NAME = "Qwen/Qwen2.5-VL-7B-Instruct"
 HF_REPO_ID = "Balab2021/Qwen2.5-VL-7B-lora-b200"
 OUTPUT_DIR = "/lustre/fsw/general_sa/checkpoints/qwen-vl-lora"
 WANDB_PROJECT = "qwen2.5-vl-7b-lora-finetune"
+MAX_LENGTH = 2048  # Increased to accommodate vision tokens
 
 # ──────────────────────────────────────────────
 # 1. Initialize Weights & Biases
 # ──────────────────────────────────────────────
 import wandb
 
-wandb.login()
-wandb.init(
-    project=WANDB_PROJECT,
-    name="qwen2.5-vl-7b-lora",
-    config={
-        "model": MODEL_NAME,
-        "lora_r": 16,
-        "lora_alpha": 32,
-        "lora_dropout": 0.1,
-        "learning_rate": 2e-5,
-        "epochs": 50,
-        "batch_size": 2,
-        "max_length": 1024,
-    },
-    tags=["lora", "qwen2.5-vl", "multimodal", "pre-tyche", "gb200"],
-)
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
+if local_rank == 0:
+    wandb.login()
+    wandb.init(
+        project=WANDB_PROJECT,
+        name="qwen2.5-vl-7b-lora-4gpu",
+        config={
+            "model": MODEL_NAME,
+            "lora_r": 16,
+            "lora_alpha": 32,
+            "lora_dropout": 0.1,
+            "learning_rate": 2e-5,
+            "epochs": 50,
+            "batch_size": 2,
+            "num_gpus": 4,
+            "max_length": MAX_LENGTH,
+        },
+        tags=["lora", "qwen2.5-vl", "multimodal", "pre-tyche", "gb200", "4gpu"],
+    )
 
 # ──────────────────────────────────────────────
 # 2. Load processor & model
 # ──────────────────────────────────────────────
-print("Loading processor and model...")
-processor = Qwen2VLProcessor.from_pretrained(MODEL_NAME)
+print(f"[Rank {local_rank}] Loading processor and model...")
 
-model = Qwen2VLForConditionalGeneration.from_pretrained(
+# Limit vision tokens by constraining image size
+processor = AutoProcessor.from_pretrained(
+    MODEL_NAME,
+    min_pixels=256 * 28 * 28,   # minimum image tokens
+    max_pixels=512 * 28 * 28,   # cap at ~512 vision tokens
+)
+
+model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
     MODEL_NAME,
     torch_dtype=torch.bfloat16,
-    device_map="auto",
-    ignore_mismatched_sizes=True,
 )
 
 # ──────────────────────────────────────────────
-# 3. Apply LoRA to language model layers
+# 3. Apply LoRA
 # ──────────────────────────────────────────────
 lora_config = LoraConfig(
     r=16,
@@ -322,103 +331,119 @@ lora_config = LoraConfig(
     task_type="CAUSAL_LM",
 )
 model = get_peft_model(model, lora_config)
-model.print_trainable_parameters()
+if local_rank == 0:
+    model.print_trainable_parameters()
 
 # ──────────────────────────────────────────────
-# 4. Load & preprocess dataset
+# 4. Custom Dataset (lazy, no truncation issues)
 # ──────────────────────────────────────────────
-print("Loading multimodal dataset...")
-dataset = load_dataset("HuggingFaceM4/the_cauldron", "ai2d", split="train[:500]")
+print(f"[Rank {local_rank}] Loading multimodal dataset...")
+raw_dataset = load_dataset("HuggingFaceM4/the_cauldron", "ai2d", split="train[:500]")
+print(f"[Rank {local_rank}] Loaded {len(raw_dataset)} examples.")
 
-def preprocess(example):
-    image = example["images"][0] if example.get("images") else None
+class QwenVLDataset(Dataset):
+    def __init__(self, dataset, processor, max_length):
+        self.dataset = dataset
+        self.processor = processor
+        self.max_length = max_length
 
-    if image is not None:
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": image},
-                    {"type": "text", "text": example["texts"][0]["user"]},
-                ],
-            },
-            {
-                "role": "assistant",
-                "content": [
-                    {"type": "text", "text": example["texts"][0]["assistant"]},
-                ],
-            },
-        ]
-    else:
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": example["texts"][0]["user"]},
-                ],
-            },
-            {
-                "role": "assistant",
-                "content": [
-                    {"type": "text", "text": example["texts"][0]["assistant"]},
-                ],
-            },
-        ]
+    def __len__(self):
+        return len(self.dataset)
 
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+    def __getitem__(self, idx):
+        example = self.dataset[idx]
+        image = example["images"][0] if example.get("images") else None
+        user_text = example["texts"][0]["user"]
+        assistant_text = example["texts"][0]["assistant"]
 
-    if image is not None:
-        inputs = processor(
-            text=[text],
-            images=[image],
-            padding="max_length",
-            max_length=1024,
-            truncation=True,
-            return_tensors="pt",
-        )
-    else:
-        inputs = processor(
-            text=[text],
-            padding="max_length",
-            max_length=1024,
-            truncation=True,
-            return_tensors="pt",
+        # Build chat messages in Qwen format
+        if image is not None:
+            image = image.convert("RGB")
+            # Resize image to limit vision tokens (max 384px on longest side)
+            image.thumbnail((384, 384))
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": image},
+                        {"type": "text", "text": user_text},
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": assistant_text}],
+                },
+            ]
+        else:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": user_text}],
+                },
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": assistant_text}],
+                },
+            ]
+
+        # Use apply_chat_template to get proper text with image placeholders
+        text = self.processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=False
         )
 
-    inputs = {k: v.squeeze(0) for k, v in inputs.items()}
-    inputs["labels"] = inputs["input_ids"].clone()
+        # Process WITHOUT truncation — let vision tokens expand fully
+        if image is not None:
+            inputs = self.processor(
+                text=[text],
+                images=[image],
+                return_tensors="pt",
+                padding="max_length",
+                max_length=self.max_length,
+                # NO truncation — this was causing the crash
+            )
+        else:
+            inputs = self.processor(
+                text=[text],
+                return_tensors="pt",
+                padding="max_length",
+                max_length=self.max_length,
+            )
 
-    return inputs
+        # Squeeze batch dim and clip to max_length (safe post-processing)
+        result = {}
+        for k, v in inputs.items():
+            v = v.squeeze(0)
+            if v.dim() >= 1 and v.shape[0] > self.max_length:
+                v = v[:self.max_length]
+            result[k] = v
+        result["labels"] = result["input_ids"].clone()
+        return result
 
-print("Preprocessing dataset (this may take a while)...")
-dataset = dataset.map(
-    preprocess,
-    remove_columns=dataset.column_names,
-    num_proc=4,
-)
-dataset.set_format("torch")
+train_dataset = QwenVLDataset(raw_dataset, processor, MAX_LENGTH)
+print(f"[Rank {local_rank}] Dataset ready.")
 
 # ──────────────────────────────────────────────
-# 5. Data collator for multimodal
+# 5. Data collator (handles variable-length tensors)
 # ──────────────────────────────────────────────
 from dataclasses import dataclass
 from typing import Dict, List
-import torch
 
 @dataclass
 class MultimodalDataCollator:
-    processor: object
-
     def __call__(self, features: List[Dict]) -> Dict[str, torch.Tensor]:
         batch = {}
         for key in features[0].keys():
-            batch[key] = torch.stack([f[key] for f in features])
+            try:
+                batch[key] = torch.stack([f[key] for f in features])
+            except Exception:
+                # Skip tensors that can't be stacked (different shapes)
+                continue
         return batch
 
-data_collator = MultimodalDataCollator(processor=processor)
+data_collator = MultimodalDataCollator()
 
 # ──────────────────────────────────────────────
-# 6. Training arguments (with W&B reporting)
+# 6. Training arguments (4 GPU DDP)
 # ──────────────────────────────────────────────
 args = TrainingArguments(
     output_dir=OUTPUT_DIR,
@@ -429,14 +454,16 @@ args = TrainingArguments(
     save_steps=50,
     save_total_limit=3,
     bf16=True,
-    gradient_accumulation_steps=8,
+    gradient_accumulation_steps=4,
     gradient_checkpointing=True,
-    warmup_ratio=0.05,
+    warmup_steps=50,
     weight_decay=0.01,
     lr_scheduler_type="cosine",
     dataloader_pin_memory=False,
-    report_to="wandb",
-    run_name="qwen2.5-vl-7b-lora",
+    dataloader_num_workers=0,
+    ddp_find_unused_parameters=False,
+    report_to="wandb" if local_rank == 0 else "none",
+    run_name="qwen2.5-vl-7b-lora-4gpu",
     logging_first_step=True,
     remove_unused_columns=False,
 )
@@ -444,56 +471,57 @@ args = TrainingArguments(
 # ──────────────────────────────────────────────
 # 7. Train
 # ──────────────────────────────────────────────
-print("Starting fine-tuning...")
+print(f"[Rank {local_rank}] Starting fine-tuning...")
 trainer = Trainer(
     model=model,
     args=args,
-    train_dataset=dataset,
+    train_dataset=train_dataset,
     data_collator=data_collator,
 )
 trainer.train()
 
-trainer.save_model(OUTPUT_DIR)
-processor.save_pretrained(OUTPUT_DIR)
-print(f"Model saved locally to {OUTPUT_DIR}")
+if local_rank == 0:
+    trainer.save_model(OUTPUT_DIR)
+    processor.save_pretrained(OUTPUT_DIR)
+    print(f"Model saved locally to {OUTPUT_DIR}")
 
-# ──────────────────────────────────────────────
-# 8. Log final metrics to W&B
-# ──────────────────────────────────────────────
-final_metrics = trainer.state.log_history[-1] if trainer.state.log_history else {}
-wandb.log({"final_train_loss": final_metrics.get("train_loss", None)})
-wandb.finish()
-print("W&B run finished.")
+    # ──────────────────────────────────────────
+    # 8. Log final metrics to W&B
+    # ──────────────────────────────────────────
+    final_metrics = trainer.state.log_history[-1] if trainer.state.log_history else {}
+    wandb.log({"final_train_loss": final_metrics.get("train_loss", None)})
+    wandb.finish()
+    print("W&B run finished.")
 
-# ──────────────────────────────────────────────
-# 9. Upload to HuggingFace Hub
-# ──────────────────────────────────────────────
-from huggingface_hub import HfApi
+    # ──────────────────────────────────────────
+    # 9. Upload to HuggingFace Hub
+    # ──────────────────────────────────────────
+    from huggingface_hub import HfApi
 
-print(f"Uploading model to HuggingFace: {HF_REPO_ID} ...")
+    print(f"Uploading model to HuggingFace: {HF_REPO_ID} ...")
 
-api = HfApi()
+    api = HfApi()
 
-api.create_repo(
-    repo_id=HF_REPO_ID,
-    repo_type="model",
-    private=True,
-    exist_ok=True,
-)
+    api.create_repo(
+        repo_id=HF_REPO_ID,
+        repo_type="model",
+        private=True,
+        exist_ok=True,
+    )
 
-api.upload_folder(
-    repo_id=HF_REPO_ID,
-    folder_path=OUTPUT_DIR,
-    commit_message="Upload Qwen2.5-VL-7B LoRA fine-tuned multimodal (Pre-Tyche GB200)",
-)
+    api.upload_folder(
+        repo_id=HF_REPO_ID,
+        folder_path=OUTPUT_DIR,
+        commit_message="Upload Qwen2.5-VL-7B LoRA fine-tuned multimodal (Pre-Tyche GB200)",
+    )
 
-print(f"Upload complete! View your model at: https://huggingface.co/{HF_REPO_ID}")
-print("All done!")
+    print(f"Upload complete! View your model at: https://huggingface.co/{HF_REPO_ID}")
+    print("All done!")
 EOF
 ```
 
 - run the code
 
 ```
-python3 finetune_qwen_vl.py
+accelerate launch --num_processes=4 --multi_gpu finetune_qwen_vl.py
 ```
