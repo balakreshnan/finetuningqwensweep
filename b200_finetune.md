@@ -236,6 +236,14 @@ EOF
 python3 finetune_lora.py
 ```
 
+```
+torchrun --nproc_per_node=$(nvidia-smi -L | wc -l) finetune_lora.py
+```
+
+```
+accelerate launch --multi_gpu --num_processes=$(nvidia-smi -L | wc -l) finetune_lora.py
+```
+
 - wait for execution to complete
 
 - now vidion model
@@ -247,8 +255,16 @@ pip install --user qwen-vl-utils pillow
 - code for qwnd vision finetuning
 
 ```
-cat > finetune_qwen_vl.py << 'EOF'
+cat > /lustre/fsw/general_sa/bbalakreshna/finetune/finetune_qwen_vl.py << 'EOF'
 import os
+
+# ──────────────────────────────────────────────
+# FIX: NCCL & env config BEFORE any torch import
+# ──────────────────────────────────────────────
+os.environ["NCCL_ASYNC_ERROR_HANDLING"] = "1"
+os.environ["NCCL_DEBUG"] = "WARN"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from transformers import (
     Qwen2_5_VLForConditionalGeneration,
     AutoProcessor,
@@ -267,10 +283,13 @@ MODEL_NAME = "Qwen/Qwen2.5-VL-7B-Instruct"
 HF_REPO_ID = "Balab2021/Qwen2.5-VL-7B-lora-b200"
 OUTPUT_DIR = "/lustre/fsw/general_sa/checkpoints/qwen-vl-lora"
 WANDB_PROJECT = "qwen2.5-vl-7b-lora-finetune"
-MAX_LENGTH = 2048  # Increased to accommodate vision tokens
+MAX_LENGTH = 2048
+# FIX: Fixed image size so all samples produce identical pixel_values shapes
+FIXED_IMAGE_SIZE = (448, 448)
+FIXED_PIXELS = FIXED_IMAGE_SIZE[0] * FIXED_IMAGE_SIZE[1]
 
 # ──────────────────────────────────────────────
-# 1. Initialize Weights & Biases
+# 1. Initialize Weights & Biases (rank 0 only)
 # ──────────────────────────────────────────────
 import wandb
 
@@ -299,11 +318,11 @@ if local_rank == 0:
 # ──────────────────────────────────────────────
 print(f"[Rank {local_rank}] Loading processor and model...")
 
-# Limit vision tokens by constraining image size
+# FIX: Set min_pixels == max_pixels to force identical vision token counts
 processor = AutoProcessor.from_pretrained(
     MODEL_NAME,
-    min_pixels=256 * 28 * 28,   # minimum image tokens
-    max_pixels=512 * 28 * 28,   # cap at ~512 vision tokens
+    min_pixels=FIXED_PIXELS,
+    max_pixels=FIXED_PIXELS,
 )
 
 model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
@@ -335,11 +354,24 @@ if local_rank == 0:
     model.print_trainable_parameters()
 
 # ──────────────────────────────────────────────
-# 4. Custom Dataset (lazy, no truncation issues)
+# 4. Custom Dataset
 # ──────────────────────────────────────────────
 print(f"[Rank {local_rank}] Loading multimodal dataset...")
 raw_dataset = load_dataset("HuggingFaceM4/the_cauldron", "ai2d", split="train[:500]")
-print(f"[Rank {local_rank}] Loaded {len(raw_dataset)} examples.")
+
+# FIX: Filter to only samples WITH images — mixed batches cause rank desync
+raw_dataset = raw_dataset.filter(
+    lambda x: x.get("images") is not None and len(x["images"]) > 0
+)
+
+# FIX: Trim to multiple of world_size * batch_size to avoid uneven last batches
+world_size = int(os.environ.get("WORLD_SIZE", 4))
+per_device_bs = 2
+trim_to = len(raw_dataset) - (len(raw_dataset) % (world_size * per_device_bs))
+raw_dataset = raw_dataset.select(range(trim_to))
+
+print(f"[Rank {local_rank}] Loaded {len(raw_dataset)} examples (trimmed for even distribution).")
+
 
 class QwenVLDataset(Dataset):
     def __init__(self, dataset, processor, max_length):
@@ -352,103 +384,97 @@ class QwenVLDataset(Dataset):
 
     def __getitem__(self, idx):
         example = self.dataset[idx]
-        image = example["images"][0] if example.get("images") else None
+        image = example["images"][0]
         user_text = example["texts"][0]["user"]
         assistant_text = example["texts"][0]["assistant"]
 
-        # Build chat messages in Qwen format
-        if image is not None:
-            image = image.convert("RGB")
-            # Resize image to limit vision tokens (max 384px on longest side)
-            image.thumbnail((384, 384))
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image", "image": image},
-                        {"type": "text", "text": user_text},
-                    ],
-                },
-                {
-                    "role": "assistant",
-                    "content": [{"type": "text", "text": assistant_text}],
-                },
-            ]
-        else:
-            messages = [
-                {
-                    "role": "user",
-                    "content": [{"type": "text", "text": user_text}],
-                },
-                {
-                    "role": "assistant",
-                    "content": [{"type": "text", "text": assistant_text}],
-                },
-            ]
+        # FIX: Resize to FIXED square size so all images produce
+        # identical pixel_values tensor shapes across all ranks
+        image = image.convert("RGB").resize(FIXED_IMAGE_SIZE)
 
-        # Use apply_chat_template to get proper text with image placeholders
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image},
+                    {"type": "text", "text": user_text},
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [{"type": "text", "text": assistant_text}],
+            },
+        ]
+
         text = self.processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=False
         )
 
-        # Process WITHOUT truncation — let vision tokens expand fully
-        if image is not None:
-            inputs = self.processor(
-                text=[text],
-                images=[image],
-                return_tensors="pt",
-                padding="max_length",
-                max_length=self.max_length,
-                # NO truncation — this was causing the crash
-            )
-        else:
-            inputs = self.processor(
-                text=[text],
-                return_tensors="pt",
-                padding="max_length",
-                max_length=self.max_length,
-            )
+        inputs = self.processor(
+            text=[text],
+            images=[image],
+            return_tensors="pt",
+            padding="max_length",
+            max_length=self.max_length,
+            truncation=True,
+        )
 
-        # Squeeze batch dim and clip to max_length (safe post-processing)
         result = {}
         for k, v in inputs.items():
             v = v.squeeze(0)
             if v.dim() >= 1 and v.shape[0] > self.max_length:
-                v = v[:self.max_length]
+                v = v[: self.max_length]
             result[k] = v
         result["labels"] = result["input_ids"].clone()
         return result
+
 
 train_dataset = QwenVLDataset(raw_dataset, processor, MAX_LENGTH)
 print(f"[Rank {local_rank}] Dataset ready.")
 
 # ──────────────────────────────────────────────
-# 5. Data collator (handles variable-length tensors)
+# 5. Data collator — FIX: pad variable tensors instead of dropping
 # ──────────────────────────────────────────────
 from dataclasses import dataclass
 from typing import Dict, List
+
 
 @dataclass
 class MultimodalDataCollator:
     def __call__(self, features: List[Dict]) -> Dict[str, torch.Tensor]:
         batch = {}
-        for key in features[0].keys():
+        # Collect only keys present in ALL samples
+        common_keys = set(features[0].keys())
+        for f in features[1:]:
+            common_keys &= set(f.keys())
+
+        for key in common_keys:
+            tensors = [f[key] for f in features]
             try:
-                batch[key] = torch.stack([f[key] for f in features])
-            except Exception:
-                # Skip tensors that can't be stacked (different shapes)
-                continue
+                batch[key] = torch.stack(tensors)
+            except RuntimeError:
+                # Variable-length dim 0 (e.g. pixel_values) — pad to max
+                max_len = max(t.shape[0] for t in tensors)
+                padded = []
+                for t in tensors:
+                    pad_size = max_len - t.shape[0]
+                    if pad_size > 0:
+                        pad_shape = (pad_size,) + tuple(t.shape[1:])
+                        t = torch.cat([t, torch.zeros(pad_shape, dtype=t.dtype)], dim=0)
+                    padded.append(t)
+                batch[key] = torch.stack(padded)
         return batch
+
 
 data_collator = MultimodalDataCollator()
 
 # ──────────────────────────────────────────────
-# 6. Training arguments (4 GPU DDP)
+# 6. Training arguments — ALL FIXES APPLIED
 # ──────────────────────────────────────────────
 args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     num_train_epochs=50,
-    per_device_train_batch_size=2,
+    per_device_train_batch_size=per_device_bs,
     learning_rate=2e-5,
     logging_steps=10,
     save_steps=50,
@@ -462,16 +488,31 @@ args = TrainingArguments(
     dataloader_pin_memory=False,
     dataloader_num_workers=0,
     ddp_find_unused_parameters=False,
-    report_to="wandb" if local_rank == 0 else "none",
+    # FIX 1: SAME report_to on all ranks (Trainer gates wandb to rank 0)
+    report_to="wandb",
     run_name="qwen2.5-vl-7b-lora-4gpu",
     logging_first_step=True,
     remove_unused_columns=False,
+    # FIX 2: Drop incomplete last batch
+    dataloader_drop_last=True,
+    # FIX 3: Explicitly disable eval
+    eval_strategy="no",
+    # FIX 4: Increase DDP timeout to 2 hours (default 30 min was too short)
+    ddp_timeout=7200,
+    # FIX 5: Set seed for reproducibility across ranks
+    seed=42,
+    data_seed=42,
 )
 
 # ──────────────────────────────────────────────
-# 7. Train
+# 7. Sync all ranks before training
 # ──────────────────────────────────────────────
 print(f"[Rank {local_rank}] Starting fine-tuning...")
+
+# FIX: Barrier to ensure all ranks are ready before training starts
+if torch.distributed.is_initialized():
+    torch.distributed.barrier()
+
 trainer = Trainer(
     model=model,
     args=args,
@@ -485,36 +526,26 @@ if local_rank == 0:
     processor.save_pretrained(OUTPUT_DIR)
     print(f"Model saved locally to {OUTPUT_DIR}")
 
-    # ──────────────────────────────────────────
-    # 8. Log final metrics to W&B
-    # ──────────────────────────────────────────
     final_metrics = trainer.state.log_history[-1] if trainer.state.log_history else {}
     wandb.log({"final_train_loss": final_metrics.get("train_loss", None)})
     wandb.finish()
     print("W&B run finished.")
 
-    # ──────────────────────────────────────────
-    # 9. Upload to HuggingFace Hub
-    # ──────────────────────────────────────────
     from huggingface_hub import HfApi
 
     print(f"Uploading model to HuggingFace: {HF_REPO_ID} ...")
-
     api = HfApi()
-
     api.create_repo(
         repo_id=HF_REPO_ID,
         repo_type="model",
         private=True,
         exist_ok=True,
     )
-
     api.upload_folder(
         repo_id=HF_REPO_ID,
         folder_path=OUTPUT_DIR,
         commit_message="Upload Qwen2.5-VL-7B LoRA fine-tuned multimodal (Pre-Tyche GB200)",
     )
-
     print(f"Upload complete! View your model at: https://huggingface.co/{HF_REPO_ID}")
     print("All done!")
 EOF
@@ -525,3 +556,9 @@ EOF
 ```
 accelerate launch --num_processes=4 --multi_gpu finetune_qwen_vl.py
 ```
+
+```
+accelerate launch --num_processes=4 --multi_gpu /lustre/fsw/general_sa/bbalakreshna/finetune/finetune_qwen_vl.py
+```
+
+- done
