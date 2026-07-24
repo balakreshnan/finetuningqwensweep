@@ -562,4 +562,8 @@ accelerate launch --num_processes=4 --multi_gpu finetune_qwen_vl.py
 accelerate launch --num_processes=4 --multi_gpu /lustre/fsw/general_sa/bbalakreshna/finetune/finetune_qwen_vl.py
 ```
 
+```
+accelerate launch --num_processes=$(nvidia-smi -L | wc -l) --multi_gpu finetune_qwen_vl.py
+```
+
 - done
