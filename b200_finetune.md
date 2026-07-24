@@ -75,6 +75,7 @@ wandb login
 ```
 
 ```
+mkdir -p /lustre/fsw/general_sa/$USER/finetune
 cd /lustre/fsw/general_sa/$USER/finetune
 ```
 
