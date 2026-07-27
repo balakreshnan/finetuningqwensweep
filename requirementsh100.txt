@@ -1,0 +1,8 @@
+pip install transformers       # Hugging Face Transformers
+pip install datasets           # Hugging Face Datasets
+pip install accelerate         # Distributed training launcher
+pip install peft               # LoRA / QLoRA / parameter-efficient FT
+pip install bitsandbytes       # 4-bit / 8-bit quantization for QLoRA
+pip install trl                # SFT / RLHF trainers
+pip install wandb              # Experiment tracking (optional)
+pip install flash-attn --no-build-isolation
