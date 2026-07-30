@@ -181,7 +181,28 @@ pip install wandb
 torchrun --nproc_per_node=4 ~/finetune_lora.py
 ```
 
+- to save the model locally
+
+```
+# Copy results to your home directory (persists after container exits)
+cp -r ./results ~/finetune-results/
+cp -r ./finetuned-model ~/finetuned-model/
+```
+
+- to push to huggingface
+
+```
+pip install huggingface_hub
+huggingface-cli login
+python -c "
+from peft import PeftModel
+model.push_to_hub('your-username/model-name')
+tokenizer.push_to_hub('your-username/model-name')
+"
+```
+
 - now try to run a GRPO fine tuning with RL
+- below takes about 40 mins
 
 ```
 cat << 'EOF' > ~/finetune_grpo.py
@@ -380,3 +401,195 @@ torchrun --nproc_per_node=4 ~/finetune_grpo.py
 ```
 
 - in my cluster i got default 4 gpu with 5 hour time limit.
+
+- now going to try a RL fine tuning for close to 2 hours, previous above took like 40 mins or so
+
+```
+cat << 'EOF' > ~/finetune_grpo.py
+import os
+import re
+import torch
+import wandb
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from peft import LoraConfig
+from datasets import load_dataset
+from trl import GRPOTrainer, GRPOConfig
+
+# ---- WandB Login ----
+wandb.login()
+wandb.init(
+    project="qwen3-grpo-math",
+    name="grpo-qwen3-1.7b-gsm8k-2hr",
+    tags=["grpo", "qwen3", "qlora", "gsm8k"],
+)
+
+# ---- Config ----
+model_name = "Qwen/Qwen3-1.7B"
+output_dir = os.path.expanduser("~/grpo-results")
+hf_repo = "Balab2021/Qwen3-1.7B-GRPO-Math"
+
+# ---- Quantization (QLoRA) ----
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=True,
+)
+
+# ---- Tokenizer ----
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "left"
+
+# ---- Model ----
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    quantization_config=bnb_config,
+    dtype=torch.bfloat16,
+    device_map={"": int(os.environ.get("LOCAL_RANK", 0))},
+    trust_remote_code=True,
+)
+
+# ---- LoRA ----
+lora_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    lora_dropout=0.05,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    task_type="CAUSAL_LM",
+    bias="none",
+)
+
+# ---- Dataset: GSM8K (full 1500 samples) ----
+dataset = load_dataset("openai/gsm8k", "main", split="train[:1500]")
+
+SYSTEM_PROMPT = (
+    "You are a helpful math assistant. "
+    "Solve the problem step by step. "
+    "Put your final numerical answer inside \\boxed{}."
+)
+
+def format_dataset(example):
+    return {
+        "prompt": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": example["question"]},
+        ],
+        "answer": example["answer"].split("####")[-1].strip(),
+    }
+
+dataset = dataset.map(format_dataset, remove_columns=["question"])
+
+# ===========================================================
+#  HELPER
+# ===========================================================
+def extract_text(completion):
+    if isinstance(completion, str):
+        return completion
+    elif isinstance(completion, list):
+        texts = []
+        for msg in completion:
+            if isinstance(msg, dict) and "content" in msg:
+                texts.append(msg["content"])
+            elif isinstance(msg, str):
+                texts.append(msg)
+        return "\n".join(texts)
+    else:
+        return str(completion)
+
+# ===========================================================
+#  REWARD FUNCTIONS
+# ===========================================================
+def correctness_reward_fn(completions, answer, **kwargs):
+    rewards = []
+    for completion, ans in zip(completions, answer):
+        text = extract_text(completion)
+        match = re.search(r'\\boxed\{([^}]*)\}', text)
+        if match:
+            predicted = match.group(1).strip().replace(",", "")
+            expected = ans.strip().replace(",", "")
+            rewards.append(2.0 if predicted == expected else -1.0)
+        else:
+            rewards.append(-1.0)
+    return rewards
+
+def format_reward_fn(completions, **kwargs):
+    rewards = []
+    for completion in completions:
+        text = extract_text(completion)
+        if re.search(r'\\boxed\{[^}]+\}', text):
+            rewards.append(1.0)
+        else:
+            rewards.append(-0.5)
+    return rewards
+
+def reasoning_reward_fn(completions, **kwargs):
+    rewards = []
+    for completion in completions:
+        text = extract_text(completion)
+        lines = text.strip().split("\n")
+        if len(lines) >= 3:
+            rewards.append(0.5)
+        elif len(lines) >= 2:
+            rewards.append(0.2)
+        else:
+            rewards.append(-0.5)
+    return rewards
+
+# ---- GRPO Config (SCALED FOR ~2 HOURS) ----
+grpo_config = GRPOConfig(
+    output_dir=output_dir,
+    num_generations=4,                   # 2 → 4 (more completions per prompt)
+    per_device_train_batch_size=2,       # 4 → 2 (smaller batch = more steps)
+    gradient_accumulation_steps=4,       # 2 → 4
+    num_train_epochs=2,                  # 1 → 2
+    learning_rate=5e-6,
+    bf16=True,
+    logging_steps=5,
+    save_steps=100,
+    save_total_limit=3,
+    gradient_checkpointing=True,
+    report_to="wandb",
+    max_completion_length=384,           # 256 → 384 (longer reasoning)
+    push_to_hub=True,
+    hub_model_id=hf_repo,
+    hub_strategy="end",
+)
+
+# ---- Trainer ----
+trainer = GRPOTrainer(
+    model=model,
+    reward_funcs=[correctness_reward_fn, format_reward_fn, reasoning_reward_fn],
+    args=grpo_config,
+    train_dataset=dataset,
+    peft_config=lora_config,
+    processing_class=tokenizer,
+)
+
+# ---- Train ----
+print("Starting GRPO training...")
+trainer.train()
+
+# ---- Save ----
+print(f"Saving model to {output_dir}")
+trainer.save_model(output_dir)
+tokenizer.save_pretrained(output_dir)
+
+# ---- Push to HuggingFace Hub ----
+print(f"Pushing model to HuggingFace: {hf_repo}")
+trainer.push_to_hub(commit_message="GRPO fine-tuned Qwen3-1.7B on GSM8K - 2hr run")
+print(f"Done! Model available at: https://huggingface.co/{hf_repo}")
+
+# ---- Finish WandB ----
+wandb.finish()
+EOF
+```
+
+- now to run with available GPU's
+
+```
+torchrun --nproc_per_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l) ~/finetune_grpo.py
+```
+
+- wait for the run to complete.
