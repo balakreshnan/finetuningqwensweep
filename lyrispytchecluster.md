@@ -25,6 +25,25 @@ srun -A general_sa \
      --pty bash
 ```
 
+- install libraries first
+
+```
+pip install transformers datasets accelerate peft bitsandbytes trl
+```
+
+- check the GPU's
+
+```
+nvidia-smi
+```
+
+- Verify the GPU usage for Torch
+
+```
+nvidia-smi
+python -c "import torch; print(torch.cuda.device_count(), 'GPUs available')"
+```
+
 - now create the fine tuning code to test
 
 ```
