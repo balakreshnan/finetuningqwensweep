@@ -271,4 +271,6 @@ watch -n 1 nvidia-smi
 
 ![Vera Rubin nvidia-smi GPU usage](images/vrsmi-1.png)
 
+![Vera Rubin nvidia-smi GPU usage](images/vrsmi-2.png)
+
 - if we can consume all gpu. next will be to optimize fine tuning code.
