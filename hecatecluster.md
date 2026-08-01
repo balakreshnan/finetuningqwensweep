@@ -274,3 +274,87 @@ watch -n 1 nvidia-smi
 ![Vera Rubin nvidia-smi GPU usage](images/vrsmi-2.png)
 
 - if we can consume all gpu. next will be to optimize fine tuning code.
+
+## Submit as batch job
+
+- first create the script
+
+```
+cat << 'EOF' > ~/finetune_job.sbatch
+#!/bin/bash
+#SBATCH --job-name=qlora-finetune
+#SBATCH --account=general_sa
+#SBATCH --partition=batch
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=4
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128G
+#SBATCH --time=04:00:00
+#SBATCH --output=%x_%j.out
+#SBATCH --error=%x_%j.err
+
+# ---- Environment ----
+export HF_TOKEN="hf_your_token_here"
+export WANDB_API_KEY="your_wandb_key_here"
+export HF_HOME=/lustre/fsw/general_sa/.cache/huggingface
+export TRANSFORMERS_CACHE=$HF_HOME
+
+# ---- Run training ----
+srun torchrun --nproc_per_node=$SLURM_GPUS_PER_NODE ~/finetune_lora.py
+EOF
+```
+
+- Next submit the job
+
+```
+sbatch ~/finetune_job.sbatch
+```
+
+- get the job id
+- monitor the job
+
+```
+# Check job status
+squeue -u $USER
+
+# Watch output in real-time
+tail -f qlora-finetune_2435001.out
+
+# Watch errors in real-time
+tail -f qlora-finetune_2435001.err
+
+# Check GPU usage on the node (if job is running)
+srun --overlap --jobid=2435001 --pty bash -c "nvidia-smi"
+```
+
+- after completion looking at logs
+
+```
+# ---- View stdout (training logs, loss, etc.) ----
+cat qlora-finetune_<JOBID>.out
+
+# ---- View stderr (warnings, errors) ----
+cat qlora-finetune_<JOBID>.err
+
+# ---- Check job exit status ----
+sacct -j <JOBID> --format=JobID,JobName,State,ExitCode,Elapsed,MaxRSS,NodeList
+# Good run = State: COMPLETED, ExitCode: 0:0
+
+# ---- Check model output files ----
+ls -la ~/finetune-results/
+
+# ---- Check W&B logs (from stdout) ----
+grep "wandb:" qlora-finetune_<JOBID>.out
+
+# ---- Check HuggingFace upload ----
+grep "Model uploaded" qlora-finetune_<JOBID>.out
+
+# ---- Quick summary: grep training loss ----
+grep "{'loss'" qlora-finetune_<JOBID>.out
+
+# ---- Check if training completed successfully ----
+tail -20 qlora-finetune_<JOBID>.out
+```
+
+- Done
