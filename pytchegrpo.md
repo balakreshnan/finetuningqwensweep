@@ -269,6 +269,10 @@ accelerate launch --num_processes=$(nvidia-smi -L | wc -l) --multi_gpu ~/finetun
 - Wait for the run to complete
 - This run is just few epoch to test the multi GPU run.
 
+![GRPO Training Run](images/qwengrpo-6.png)
+
+- Seeing wandb metrics
+
 ![GRPO Training Run](images/qwengrpo-1.png)
 
 - Status of run
@@ -285,6 +289,8 @@ accelerate launch --num_processes=$(nvidia-smi -L | wc -l) --multi_gpu ~/finetun
 ```
 https://wandb.ai/balabala76/qwen3-grpo-math/runs/bl00xnfc
 ```
+
+![GRPO Training Run](images/qwengrpo-5.png)
 
 # Conclusion
 
