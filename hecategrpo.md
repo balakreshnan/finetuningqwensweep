@@ -308,6 +308,8 @@ accelerate launch --num_processes=$(nvidia-smi -L | wc -l) --multi_gpu ~/finetun
 
 ![GRPO Training Run](images/qwengrpo-9.png)
 
+![GRPO Training Run](images/qwengrpo-10.png)
+
 - Shows only 6 mins
 
 ![GRPO Training Run](images/qwengrpo-7.png)
