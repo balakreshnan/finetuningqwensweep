@@ -1,4 +1,4 @@
-# Fine tuning Open Source model with Pytche
+# Fine tuning Open Source model with Hecate
 
 ## Pre-requiste
 
@@ -40,12 +40,12 @@ EOF
 
 ```
 srun --account=general_sa \
-     --partition=36x2-a01r \
+     --partition=batch-xdr \
      --nodes=1 \
      --ntasks-per-node=1 \
      --time=5:00:00 \
      --job-name=general_sa-finetune:interactive \
-     --container-image=gitlab-master.nvidia.com/dl/dgx/pytorch:main-py3-devel \
+     --container-image=gitlab-master.nvidia.com/dl/dgx/pytorch:25.04-py3-devel \
      --container-mount-home \
      --no-container-remap-root \
      --mpi=pmix \
@@ -57,6 +57,20 @@ srun --account=general_sa \
 
 ```
 pip install transformers datasets accelerate peft bitsandbytes trl
+```
+
+- Fix to update TRL to latest for GRPOConfig
+- test if the right library is installed
+
+```
+pip install "trl>=0.18" --no-deps
+pip install "datasets>=3.0" --no-deps
+```
+
+- testing
+
+```
+python -c "from trl import GRPOTrainer, GRPOConfig; print('OK')"
 ```
 
 - Check the GPU access
@@ -77,6 +91,13 @@ pip install wandb
 
 ```
 hf auth login --token "xxxxxxxxxxxxxx"
+```
+
+- if hugging face login didn't work then use
+
+```
+export HF_TOKEN="xxxxxxxxxxxxxxx"
+export WANDB_API_KEY="xxxxx"
 ```
 
 - Login into wandb
@@ -284,33 +305,17 @@ accelerate launch --num_processes=$(nvidia-smi -L | wc -l) --multi_gpu ~/finetun
 
 - Wait for the run to complete
 - This run is just few epoch to test the multi GPU run.
-- Took about 15 minutes
 
-![GRPO Training Run](images/qwengrpo-6.png)
+![GRPO Training Run](images/qwengrpo-9.png)
 
-- Seeing wandb metrics
+- Shows only 6 mins
 
-![GRPO Training Run](images/qwengrpo-1.png)
+![GRPO Training Run](images/qwengrpo-7.png)
 
-- Status of run
+![GRPO Training Run](images/qwengrpo-8.png)
 
-![GRPO Training Run](images/qwengrpo-2.png)
-
-- Wandb metrics view
-
-![GRPO Training Run](images/qwengrpo-3.png)
-![GRPO Training Run](images/qwengrpo-4.png)
-
-- here is the URL to check the metrics
+- wandb metrics
 
 ```
-https://wandb.ai/balabala76/qwen3-grpo-math/runs/bl00xnfc
+https://wandb.ai/balabala76/qwen3-grpo-math/runs/b7vjnlar
 ```
-
-![GRPO Training Run](images/qwengrpo-5.png)
-
-# Conclusion
-
-- was able to run the GRPO RL based fine tuning for multi modal vision model.
-- tested torchrun and accelerate to run just epoch 1
-- next to optimize the run.
