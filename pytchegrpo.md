@@ -283,7 +283,7 @@ accelerate launch --num_processes=$(nvidia-smi -L | wc -l) --multi_gpu ~/finetun
 - here is the URL to check the metrics
 
 ```
-https://wandb.ai/balabala76/qwen3-grpo-math/runs/pgxc47up?nw=nwuserbalabala76
+https://wandb.ai/balabala76/qwen3-grpo-math/runs/bl00xnfc
 ```
 
 # Conclusion
