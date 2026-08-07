@@ -96,6 +96,7 @@ mkdir -p ${BASE_DIR}/cosmos3/configs
 ```
 
 - create the download dataset code
+- make sure update the huggingface token
 
 ```
 cat > /lustre/fsw/general_sa/bbalakreshna/cosmos3/download_dataset.py << 'EOF'
@@ -103,7 +104,7 @@ import os
 from huggingface_hub import snapshot_download
 
 # Set your Hugging Face token
-os.environ["HF_TOKEN"] = "hf_YOUR_TOKEN"  # Replace with your actual token
+# os.environ["HF_TOKEN"] = "hf_YOUR_TOKEN"  # Replace with your actual token
 
 BASE_DIR = "/lustre/fsw/general_sa/bbalakreshna/cosmos3"
 
@@ -135,6 +136,10 @@ print("\n🎉 All downloads complete!")
 print(f"   Dataset: {BASE_DIR}/data/cosmos3_dataset")
 print(f"   Model:   {BASE_DIR}/models/cosmos3-nano")
 EOF
+```
+
+```
+sed -i 's/hf_YOUR_TOKEN/xxxxxxxxxxxxxxx/' /lustre/fsw/general_sa/bbalakreshna/cosmos3/download_dataset.py
 ```
 
 - now execute the code
