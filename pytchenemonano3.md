@@ -32,17 +32,42 @@ python -c "import transformers; print(f'transformers: {transformers.__version__}
 rm -rf ~/.cache/huggingface/hub/models--nvidia--NVIDIA-Nemotron-3-Nano-30B-A3B-BF16/
 
 # Redirect HF cache to the tmpfs (fast, 427GB free)
-export HF_HOME=/workspace/hf_cache
-mkdir -p $HF_HOME
+mkdir -p /tmp/hf_cache
+rm -rf /home/bbalakreshna/.cache/huggingface
+ln -s /tmp/hf_cache /home/bbalakreshna/.cache/huggingface
 
 # Retry
 HF_MODEL_ID=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
 
+huggingface-cli download nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16 \
+  --local-dir /workspace/output/hf_model
+```
+
+- if not downloading use the bwloe
+
+```
+huggingface-cli login
+huggingface-cli download nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16 --local-dir /workspace/output/hf_model
+```
+
+- then do local conversion mapping
+
+```
 python /opt/Megatron-Bridge/examples/conversion/convert_checkpoints.py import \
-  --hf-model $HF_MODEL_ID \
+  --hf-model /workspace/output/hf_model \
   --megatron-path /workspace/output/megatron/ckpt \
   --trust-remote-code
 ```
+- for pytche
+
+```
+WORLD_SIZE=1 RANK=0 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29500 \
+python /opt/Megatron-Bridge/examples/conversion/convert_checkpoints.py import \
+  --hf-model /workspace/output/hf_model \
+  --megatron-path /workspace/output/megatron/ckpt \
+  --trust-remote-code
+```
+
 - for 8 gpu H100
 
 ```
