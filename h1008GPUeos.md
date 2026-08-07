@@ -823,3 +823,4 @@ python finetune_cosmos3_nano.py
 https://wandb.ai/balabala76/cosmos3-nano-finetune/runs/bpxl1y8v
 ```
 
+![Cosmos 3 nano finetuning Run](images/cosmos3nanofinetune-1.png)
