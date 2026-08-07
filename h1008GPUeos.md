@@ -53,9 +53,20 @@ pip install diffusers>=0.32.0 transformers>=4.45.0 accelerate
 pip install peft>=0.14.0
 pip install wandb pyyaml decord opencv-python-headless huggingface_hub
 ```
+- or
+
+- for pytche, eos clusters
 
 ```
+pip install --upgrade pip
 pip install transformers==4.51.3 datasets accelerate peft bitsandbytes trl
+pip install wandb huggingface_hub
+```
+
+- this is for default
+
+```
+pip install transformers datasets accelerate peft bitsandbytes trl
 pip install wandb huggingface_hub
 ```
 
