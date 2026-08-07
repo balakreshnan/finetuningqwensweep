@@ -1,4 +1,4 @@
-# EOS - H100 - 8GPU Fine tuning Cosmos 3 Nano
+# EOS - H100 - 8GPU Fine tuning Cosmos-Predict2-2B
 
 ## Steps
 
