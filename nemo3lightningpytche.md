@@ -40,6 +40,22 @@ srun --account=general_sa \
      --pty bash
 ```
 
+- for exports
+
+```
+srun --account=general_sa \
+     --partition=36x2-a01r \
+     --nodes=1 --ntasks-per-node=1 \
+     --time=5:00:00 \
+     --job-name=export-hf:interactive \
+     --container-image=nvcr.io#nvidia/nemo:26.02 \
+     --container-mounts=/localhome/local-bbalakreshna:/workspace \
+     --container-mount-home \
+     --no-container-remap-root \
+     --mpi=pmix \
+     --pty bash
+```
+
 - install wandb
 
 ```
@@ -210,8 +226,9 @@ torchrun --nproc_per_node=4 \
 
 ```
 python /opt/Megatron-Bridge/examples/peft/merge_lora.py \
-  --lora-checkpoint /workspace/results/checkpoints \
+  --lora-checkpoint /workspace/results/checkpoints/iter_0000200 \
   --hf-model-path /workspace/nemotron-mini-4b \
+  --pretrained /workspace/megatron_ckpt/nemotron3_nano \
   --output /workspace/merged_model
 ```
 
@@ -222,6 +239,11 @@ torchrun --nproc_per_node=1 \
   /opt/Megatron-Bridge/examples/conversion/convert_checkpoints.py export \
   --hf-model /workspace/nemotron-mini-4b \
   --megatron-path /workspace/merged_model \
-  --hf-path /workspace/nemotron-finetuned-hf \
-  --trust-remote-code
+  --hf-path /workspace/nemotron-finetuned-hf
+```
+
+- to view all the gpu
+
+```
+nvidia-smi -q | grep -i "cuda\|driver\|architecture" | head
 ```
