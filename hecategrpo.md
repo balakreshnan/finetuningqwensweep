@@ -2,7 +2,7 @@
 
 ## Pre-requiste
 
-- Need a B200 4 GPU Machine
+- Need a Rubin 4 GPU Machine
 - To validate multi gpu fine tuning
 - Access to huggingface
 - Access to wandb for metrics
