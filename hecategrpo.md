@@ -37,6 +37,7 @@ EOF
 
 - Now lets get a interactive cluster to quick check
 - Depends on the availability
+- to get latest image use
 
 ```
 srun --account=general_sa \
@@ -45,7 +46,23 @@ srun --account=general_sa \
      --ntasks-per-node=1 \
      --time=5:00:00 \
      --job-name=general_sa-finetune:interactive \
-     --container-image=gitlab-master.nvidia.com/dl/dgx/pytorch:25.04-py3-devel \
+     --container-image=gitlab-master.nvidia.com/dl/dgx/pytorch:main-py3-devel \
+     --container-mount-home \
+     --no-container-remap-root \
+     --mpi=pmix \
+     --pty bash
+```
+
+- if you want latest version as of writing this article it was 26.04
+
+```
+srun --account=general_sa \
+     --partition=batch-xdr \
+     --nodes=1 \
+     --ntasks-per-node=1 \
+     --time=5:00:00 \
+     --job-name=general_sa-finetune:interactive \
+     --container-image=gitlab-master.nvidia.com/dl/dgx/pytorch:26.04-py3-devel \
      --container-mount-home \
      --no-container-remap-root \
      --mpi=pmix \
