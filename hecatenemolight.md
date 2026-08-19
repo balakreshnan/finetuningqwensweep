@@ -192,7 +192,7 @@ model = AutoModelForCausalLM.from_pretrained(
     model_name,
     quantization_config=bnb_config,
     dtype=torch.bfloat16,
-    device_map={{"": 0}},
+    device_map="auto",
     trust_remote_code=True,
 )
 
