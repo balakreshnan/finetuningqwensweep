@@ -291,8 +291,12 @@ accelerate launch --num_processes=4 finetune_lora.py
 hf upload Balab2021/Nemotron-3.5-Lightning-30B-A3B-LoRA /workspace/nemotron-3.5-lora-output/final .
 ```
 
+![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningft-6.png)
+
 - wandb metrics
 
 ![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningft-5.png)
+![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningft-7.png)
+![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningft-8.png)
 
 - Now we can explore based on custom dataset for business domains or use cases.
