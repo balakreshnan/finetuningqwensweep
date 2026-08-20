@@ -23,6 +23,9 @@ cat > ~/.config/enroot/.credentials << 'EOF'
 machine x.com login xxxx@nvidxxxia.com password xxxxx
 machine nvcrdoc.io login $oauthtoken password xxxxxxx
 EOF
+```
+
+- create a interactive session to work
 
 ```
 srun --account=general_sa --partition=backfill-spx --nodes=1 \
@@ -486,7 +489,6 @@ model = PeftModel.from_pretrained(base_model, "bbalakreshna/cosmos3-nano-finetun
 ```
 ## Step 9: Create the Slurm Batch Script (Full Pipeline)
 
-```bash
 cat > /lustre/fsw/general_sa/bbalakreshna/cosmos3/run_finetune.sbatch << 'EOF'
 #!/bin/bash
 #SBATCH --job-name=cosmos3-nano-ft
