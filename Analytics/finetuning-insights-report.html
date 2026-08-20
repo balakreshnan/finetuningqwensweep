@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Fine-Tuning Insights Report</title>
+    <style>
+        :root {
+            --nvidia-green: #76b900;
+            --nvidia-dark: #1a1a2e;
+            --nvidia-darker: #0f0f1a;
+            --card-bg: #1e1e30;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0b0;
+            --border: #2a2a40;
+            --error-red: #ef4444;
+            --success-green: #22c55e;
+            --warning-yellow: #f59e0b;
+            --info-blue: #3b82f6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--nvidia-darker);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--nvidia-dark), #1a2e1a);
+            border-bottom: 2px solid var(--nvidia-green);
+            padding: 2rem;
+            text-align: center;
+        }
+        .header h1 { color: var(--nvidia-green); font-size: 2rem; margin-bottom: 0.5rem; }
+        .header p { color: var(--text-secondary); }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(118,185,0,0.1); }
+        .stat-card .number { font-size: 2.5rem; font-weight: 700; color: var(--nvidia-green); }
+        .stat-card .label { color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem; }
+
+        /* Tabs */
+        .tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+        .tab-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { border-color: var(--nvidia-green); color: var(--text-primary); }
+        .tab-btn.active { background: var(--nvidia-green); color: #000; border-color: var(--nvidia-green); font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .card h3 { color: var(--nvidia-green); margin-bottom: 0.75rem; }
+        .card h4 { color: var(--text-primary); margin: 0.75rem 0 0.5rem; }
+
+        /* Error items */
+        .error-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--error-red);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .error-item:hover { border-left-color: var(--nvidia-green); background: #22223a; }
+        .error-item.resolved { border-left-color: var(--success-green); }
+        .error-item .error-header { display: flex; justify-content: space-between; align-items: center; }
+        .error-item .error-title { font-weight: 600; }
+        .error-item .error-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .badge-resolved { background: rgba(34,197,94,0.15); color: var(--success-green); }
+        .badge-blocked { background: rgba(239,68,68,0.15); color: var(--error-red); }
+        .badge-warning { background: rgba(245,158,11,0.15); color: var(--warning-yellow); }
+        .error-detail { display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.9rem; color: var(--text-secondary); }
+        .error-detail.show { display: block; }
+        .error-detail code { background: #0d0d1a; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.8rem; color: #f87171; }
+        .error-detail pre { background: #0d0d1a; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; font-size: 0.8rem; }
+
+        /* Timeline */
+        .timeline { position: relative; padding-left: 2rem; }
+        .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+        .timeline-item { position: relative; margin-bottom: 1.5rem; }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -2rem;
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--nvidia-green);
+            border: 2px solid var(--nvidia-darker);
+        }
+        .timeline-item.error::before { background: var(--error-red); }
+        .timeline-item .tl-date { font-size: 0.8rem; color: var(--text-secondary); }
+        .timeline-item .tl-title { font-weight: 600; margin: 0.25rem 0; }
+        .timeline-item .tl-desc { font-size: 0.9rem; color: var(--text-secondary); }
+
+        /* Model comparison table */
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--nvidia-green); font-weight: 600; background: rgba(118,185,0,0.05); }
+        tr:hover { background: rgba(255,255,255,0.02); }
+
+        /* Time spent chart (CSS bar chart) */
+        .bar-chart { margin: 1rem 0; }
+        .bar-row { display: flex; align-items: center; margin-bottom: 0.6rem; }
+        .bar-label { width: 220px; font-size: 0.85rem; color: var(--text-secondary); flex-shrink: 0; }
+        .bar-track { flex: 1; height: 24px; background: #0d0d1a; border-radius: 4px; overflow: hidden; position: relative; }
+        .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 0.75rem; font-weight: 600; color: #000; transition: width 1s ease; }
+        .bar-value { margin-left: 0.75rem; font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; }
+
+        /* Lessons */
+        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+        .lesson-card {
+            background: rgba(118,185,0,0.03);
+            border: 1px solid rgba(118,185,0,0.2);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .lesson-card .lesson-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .lesson-card .lesson-title { font-weight: 600; margin-bottom: 0.3rem; }
+        .lesson-card .lesson-text { font-size: 0.85rem; color: var(--text-secondary); }
+
+        /* Filter */
+        .filter-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .filter-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .filter-btn.active { background: var(--nvidia-green); color: #000; border-color: var(--nvidia-green); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&#9889; LLM Fine-Tuning Insights Report</h1>
+        <p>Balamurugan Balakreshnan | August 2026 | NVIDIA EOS / Ptyche / Hecate / Theia Clusters</p>
+    </div>
+
+    <div class="container">
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card"><div class="number">7</div><div class="label">Models Fine-Tuned</div></div>
+            <div class="stat-card"><div class="number">30+</div><div class="label">Errors Resolved</div></div>
+            <div class="stat-card"><div class="number">4</div><div class="label">GPU Clusters Used</div></div>
+            <div class="stat-card"><div class="number">5</div><div class="label">PEFT Methods (LoRA/QLoRA)</div></div>
+            <div class="stat-card"><div class="number">2</div><div class="label">Blocked Issues</div></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('overview')">Overview</button>
+            <button class="tab-btn" onclick="showTab('errors')">Errors & Fixes</button>
+            <button class="tab-btn" onclick="showTab('timespent')">Time Spent</button>
+            <button class="tab-btn" onclick="showTab('models')">Models & Configs</button>
+            <button class="tab-btn" onclick="showTab('lessons')">Lessons Learned</button>
+            <button class="tab-btn" onclick="showTab('timeline')">Timeline</button>
+        </div>
+
+        <!-- TAB: Overview -->
+        <div class="tab-content active" id="tab-overview">
+            <div class="card">
+                <h3>Project Summary</h3>
+                <p>End-to-end LoRA/QLoRA fine-tuning across 7 different models on NVIDIA internal GPU clusters, spanning video generation (Cosmos3-Nano DiT), large MoE language models (Nemotron-3.5 30B, Nemotron-3 Nano 30B), and vision-language models (Qwen2.5-VL 7B). Each experiment surfaced unique infrastructure, software, and configuration challenges.</p>
+            </div>
+            <div class="card">
+                <h3>Models Fine-Tuned</h3>
+                <table>
+                    <tr><th>Model</th><th>Params</th><th>Method</th><th>Cluster</th><th>Status</th></tr>
+                    <tr><td>Cosmos3-Nano (Predict2-2B)</td><td>2B</td><td>LoRA</td><td>EOS (H100)</td><td style="color:var(--success-green)">&#10003; Complete</td></tr>
+                    <tr><td>Nemotron-3.5-Lightning-30B-A3B</td><td>30B (3B active)</td><td>QLoRA 4-bit</td><td>DGX Multi-GPU</td><td style="color:var(--success-green)">&#10003; Complete</td></tr>
+                    <tr><td>Nemotron-3 Nano (8B)</td><td>8B</td><td>LoRA + Megatron</td><td>EOS / Ptyche</td><td style="color:var(--success-green)">&#10003; Complete</td></tr>
+                    <tr><td>Nemotron-3 Nano (Hecate)</td><td>9.58B MoE</td><td>LoRA + Megatron</td><td>Hecate (Blackwell sm_107a)</td><td style="color:var(--warning-yellow)">&#9888; Partial (GPU compat issues)</td></tr>
+                    <tr><td>Nemotron-3 Nano (Export)</td><td>30B</td><td>Megatron&#8594;HF export</td><td>Ptyche (aarch64)</td><td style="color:var(--error-red)">&#10007; Blocked (mamba ABI)</td></tr>
+                    <tr><td>Qwen2.5-VL-7B-Instruct</td><td>7B</td><td>LoRA</td><td>Theia (GB300)</td><td style="color:var(--success-green)">&#10003; Complete</td></tr>
+                    <tr><td>Nemotron Checkpoint Convert</td><td>30B</td><td>HF&#8594;Megatron</td><td>Ptyche</td><td style="color:var(--success-green)">&#10003; Complete</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: Errors -->
+        <div class="tab-content" id="tab-errors">
+            <div class="filter-row">
+                <button class="filter-btn active" onclick="filterErrors('all')">All (30+)</button>
+                <button class="filter-btn" onclick="filterErrors('infra')">Infrastructure</button>
+                <button class="filter-btn" onclick="filterErrors('config')">Configuration</button>
+                <button class="filter-btn" onclick="filterErrors('compat')">Compatibility</button>
+                <button class="filter-btn" onclick="filterErrors('data')">Data/Format</button>
+            </div>
+            <div id="error-list">
+                <!-- Infra errors -->
+                <div class="error-item resolved" data-cat="infra" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128268; Network Blocked on EOS Compute Nodes</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Cosmos3-Nano</p>
+                        <p><strong>Error:</strong> <code>ConnectionResetError: [Errno 104] Connection reset by peer</code></p>
+                        <p><strong>Cause:</strong> EOS compute nodes block outbound HTTPS. Cannot download from HuggingFace.</p>
+                        <p><strong>Fix:</strong> Download models on login nodes first, reference local /lustre/ paths from GPU jobs.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="infra" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128268; Slurm GRES Not Configured</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron-3 Nano (EOS/Ptyche)</p>
+                        <p><strong>Error:</strong> <code>srun: error: Invalid generic resource (gres) specification</code></p>
+                        <p><strong>Cause:</strong> Cluster doesn't use Slurm GRES for GPU management. Partition is EXCLUSIVE = full node.</p>
+                        <p><strong>Fix:</strong> Remove <code>--gres=gpu:8</code> entirely. Verified with <code>sinfo -p batch -o "%N %G"</code> showing (null).</p>
+                        <p><strong>Time wasted:</strong> ~30 min diagnosing why srun was rejected.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="infra" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128268; NFS Home Disk Full (Errno 28)</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron Checkpoint Conversion</p>
+                        <p><strong>Error:</strong> <code>OSError: [Errno 28] No space left on device</code> — couldn't create a lock file in ~/.cache/huggingface/</p>
+                        <p><strong>Cause:</strong> Megatron-Bridge's safe_config_loader.py hardcodes lock file path to ~/.cache/huggingface/, ignoring HF_HOME env var.</p>
+                        <p><strong>Fix:</strong> <code>rm -rf ~/.cache/huggingface && ln -s /tmp/hf_cache ~/.cache/huggingface</code></p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="infra" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128268; Pyxis Mount Failure — Node-Local Path</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron Export (Ptyche)</p>
+                        <p><strong>Error:</strong> <code>pyxis: --container-mounts: source path does not exist: /localhome/local-bbalakreshna</code></p>
+                        <p><strong>Cause:</strong> /localhome/ is node-local scratch. Does not exist on the newly allocated node.</p>
+                        <p><strong>Fix:</strong> Use shared NFS ($HOME) or Lustre paths for container mounts.</p>
+                    </div>
+                </div>
+                <div class="error-item" data-cat="infra" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128268; Checkpoint Lost on Ephemeral Storage</span>
+                        <span class="error-badge badge-blocked">BLOCKED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron Export (Ptyche)</p>
+                        <p><strong>Cause:</strong> All srun commands used --container-mount-home only. Merged checkpoint was written to ephemeral /workspace inside a job container. When job ended, checkpoint was lost.</p>
+                        <p><strong>Lesson:</strong> ALWAYS write outputs to $HOME or Lustre. Never rely on container /workspace persistence.</p>
+                    </div>
+                </div>
+
+                <!-- Compatibility errors -->
+                <div class="error-item resolved" data-cat="compat" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#9889; Diffusers Format Not Available for Cosmos3</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Cosmos3-Nano</p>
+                        <p><strong>Cause:</strong> Model is in Cosmos native .pt format (flat net.* keys), NOT diffusers safetensors format. No config.json.</p>
+                        <p><strong>Fix:</strong> Reverse-engineered the full architecture from 689 checkpoint keys. Built custom nn.Module matching exact tensor shapes.</p>
+                        <p><strong>Time spent:</strong> Several hours inspecting checkpoint keys and iterating on shape mismatches.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="compat" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#9889; Shape Mismatches — Cosmos3 Architecture</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Cosmos3-Nano</p>
+                        <p><strong>Error:</strong> <code>RuntimeError: size mismatch for crossattn_proj.weight: (1024, 100352) vs model (2048, 1024)</code></p>
+                        <p><strong>Cause:</strong> Multiple wrong dimension assumptions: crossattn_proj is a built-in vocab embedding (100352→1024), adaln uses a 256-dim bottleneck, final output is 64 not 72.</p>
+                        <p><strong>Fix:</strong> Fixed all layer dimensions by reading exact checkpoint tensor shapes. Required 5+ iterations.</p>
+                    </div>
+                </div>
+                <div class="error-item" data-cat="compat" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#9889; Mamba/causal-conv1d CUDA ABI Mismatch</span>
+                        <span class="error-badge badge-blocked">BLOCKED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron Export (Ptyche aarch64)</p>
+                        <p><strong>Error:</strong> <code>undefined symbol: _ZNK3c1010TensorImpl15decref_pyobjectEv</code></p>
+                        <p><strong>Cause:</strong> Prebuilt mamba .so files linked against a different libtorch ABI than torch 2.10.0a0+nv25.11. The Qwen3Next model eagerly imports causal_conv1d at top-level, blocking even unrelated model exports.</p>
+                        <p><strong>Attempts:</strong> Reinstall, force source compile, purge ~/.local — all failed. Pinned versions don't link against this torch.</p>
+                        <p><strong>Recommended fix:</strong> Use nemo:25.11.nemotron_3_nano image which ships matched kernels. Purge ~/.local shadows.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="compat" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#9889; DeepEP Unsupported GPU (Blackwell sm_107a)</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron-3 Nano (Hecate)</p>
+                        <p><strong>Error:</strong> <code>ValueError: DeepEP is supported for Ampere, Hopper, and Blackwell (only B200 and B300) GPUs</code></p>
+                        <p><strong>Cause:</strong> Pre-release Blackwell sm_107a silicon not in DeepEP's GPU allowlist.</p>
+                        <p><strong>Fix:</strong> <code>model.moe_token_dispatcher_type=alltoall</code> + <code>model.moe_flex_dispatcher_backend=none</code></p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="compat" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#9889; Triton/ptxas sm_107a Not Recognized</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron-3 Nano (Hecate)</p>
+                        <p><strong>Error:</strong> <code>ptxas fatal: Value 'sm_107a' is not defined for option 'gpu-name'</code></p>
+                        <p><strong>Cause:</strong> Bundled ptxas too old for pre-release Blackwell. Triton JIT compilation fails.</p>
+                        <p><strong>Fix:</strong> <code>TORCH_COMPILE_DISABLE=1 TORCHDYNAMO_DISABLE=1</code> + <code>model.bias_activation_fusion=false</code></p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="compat" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#9889; PIL + fork() Segfault (Signal 11)</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Qwen2.5-VL</p>
+                        <p><strong>Error:</strong> <code>Signal 11 (SIGSEGV) received by PID</code></p>
+                        <p><strong>Cause:</strong> PIL Image objects in HuggingFace Arrow datasets corrupt when accessed across forked DDP processes. C-level pointers become invalid after fork().</p>
+                        <p><strong>Fix:</strong> Decode images only in the data collator (main process). Set dataloader_num_workers=0, num_proc=1.</p>
+                        <p><strong>Time spent:</strong> This was the single most time-consuming bug — multiple hours of debugging.</p>
+                    </div>
+                </div>
+
+                <!-- Config errors -->
+                <div class="error-item resolved" data-cat="config" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128295; HuggingFace README Invalid base_model</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Cosmos3-Nano</p>
+                        <p><strong>Error:</strong> <code>ValueError: "base_model" with value "/lustre/fsw/..." is not valid</code></p>
+                        <p><strong>Cause:</strong> PEFT save_pretrained() writes local filesystem path as base_model in README.md.</p>
+                        <p><strong>Fix:</strong> <code>re.sub(r"base_model:.*", f"base_model: nvidia/Cosmos-Predict2-2B", readme)</code></p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="config" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128295; TypeError: unhashable type 'dict' (Double Braces)</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron-3.5</p>
+                        <p><strong>Error:</strong> <code>TypeError: unhashable type: 'dict'</code> on <code>device_map={{"": 0}}</code></p>
+                        <p><strong>Cause:</strong> Double braces {{ }} in regular Python code creates a set containing a dict (unhashable). Only valid in f-strings.</p>
+                        <p><strong>Fix:</strong> Use <code>device_map="auto"</code> or <code>device_map={"": 0}</code></p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="config" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128295; Script Path Not Found in Container</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron-3 Nano (all Megatron runs)</p>
+                        <p><strong>Error:</strong> <code>can't open file '/workspace/examples/...': [Errno 2] No such file or directory</code></p>
+                        <p><strong>Cause:</strong> Scripts live at /opt/Megatron-Bridge/ inside the container, NOT /workspace/.</p>
+                        <p><strong>Fix:</strong> <code>find / -name "script.py" 2>/dev/null</code> then use absolute path.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="config" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128295; Distributed Timeout (1/2 clients joined)</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron Checkpoint Conversion</p>
+                        <p><strong>Error:</strong> <code>DistStoreError: Timed out after 601 seconds waiting for clients. 1/2 clients joined.</code></p>
+                        <p><strong>Cause:</strong> Conversion is single-process but Slurm set WORLD_SIZE=2 (2-node allocation).</p>
+                        <p><strong>Fix:</strong> Use <code>--nodes 1</code> or override <code>WORLD_SIZE=1 RANK=0 LOCAL_RANK=0</code>.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="config" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128295; SFTTrainer API Change (max_seq_length)</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron-3.5</p>
+                        <p><strong>Error:</strong> <code>TypeError: SFTTrainer.__init__() got unexpected keyword argument 'max_seq_length'</code></p>
+                        <p><strong>Cause:</strong> Newer trl moved max_seq_length into SFTConfig as max_length.</p>
+                        <p><strong>Fix:</strong> Use <code>SFTConfig(..., max_length=1024)</code> instead of passing to SFTTrainer.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="config" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128295; Accelerate Unknown Key 'main_training_port'</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Qwen2.5-VL</p>
+                        <p><strong>Cause:</strong> accelerate version in container didn't support the config key.</p>
+                        <p><strong>Fix:</strong> Removed the key from YAML. Port 29500 is the default anyway.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="config" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128295; huggingface-cli Deprecated</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Projects:</strong> All</p>
+                        <p><strong>Fix:</strong> Use <code>hf upload</code>, <code>hf auth login</code> instead of <code>huggingface-cli</code>.</p>
+                    </div>
+                </div>
+
+                <!-- Data errors -->
+                <div class="error-item resolved" data-cat="data" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128202; Dataset KeyError 'context' (SQuAD processor)</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Nemotron-3 Nano (Hecate)</p>
+                        <p><strong>Error:</strong> <code>KeyError: 'context'</code> in process_squad_example()</p>
+                        <p><strong>Cause:</strong> Default dataset_name=json routes through SQuAD processor but actual data has input/output fields.</p>
+                        <p><strong>Fix:</strong> Monkey-patch process_squad_example to handle input/output format.</p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="data" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128202; KeyError 'image' vs 'images' (plural)</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Qwen2.5-VL</p>
+                        <p><strong>Cause:</strong> The Cauldron dataset uses 'images' (list of PIL) not 'image' (singular).</p>
+                        <p><strong>Fix:</strong> <code>images = example.get("images") or example.get("image")</code></p>
+                    </div>
+                </div>
+                <div class="error-item resolved" data-cat="data" onclick="toggleDetail(this)">
+                    <div class="error-header">
+                        <span class="error-title">&#128202; Vision Position IDs — squeeze(0) Bug</span>
+                        <span class="error-badge badge-resolved">RESOLVED</span>
+                    </div>
+                    <div class="error-detail">
+                        <p><strong>Project:</strong> Qwen2.5-VL</p>
+                        <p><strong>Error:</strong> <code>TypeError: cannot unpack non-iterable int object</code></p>
+                        <p><strong>Cause:</strong> .squeeze(0) collapsed image_grid_thw from (1,3) to (3,), breaking the vision encoder's position computation.</p>
+                        <p><strong>Fix:</strong> Removed .squeeze(0) from pixel_values and image_grid_thw in collator.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Time Spent -->
+        <div class="tab-content" id="tab-timespent">
+            <div class="card">
+                <h3>Where Time Was Spent (Estimated Debugging Hours)</h3>
+                <p style="color:var(--text-secondary); margin-bottom:1rem;">Based on error complexity, iteration count, and multiple attempts documented.</p>
+                <div class="bar-chart">
+                    <div class="bar-row">
+                        <span class="bar-label">PIL + fork() Segfault (Qwen2.5-VL)</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:90%;background:var(--error-red)">~6 hrs</div></div>
+                    </div>
+                    <div class="bar-row">
+                        <span class="bar-label">Cosmos3 Architecture Reverse-Engineering</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:80%;background:var(--warning-yellow)">~5 hrs</div></div>
+                    </div>
+                    <div class="bar-row">
+                        <span class="bar-label">Mamba ABI Mismatch (still blocked)</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:70%;background:var(--error-red)">~4 hrs</div></div>
+                    </div>
+                    <div class="bar-row">
+                        <span class="bar-label">Blackwell sm_107a Compat (Hecate)</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:55%;background:var(--warning-yellow)">~3.5 hrs</div></div>
+                    </div>
+                    <div class="bar-row">
+                        <span class="bar-label">Slurm/Container/Path Issues</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:50%;background:var(--info-blue)">~3 hrs</div></div>
+                    </div>
+                    <div class="bar-row">
+                        <span class="bar-label">Checkpoint Conversion (distributed timeout)</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:40%;background:var(--info-blue)">~2.5 hrs</div></div>
+                    </div>
+                    <div class="bar-row">
+                        <span class="bar-label">API/CLI Changes (trl, hf-cli, accelerate)</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:25%;background:var(--success-green)">~1.5 hrs</div></div>
+                    </div>
+                    <div class="bar-row">
+                        <span class="bar-label">Dataset Format Mismatches</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:20%;background:var(--success-green)">~1 hr</div></div>
+                    </div>
+                    <div class="bar-row">
+                        <span class="bar-label">Disk Space / NFS Quota</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:15%;background:var(--success-green)">~1 hr</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Root Cause Categories</h3>
+                <table>
+                    <tr><th>Category</th><th>Error Count</th><th>% of Total Time</th><th>Preventable?</th></tr>
+                    <tr><td>GPU/Driver Compatibility</td><td>4</td><td>~35%</td><td>Partially (use matched containers)</td></tr>
+                    <tr><td>Infrastructure (Slurm/Storage)</td><td>6</td><td>~25%</td><td>Yes (docs, persistent mounts)</td></tr>
+                    <tr><td>Model Format / Architecture</td><td>4</td><td>~20%</td><td>No (exploration required)</td></tr>
+                    <tr><td>API/Library Breaking Changes</td><td>5</td><td>~10%</td><td>Partially (pin versions)</td></tr>
+                    <tr><td>Data Format Mismatches</td><td>4</td><td>~10%</td><td>Yes (inspect before coding)</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: Models -->
+        <div class="tab-content" id="tab-models">
+            <div class="card">
+                <h3>Hardware Used Across Experiments</h3>
+                <table>
+                    <tr><th>Cluster</th><th>GPU</th><th>VRAM</th><th>Arch</th><th>Used For</th></tr>
+                    <tr><td>EOS</td><td>H100 80GB HBM3</td><td>80 GB</td><td>x86_64</td><td>Cosmos3-Nano, Nemotron-3 Nano</td></tr>
+                    <tr><td>Ptyche</td><td>B200 / H200 184GB</td><td>184 GB</td><td>aarch64 (Grace)</td><td>Nemotron-3 Nano, Checkpoint Convert</td></tr>
+                    <tr><td>Hecate</td><td>Blackwell (sm_107a pre-release)</td><td>~80 GB</td><td>x86_64</td><td>Nemotron-3 Nano MoE</td></tr>
+                    <tr><td>Theia (Lyris)</td><td>GB300 284GB</td><td>284 GB</td><td>—</td><td>Qwen2.5-VL-7B</td></tr>
+                </table>
+            </div>
+            <div class="card">
+                <h3>LoRA Configurations Comparison</h3>
+                <table>
+                    <tr><th>Model</th><th>Rank</th><th>Alpha</th><th>Targets</th><th>Trainable %</th><th>Quantization</th></tr>
+                    <tr><td>Cosmos3-Nano</td><td>16</td><td>32</td><td>q/k/v/output_proj</td><td>~1%</td><td>None (bf16)</td></tr>
+                    <tr><td>Nemotron-3.5-30B</td><td>16</td><td>32</td><td>q/k/v/o/gate/up/down</td><td>0.57%</td><td>4-bit NF4 (QLoRA)</td></tr>
+                    <tr><td>Nemotron-3 Nano</td><td>—</td><td>—</td><td>Megatron LoRA</td><td>0.35%</td><td>None (bf16)</td></tr>
+                    <tr><td>Qwen2.5-VL-7B</td><td>64</td><td>128</td><td>q/k/v/o/gate/up/down</td><td>~1.5%</td><td>None (bf16)</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: Lessons -->
+        <div class="tab-content" id="tab-lessons">
+            <div class="lesson-grid">
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128190;</div>
+                    <div class="lesson-title">Always Use Persistent Storage</div>
+                    <div class="lesson-text">Container /workspace is ephemeral. Write outputs to $HOME (NFS) or /lustre/. Lost an entire merged checkpoint by writing to ephemeral storage.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128270;</div>
+                    <div class="lesson-title">Inspect Checkpoints Before Coding</div>
+                    <div class="lesson-text">Run torch.load() and inspect keys/shapes first. The Cosmos3 model had a completely custom format that required reverse-engineering 689 keys.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128683;</div>
+                    <div class="lesson-title">PIL + fork() = Segfault</div>
+                    <div class="lesson-text">Never store PIL Images in Arrow datasets with multiprocessing. Decode images only in the main-process collator. Set num_workers=0.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128187;</div>
+                    <div class="lesson-title">Know Your Cluster's GRES Config</div>
+                    <div class="lesson-text">Run sinfo -p batch -o "%N %G" before requesting GPUs. Some clusters don't use GRES at all (EXCLUSIVE partitions give you the whole node).</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128230;</div>
+                    <div class="lesson-title">Container Scripts ≠ /workspace</div>
+                    <div class="lesson-text">NeMo/Megatron scripts live at /opt/Megatron-Bridge/. Always use find / -name "script.py" to locate files inside containers.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#9889;</div>
+                    <div class="lesson-title">Pre-release GPUs Break Everything</div>
+                    <div class="lesson-text">sm_107a Blackwell needed 3 workarounds: disable torch.compile, bypass DeepEP, disable bias fusion. Use matched container images.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128279;</div>
+                    <div class="lesson-title">~/.local Poisons Container Kernels</div>
+                    <div class="lesson-text">--container-mount-home shares ~/.local across ALL containers. A broken .so installed there "follows you" everywhere. Purge it.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128736;</div>
+                    <div class="lesson-title">APIs Break Frequently</div>
+                    <div class="lesson-text">trl (SFTConfig vs SFTTrainer args), huggingface-cli→hf, accelerate config keys — always check your installed version's API.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#127919;</div>
+                    <div class="lesson-title">Start Single-GPU, Scale Later</div>
+                    <div class="lesson-text">Debug with CUDA_VISIBLE_DEVICES=0 first. This isolates data pipeline issues from distributed training issues.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128200;</div>
+                    <div class="lesson-title">Dimension Errors Are Informative</div>
+                    <div class="lesson-text">load_state_dict size mismatch errors tell you exact checkpoint shapes. Use them to correct your model definition instead of guessing.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128203;</div>
+                    <div class="lesson-title">PEFT README Fix Required for HF Upload</div>
+                    <div class="lesson-text">PEFT save_pretrained() writes local paths as base_model. HuggingFace rejects local filesystem paths. Always regex-fix before uploading.</div>
+                </div>
+                <div class="lesson-card">
+                    <div class="lesson-icon">&#128640;</div>
+                    <div class="lesson-title">Conversion ≠ Training (1 GPU is enough)</div>
+                    <div class="lesson-text">Checkpoint conversion is single-process. Don't allocate multi-node for it — Slurm sets WORLD_SIZE=N causing distributed timeouts.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Timeline -->
+        <div class="tab-content" id="tab-timeline">
+            <div class="card">
+                <h3>Project Timeline</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="tl-date">08/03/2026</div>
+                        <div class="tl-title">Qwen2.5-VL-7B Fine-Tuning (Theia / GB300)</div>
+                        <div class="tl-desc">LoRA fine-tuning on ai2d dataset. Solved PIL segfault, tensor shape issues, disk space. &#10003; Complete.</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="tl-date">08/06–08/20/2026</div>
+                        <div class="tl-title">Cosmos3-Nano LoRA Fine-Tuning (EOS / H100)</div>
+                        <div class="tl-desc">Reverse-engineered DiT architecture from native .pt checkpoint. Built custom model, uploaded to HuggingFace. &#10003; Complete.</div>
+                    </div>
+                    <div class="timeline-item error">
+                        <div class="tl-date">08/14/2026</div>
+                        <div class="tl-title">Nemotron-3 Nano on Hecate (Blackwell sm_107a)</div>
+                        <div class="tl-desc">Hit DeepEP + ptxas + dataset processor issues on pre-release Blackwell GPUs. Resolved with workarounds. &#9888; Partial.</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="tl-date">08/19/2026</div>
+                        <div class="tl-title">Nemotron-3.5-30B QLoRA Fine-Tuning</div>
+                        <div class="tl-desc">4-bit QLoRA on SQuAD. Solved double-brace syntax, trl API changes, multi-GPU error cascades. &#10003; Complete.</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="tl-date">08/19/2026</div>
+                        <div class="tl-title">Nemotron-3 Nano Megatron Fine-Tuning (EOS/Ptyche)</div>
+                        <div class="tl-desc">Full Megatron-Bridge pipeline: convert→train→export. Solved GRES, paths, conversion issues. &#10003; Complete.</div>
+                    </div>
+                    <div class="timeline-item error">
+                        <div class="tl-date">08/20/2026</div>
+                        <div class="tl-title">Nemotron Export to HuggingFace (Ptyche aarch64)</div>
+                        <div class="tl-desc">Blocked by mamba kernel ABI mismatch + lost checkpoint on ephemeral storage. &#10007; Blocked.</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="tl-date">08/20/2026</div>
+                        <div class="tl-title">Checkpoint Conversion Troubleshooting (Ptyche)</div>
+                        <div class="tl-desc">HF→Megatron conversion. Solved NFS quota, distributed timeout, model download issues. &#10003; Complete.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function toggleDetail(el) {
+            const detail = el.querySelector('.error-detail');
+            detail.classList.toggle('show');
+        }
+
+        function filterErrors(cat) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.error-item').forEach(item => {
+                if (cat === 'all' || item.dataset.cat === cat) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
