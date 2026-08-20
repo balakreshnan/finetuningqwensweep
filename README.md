@@ -11,6 +11,27 @@ scripts and cluster runbooks for Qwen, Llama, Nemotron and Cosmos models on
 NVIDIA GH200 / H100 / B200 / Vera Rubin hardware, using QLoRA, LoRA, GRPO, TRL,
 NeMo and Megatron Bridge, with Weights & Biases tracking and Hugging Face Hub upload.
 
+## Timeline
+
+![End-to-end fine-tuning timeline](images/fine-tuning-end-to-end-whiteboard-photorealistic.png)
+
+| Date | Milestone |
+| --- | --- |
+| 2026-07-17 | Repo initialized. |
+| 2026-07-20 | First multimodal fine-tune pass: `Qwen/Qwen3-VL-2B-Instruct` (H200) and `Qwen/Qwen3.5-2B`. |
+| 2026-07-21 | Added Weights & Biases logging and Hugging Face Hub push. |
+| 2026-07-23 | Ported vision fine-tuning to B200 hardware; extended to 4-GPU multimodal runs. |
+| 2026-07-24 | Got 4-GPU multimodal fine-tuning working end-to-end on B200. |
+| 2026-07-27 | Ran fine-tune job on H100 (Colossus bare metal). |
+| 2026-07-28 – 2026-07-30 | Stability fixes and file cleanup/renaming across scripts. |
+| 2026-08-01 | Fine-tuning on Vera Rubin (VR) hardware. |
+| 2026-08-04 | GRPO reinforcement fine-tune of `Qwen/Qwen3-1.7B` on math, on Hecate (Vera Rubin). |
+| 2026-08-06 | Cosmos3 Nano multimodal fine-tune (NeMo) on Vera Rubin. |
+| 2026-08-07 | Dependency/environment upgrades across cluster runbooks. |
+| 2026-08-14 | Further runbook and script updates. |
+| 2026-08-19 | Fine-tuned `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16` with NeMo Lightning on Hecate. |
+| 2026-08-20 | README overhaul documenting the full set of scripts and runbooks. |
+
 ## Training scripts
 
 | File | What it does |
