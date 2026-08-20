@@ -4,974 +4,882 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GRPO Training Comparison Report — Pytche vs Hecate</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
-  :root {
-    --nv-green: #76b900;
-    --nv-green-dark: #5a8f00;
-    --nv-black: #1a1a2e;
-    --nv-dark: #16213e;
-    --nv-mid: #0f3460;
-    --nv-accent: #e94560;
-    --card-bg: #1e2a3a;
-    --card-border: #2a3f55;
-    --text-primary: #e8e8e8;
-    --text-secondary: #a0b0c0;
-    --pytche-color: #4fc3f7;
-    --hecate-color: #76b900;
-    --warning-color: #ffb74d;
-    --danger-color: #ef5350;
-    --success-color: #66bb6a;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background: linear-gradient(135deg, var(--nv-black) 0%, var(--nv-dark) 50%, #0a1628 100%);
-    color: var(--text-primary);
-    min-height: 100vh;
-    padding: 0;
-  }
-  /* Header */
-  .header {
-    background: linear-gradient(90deg, var(--nv-black), var(--nv-dark));
-    border-bottom: 3px solid var(--nv-green);
-    padding: 30px 40px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-  .header-left { display: flex; align-items: center; gap: 20px; }
-  .nvidia-logo {
-    width: 48px; height: 48px;
-    background: var(--nv-green);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 900; font-size: 20px; color: #000;
-  }
-  .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-  .header h1 span { color: var(--nv-green); }
-  .header-meta { color: var(--text-secondary); font-size: 13px; text-align: right; }
-  .header-meta strong { color: var(--nv-green); }
+:root{
+  --nv:#76b900;--nv-d:#5a8f00;--bg:#0f1923;--bg2:#162029;--card:#1a2733;
+  --bdr:#243342;--t1:#e8eaed;--t2:#8b9db5;--py:#4fc3f7;--he:#76b900;
+  --warn:#ffb74d;--bad:#ef5350;--ok:#66bb6a;--info:#42a5f5;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--t1);min-height:100vh}
 
-  /* Tabs */
-  .tab-bar {
-    display: flex; gap: 0; background: rgba(0,0,0,0.3);
-    border-bottom: 1px solid var(--card-border);
-    padding: 0 40px;
-    overflow-x: auto;
-  }
-  .tab-btn {
-    padding: 14px 28px; cursor: pointer; border: none;
-    background: transparent; color: var(--text-secondary);
-    font-size: 14px; font-weight: 600; letter-spacing: 0.3px;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-  .tab-btn:hover { color: var(--text-primary); background: rgba(118,185,0,0.05); }
-  .tab-btn.active { color: var(--nv-green); border-bottom-color: var(--nv-green); }
-  .tab-content { display: none; padding: 30px 40px; animation: fadeIn 0.3s; }
-  .tab-content.active { display: block; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+/* HEADER */
+.hdr{background:linear-gradient(90deg,#0d1520,#162029);border-bottom:3px solid var(--nv);padding:28px 36px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.hdr-l{display:flex;align-items:center;gap:18px}
+.logo{width:46px;height:46px;background:var(--nv);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;color:#000}
+.hdr h1{font-size:24px;font-weight:700;letter-spacing:-.4px}.hdr h1 b{color:var(--nv)}
+.hdr-sub{color:var(--t2);font-size:13px;margin-top:3px}
+.hdr-r{color:var(--t2);font-size:12px;text-align:right;line-height:1.7}.hdr-r strong{color:var(--nv)}
 
-  /* Container */
-  .container { max-width: 1400px; margin: 0 auto; }
+/* TABS */
+.tabs{display:flex;background:rgba(0,0,0,.35);border-bottom:1px solid var(--bdr);overflow-x:auto;padding:0 36px}
+.tabs input[type=radio]{display:none}
+.tabs label{padding:13px 22px;cursor:pointer;color:var(--t2);font-size:13px;font-weight:600;border-bottom:3px solid transparent;white-space:nowrap;transition:.2s}
+.tabs label:hover{color:var(--t1);background:rgba(118,185,0,.04)}
+#t1:checked~.tabs label[for=t1],#t2:checked~.tabs label[for=t2],#t3:checked~.tabs label[for=t3],
+#t4:checked~.tabs label[for=t4],#t5:checked~.tabs label[for=t5],#t6:checked~.tabs label[for=t6],
+#t7:checked~.tabs label[for=t7]{color:var(--nv);border-bottom-color:var(--nv)}
 
-  /* KPI strip */
-  .kpi-strip {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px; margin-bottom: 30px;
-  }
-  .kpi-card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .kpi-card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: var(--nv-green);
-  }
-  .kpi-card.warn::before { background: var(--warning-color); }
-  .kpi-card.danger::before { background: var(--danger-color); }
-  .kpi-card .kpi-icon { font-size: 28px; margin-bottom: 8px; }
-  .kpi-card .kpi-value { font-size: 28px; font-weight: 800; color: #fff; }
-  .kpi-card .kpi-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
-  .kpi-card .kpi-sub { font-size: 11px; color: var(--nv-green); margin-top: 6px; font-weight: 600; }
+.pane{display:none;padding:28px 36px;max-width:1400px;margin:0 auto;animation:fadeIn .25s}
+#t1:checked~#p1,#t2:checked~#p2,#t3:checked~#p3,#t4:checked~#p4,
+#t5:checked~#p5,#t6:checked~#p6,#t7:checked~#p7{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-  /* Section */
-  .section { margin-bottom: 36px; }
-  .section-title {
-    font-size: 18px; font-weight: 700; margin-bottom: 16px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .section-title::before {
-    content: ''; width: 4px; height: 22px;
-    background: var(--nv-green); border-radius: 2px;
-  }
+/* LAYOUT */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.g4{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:28px}
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr}}
+.mb{margin-bottom:26px}
 
-  /* Cards / panels */
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 20px;
-  }
-  .card-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--nv-green); }
+/* CARDS */
+.cd{background:var(--card);border:1px solid var(--bdr);border-radius:11px;padding:22px;margin-bottom:18px}
+.cd-t{font-size:14px;font-weight:700;color:var(--nv);margin-bottom:14px}
+.sec-t{font-size:17px;font-weight:700;margin-bottom:15px;display:flex;align-items:center;gap:10px}
+.sec-t::before{content:'';width:4px;height:20px;background:var(--nv);border-radius:2px}
 
-  /* Grid layouts */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-  @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+/* KPI */
+.kpi{background:var(--card);border:1px solid var(--bdr);border-radius:11px;padding:18px;text-align:center;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--nv)}
+.kpi.w::before{background:var(--warn)}.kpi.b::before{background:var(--bad)}
+.kpi .ic{font-size:26px;margin-bottom:6px}
+.kpi .v{font-size:26px;font-weight:800;color:#fff}
+.kpi .l{font-size:11px;color:var(--t2);margin-top:4px;text-transform:uppercase;letter-spacing:.7px}
+.kpi .s{font-size:11px;color:var(--nv);margin-top:5px;font-weight:600}
 
-  /* Tables */
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th {
-    text-align: left; padding: 10px 14px;
-    background: rgba(118,185,0,0.1);
-    color: var(--nv-green); font-weight: 700;
-    border-bottom: 2px solid var(--card-border);
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px;
-  }
-  td {
-    padding: 10px 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  tr:hover td { background: rgba(118,185,0,0.03); }
-  .val-pytche { color: var(--pytche-color); font-weight: 600; }
-  .val-hecate { color: var(--hecate-color); font-weight: 600; }
-  .val-delta { color: var(--warning-color); font-weight: 600; }
-  .val-bad { color: var(--danger-color); font-weight: 600; }
-  .val-good { color: var(--success-color); font-weight: 600; }
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 13px;background:rgba(118,185,0,.08);color:var(--nv);font-weight:700;border-bottom:2px solid var(--bdr);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.04)}
+tr:hover td{background:rgba(118,185,0,.02)}
+.vp{color:var(--py);font-weight:600}.vh{color:var(--he);font-weight:600}
+.vd{color:var(--warn);font-weight:600}.vb{color:var(--bad);font-weight:600}
+.vg{color:var(--ok);font-weight:600}
 
-  /* Badges */
-  .badge {
-    display: inline-block; padding: 3px 10px;
-    border-radius: 20px; font-size: 11px; font-weight: 700;
-  }
-  .badge-pytche { background: rgba(79,195,247,0.15); color: var(--pytche-color); }
-  .badge-hecate { background: rgba(118,185,0,0.15); color: var(--hecate-color); }
-  .badge-warn { background: rgba(255,183,77,0.15); color: var(--warning-color); }
-  .badge-danger { background: rgba(239,83,80,0.15); color: var(--danger-color); }
-  .badge-ok { background: rgba(102,187,106,0.15); color: var(--success-color); }
+/* BADGES */
+.bg{display:inline-block;padding:2px 9px;border-radius:16px;font-size:11px;font-weight:700}
+.bg-b{background:rgba(239,83,80,.13);color:var(--bad)}
+.bg-g{background:rgba(102,187,106,.13);color:var(--ok)}
+.bg-w{background:rgba(255,183,77,.13);color:var(--warn)}
+.bg-i{background:rgba(66,165,245,.13);color:var(--info)}
 
-  /* Chart containers */
-  .chart-container {
-    position: relative;
-    height: 320px;
-    width: 100%;
-  }
-  .chart-container-sm { height: 260px; }
+/* CSS BAR CHART */
+.bar-chart{display:flex;flex-direction:column;gap:10px}
+.bar-row{display:flex;align-items:center;gap:10px;font-size:12px}
+.bar-label{width:130px;text-align:right;color:var(--t2);flex-shrink:0;font-weight:600}
+.bar-track{flex:1;height:28px;background:rgba(255,255,255,.04);border-radius:6px;position:relative;overflow:hidden;display:flex;gap:2px}
+.bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;font-size:11px;font-weight:700;color:#fff;transition:width .6s;min-width:fit-content}
+.bar-fill.py{background:linear-gradient(90deg,rgba(79,195,247,.3),rgba(79,195,247,.8))}
+.bar-fill.he{background:linear-gradient(90deg,rgba(118,185,0,.3),rgba(118,185,0,.8))}
+.bar-val{width:70px;font-weight:700;font-size:12px;text-align:right;flex-shrink:0}
 
-  /* Finding cards */
-  .finding {
-    display: flex; gap: 14px; padding: 14px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .finding:last-child { border-bottom: none; }
-  .finding-icon {
-    width: 36px; height: 36px; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0;
-  }
-  .finding-icon.critical { background: rgba(239,83,80,0.15); }
-  .finding-icon.warning { background: rgba(255,183,77,0.15); }
-  .finding-icon.info { background: rgba(79,195,247,0.15); }
-  .finding-icon.success { background: rgba(102,187,106,0.15); }
-  .finding-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-  .finding-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+/* DUAL BAR */
+.dual-bar{display:flex;flex-direction:column;gap:14px}
+.dual-row .dual-label{font-size:12px;font-weight:600;color:var(--t2);margin-bottom:4px}
+.dual-track{height:22px;background:rgba(255,255,255,.03);border-radius:5px;overflow:hidden;position:relative;margin-bottom:2px}
+.dual-fill{height:100%;border-radius:5px;display:flex;align-items:center;padding:0 8px;font-size:10px;font-weight:700;color:#fff}
+.dual-fill.py{background:rgba(79,195,247,.7)}.dual-fill.he{background:rgba(118,185,0,.7)}
+.dual-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--t2)}
 
-  /* Links */
-  a { color: var(--nv-green); text-decoration: none; }
-  a:hover { text-decoration: underline; }
+/* HORIZONTAL COMPARISON BAR */
+.cmp{display:flex;flex-direction:column;gap:16px}
+.cmp-row{display:flex;flex-direction:column;gap:4px}
+.cmp-head{display:flex;justify-content:space-between;font-size:12px;font-weight:600}
+.cmp-bars{display:flex;gap:3px;height:26px}
+.cmp-b{border-radius:5px;display:flex;align-items:center;padding:0 8px;font-size:10px;font-weight:700;color:#fff}
+.cmp-b.py{background:rgba(79,195,247,.75)}.cmp-b.he{background:rgba(118,185,0,.75)}
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+/* STACKED REWARD BAR */
+.rw-chart{display:flex;flex-direction:column;gap:12px}
+.rw-row{display:flex;align-items:center;gap:10px}
+.rw-lbl{width:60px;font-size:12px;color:var(--t2);font-weight:600;text-align:right}
+.rw-bar-area{flex:1;height:24px;position:relative;display:flex;align-items:center}
+.rw-bar{height:100%;border-radius:4px;position:absolute}
+.rw-val{margin-left:auto;font-size:12px;font-weight:700;width:60px;text-align:right}
 
-  /* Tooltip style for lists */
-  .env-list { list-style: none; padding: 0; }
-  .env-list li {
-    padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
-    font-size: 13px; display: flex; justify-content: space-between;
-  }
-  .env-list li:last-child { border-bottom: none; }
-  .env-list .env-key { color: var(--text-secondary); }
-  .env-list .env-val { font-weight: 600; }
+/* DONUT (CSS) */
+.donut-wrap{display:flex;align-items:center;justify-content:center;gap:30px;padding:20px 0}
+.donut{width:160px;height:160px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center}
+.donut-inner{width:90px;height:90px;background:var(--card);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:1}
+.donut-inner .dv{font-size:20px;font-weight:800;color:#fff}.donut-inner .dl{font-size:10px;color:var(--t2)}
+.donut-legend{display:flex;flex-direction:column;gap:10px}
+.donut-legend div{display:flex;align-items:center;gap:8px;font-size:13px}
+.donut-legend .dot{width:12px;height:12px;border-radius:3px}
 
-  /* Recommendation cards */
-  .rec-card {
-    background: rgba(118,185,0,0.05);
-    border: 1px solid rgba(118,185,0,0.2);
-    border-radius: 10px;
-    padding: 18px;
-  }
-  .rec-num {
-    display: inline-flex; width: 26px; height: 26px;
-    background: var(--nv-green); color: #000;
-    border-radius: 50%; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 13px; margin-right: 10px;
-  }
-  .rec-title { font-weight: 700; font-size: 14px; display: inline; }
-  .rec-desc { margin-top: 8px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+/* SPARK LINE (CSS) */
+.spark{display:flex;align-items:flex-end;gap:3px;height:50px}
+.spark-bar{flex:1;border-radius:3px 3px 0 0;transition:height .3s}
 
-  /* WandB links */
-  .wandb-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .wandb-link {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 14px; border-radius: 8px;
-    font-size: 12px; font-weight: 600;
-    border: 1px solid var(--card-border);
-    transition: all 0.2s;
-  }
-  .wandb-link:hover { background: rgba(118,185,0,0.1); border-color: var(--nv-green); text-decoration: none; }
+/* FINDING */
+.find{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.find:last-child{border-bottom:none}
+.find-ic{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.find-ic.cr{background:rgba(239,83,80,.12)}.find-ic.wr{background:rgba(255,183,77,.12)}
+.find-ic.in{background:rgba(66,165,245,.12)}.find-ic.su{background:rgba(102,187,106,.12)}
+.find-tt{font-weight:700;font-size:13px;margin-bottom:3px}
+.find-ds{font-size:12px;color:var(--t2);line-height:1.55}
+
+/* REC */
+.rec{background:rgba(118,185,0,.04);border:1px solid rgba(118,185,0,.18);border-radius:10px;padding:16px;margin-bottom:12px}
+.rec-n{display:inline-flex;width:24px;height:24px;background:var(--nv);color:#000;border-radius:50%;align-items:center;justify-content:center;font-weight:800;font-size:12px;margin-right:8px}
+.rec-t{font-weight:700;font-size:13px;display:inline}
+.rec-d{margin-top:7px;font-size:12px;color:var(--t2);line-height:1.55}
+
+/* LINKS */
+a{color:var(--nv);text-decoration:none}a:hover{text-decoration:underline}
+.wl{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.wl a{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;border:1px solid var(--bdr);transition:.2s}
+.wl a:hover{background:rgba(118,185,0,.08);border-color:var(--nv);text-decoration:none}
+
+/* ENV */
+.el{list-style:none}.el li{padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px;display:flex;justify-content:space-between}
+.el li:last-child{border-bottom:none}
+
+/* ARCH DIAGRAM */
+.arch-block{background:rgba(118,185,0,.04);border:1px solid rgba(118,185,0,.15);border-radius:10px;padding:16px 20px;margin-bottom:10px}
+.arch-block-title{font-weight:700;font-size:14px;color:var(--nv);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.arch-block-title .arch-icon{font-size:18px}
+.arch-detail{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:12px}
+.arch-detail .ak{color:var(--t2)}.arch-detail .av{font-weight:600}
+.arch-flow{display:flex;align-items:center;gap:0;justify-content:center;flex-wrap:wrap;margin:20px 0}
+.arch-node{background:var(--card);border:2px solid var(--bdr);border-radius:10px;padding:12px 18px;text-align:center;min-width:120px}
+.arch-node.hl{border-color:var(--nv);background:rgba(118,185,0,.06)}
+.arch-node-t{font-size:12px;font-weight:700;margin-bottom:3px}
+.arch-node-s{font-size:10px;color:var(--t2)}
+.arch-arrow{color:var(--nv);font-size:22px;padding:0 6px;font-weight:700}
+
+/* PARAM BAR */
+.param-bar-wrap{margin:6px 0}
+.param-bar-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.param-bar-label .pk{color:var(--t2)}.param-bar-label .pv{font-weight:600}
+.param-bar-track{height:14px;background:rgba(255,255,255,.04);border-radius:4px;overflow:hidden}
+.param-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--nv-d),var(--nv))}
+
+code{background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px;font-size:12px}
 </style>
 </head>
 <body>
 
-<!-- Header -->
-<div class="header">
-  <div class="header-left">
-    <div class="nvidia-logo">NV</div>
-    <div>
-      <h1><span>GRPO</span> Training Comparison Report</h1>
-      <div style="color:var(--text-secondary); font-size:13px; margin-top:4px;">Qwen3-1.7B · GSM8K · Pytche vs Hecate Cluster</div>
-    </div>
+<!-- Radio buttons for tabs (CSS-only) -->
+<input type="radio" name="tab" id="t1" checked>
+<input type="radio" name="tab" id="t2">
+<input type="radio" name="tab" id="t3">
+<input type="radio" name="tab" id="t4">
+<input type="radio" name="tab" id="t5">
+<input type="radio" name="tab" id="t6">
+<input type="radio" name="tab" id="t7">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-l">
+    <div class="logo">NV</div>
+    <div><h1><b>GRPO</b> Training Comparison Report</h1><div class="hdr-sub">Qwen3-1.7B · GSM8K · Pytche vs Hecate Cluster</div></div>
   </div>
-  <div class="header-meta">
-    <div>Date: <strong>08/20/2026</strong></div>
-    <div>User: <strong>bbalakreshna@nvidia.com</strong></div>
-    <div>Model: <strong>Balab2021/Qwen3-1.7B-GRPO-Math</strong></div>
+  <div class="hdr-r">
+    Date: <strong>08/20/2026</strong><br>
+    User: <strong>bbalakreshna@nvidia.com</strong><br>
+    Model: <strong><a href="https://huggingface.co/Balab2021/Qwen3-1.7B-GRPO-Math" target="_blank">Balab2021/Qwen3-1.7B-GRPO-Math</a></strong>
   </div>
 </div>
 
-<!-- Tabs -->
-<div class="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
-  <button class="tab-btn" onclick="switchTab('performance')">⚡ Performance</button>
-  <button class="tab-btn" onclick="switchTab('training')">📈 Training Metrics</button>
-  <button class="tab-btn" onclick="switchTab('rewards')">🎯 Reward Analysis</button>
-  <button class="tab-btn" onclick="switchTab('diagnostics')">🔬 Diagnostics</button>
-  <button class="tab-btn" onclick="switchTab('recommendations')">💡 Recommendations</button>
+<!-- TABS -->
+<div class="tabs">
+  <label for="t1">📊 Overview</label>
+  <label for="t2">⚡ Performance</label>
+  <label for="t3">📈 Training Metrics</label>
+  <label for="t4">🎯 Reward Analysis</label>
+  <label for="t5">🧬 Model Architecture</label>
+  <label for="t6">🔬 Diagnostics</label>
+  <label for="t7">💡 Recommendations</label>
 </div>
 
-<!-- ============ TAB: OVERVIEW ============ -->
-<div id="tab-overview" class="tab-content active">
-<div class="container">
+<!-- ======== TAB 1: OVERVIEW ======== -->
+<div class="pane" id="p1">
 
-  <!-- KPI Strip -->
-  <div class="kpi-strip">
-    <div class="kpi-card">
-      <div class="kpi-icon">🧠</div>
-      <div class="kpi-value">Qwen3-1.7B</div>
-      <div class="kpi-label">Base Model</div>
-      <div class="kpi-sub">1.7 Billion Parameters</div>
+  <div class="g4">
+    <div class="kpi"><div class="ic">🧠</div><div class="v">Qwen3-1.7B</div><div class="l">Base Model</div><div class="s">1.7B Parameters</div></div>
+    <div class="kpi"><div class="ic">📚</div><div class="v">GSM8K</div><div class="l">Dataset</div><div class="s">500 Train Samples</div></div>
+    <div class="kpi w"><div class="ic">🏋️</div><div class="v">31</div><div class="l">Training Steps</div><div class="s">1 Epoch</div></div>
+    <div class="kpi b"><div class="ic">🎯</div><div class="v">-1.0</div><div class="l">Final Reward</div><div class="s">No learning occurred</div></div>
+    <div class="kpi"><div class="ic">⚡</div><div class="v">1.83×</div><div class="l">Hecate Speedup</div><div class="s">496.6s vs 908.6s</div></div>
+    <div class="kpi b"><div class="ic">✂️</div><div class="v">100%</div><div class="l">Clipped Completions</div><div class="s">All hit 256-token cap</div></div>
+  </div>
+
+  <div class="sec-t">Run Configuration Comparison</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>Parameter</th><th>Pytche</th><th>Hecate</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Cluster</td><td class="vp">Pytche</td><td class="vh">Hecate</td><td>Different GPU hardware</td></tr>
+        <tr><td>Command</td><td colspan="2" style="font-family:monospace;font-size:11px">accelerate launch --num_processes=4 --multi_gpu ~/finetune_grpo.py</td><td>Identical</td></tr>
+        <tr><td>GPUs</td><td class="vp">4</td><td class="vh">4</td><td>Same count</td></tr>
+        <tr><td>Strategy</td><td colspan="2">DDP (find_unused_parameters=True)</td><td>Identical</td></tr>
+        <tr><td>Mixed Precision</td><td colspan="2">No (default)</td><td>Could enable for speedup</td></tr>
+        <tr><td>CUDA Version</td><td colspan="2">13.4 (bnb fallback → 13.2)</td><td>Identical</td></tr>
+        <tr><td>Start Time (UTC)</td><td class="vp">05:47:21</td><td class="vh">06:03:23</td><td>~16 min apart</td></tr>
+        <tr><td>Max New Tokens</td><td colspan="2"><span class="vb">256</span></td><td>⚠️ Root cause of failure</td></tr>
+        <tr><td>Output Dir</td><td colspan="2">/home/bbalakreshna/grpo-results</td><td>Identical</td></tr>
+        <tr><td>HuggingFace</td><td colspan="2"><a href="https://huggingface.co/Balab2021/Qwen3-1.7B-GRPO-Math" target="_blank">Balab2021/Qwen3-1.7B-GRPO-Math</a></td><td>Pushed from both</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec-t">WandB Run Links</div>
+  <div class="g2">
+    <div class="cd"><div class="cd-t">🔵 Pytche Cluster Runs</div>
+      <div class="wl">
+        <a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/pg4fq2zt" target="_blank">🚀 pg4fq2zt</a>
+        <a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/20pxmumv" target="_blank">🚀 20pxmumv</a>
+        <a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/lccp10b2" target="_blank">🚀 lccp10b2</a>
+        <a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/2o3xxgw0" target="_blank">🚀 2o3xxgw0</a>
+      </div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">📚</div>
-      <div class="kpi-value">GSM8K</div>
-      <div class="kpi-label">Dataset</div>
-      <div class="kpi-sub">500 Train Samples</div>
+    <div class="cd"><div class="cd-t">🟢 Hecate Cluster Runs</div>
+      <div class="wl">
+        <a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/421p93uu" target="_blank">🚀 421p93uu</a>
+        <a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/mm3xtcrn" target="_blank">🚀 mm3xtcrn</a>
+        <a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/7upkm8w0" target="_blank">🚀 7upkm8w0</a>
+        <a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/nayf6psp" target="_blank">🚀 nayf6psp</a>
+      </div>
     </div>
-    <div class="kpi-card warn">
-      <div class="kpi-icon">🏋️</div>
-      <div class="kpi-value">31</div>
-      <div class="kpi-label">Training Steps</div>
-      <div class="kpi-sub">1 Epoch</div>
+  </div>
+</div>
+
+<!-- ======== TAB 2: PERFORMANCE ======== -->
+<div class="pane" id="p2">
+
+  <div class="g4">
+    <div class="kpi"><div class="ic">🕐</div><div class="v">908.6s</div><div class="l">Pytche Runtime</div><div class="s">~15 min 9 sec</div></div>
+    <div class="kpi"><div class="ic">🕐</div><div class="v">496.6s</div><div class="l">Hecate Runtime</div><div class="s">~8 min 17 sec</div></div>
+    <div class="kpi"><div class="ic">🚀</div><div class="v">1.83×</div><div class="l">Speedup Factor</div><div class="s">Hecate is faster</div></div>
+    <div class="kpi"><div class="ic">⏱️</div><div class="v">412s</div><div class="l">Time Saved</div><div class="s">45.3% reduction</div></div>
+  </div>
+
+  <div class="g2 mb">
+    <div class="cd">
+      <div class="cd-t">Step Time Comparison (seconds)</div>
+      <div class="bar-chart">
+        <div class="bar-row"><div class="bar-label">Step 1</div><div class="bar-track"><div class="bar-fill py" style="width:100%">52.75</div></div></div>
+        <div class="bar-row"><div class="bar-label">(warmup)</div><div class="bar-track"><div class="bar-fill he" style="width:57.7%">30.42</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 2</div><div class="bar-track"><div class="bar-fill py" style="width:47.7%">25.15</div></div></div>
+        <div class="bar-row"><div class="bar-label"></div><div class="bar-track"><div class="bar-fill he" style="width:24.8%">13.09</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 3</div><div class="bar-track"><div class="bar-fill py" style="width:47.7%">25.17</div></div></div>
+        <div class="bar-row"><div class="bar-label"></div><div class="bar-track"><div class="bar-fill he" style="width:25.6%">13.48</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 4</div><div class="bar-track"><div class="bar-fill py" style="width:46.2%">24.38</div></div></div>
+        <div class="bar-row"><div class="bar-label"></div><div class="bar-track"><div class="bar-fill he" style="width:24.2%">12.75</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 5</div><div class="bar-track"><div class="bar-fill py" style="width:47.9%">25.25</div></div></div>
+        <div class="bar-row"><div class="bar-label"></div><div class="bar-track"><div class="bar-fill he" style="width:25.3%">13.33</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 6</div><div class="bar-track"><div class="bar-fill py" style="width:45.3%">23.90</div></div></div>
+        <div class="bar-row"><div class="bar-label"></div><div class="bar-track"><div class="bar-fill he" style="width:24.4%">12.88</div></div></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--t2)">
+        <span>🔵 <span style="color:var(--py)">Pytche</span></span>
+        <span>🟢 <span style="color:var(--he)">Hecate</span></span>
+      </div>
     </div>
-    <div class="kpi-card danger">
-      <div class="kpi-icon">🎯</div>
-      <div class="kpi-value">-1.0</div>
-      <div class="kpi-label">Final Reward</div>
-      <div class="kpi-sub">Both clusters — no learning</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">⚡</div>
-      <div class="kpi-value">1.83×</div>
-      <div class="kpi-label">Hecate Speedup</div>
-      <div class="kpi-sub">496.6s vs 908.6s</div>
-    </div>
-    <div class="kpi-card danger">
-      <div class="kpi-icon">✂️</div>
-      <div class="kpi-value">100%</div>
-      <div class="kpi-label">Clipped Completions</div>
-      <div class="kpi-sub">All hit 256-token cap</div>
+
+    <div class="cd">
+      <div class="cd-t">Total Runtime Comparison</div>
+      <div class="bar-chart" style="margin-bottom:24px">
+        <div class="bar-row"><div class="bar-label">Pytche</div><div class="bar-track"><div class="bar-fill py" style="width:100%">908.6s</div></div></div>
+        <div class="bar-row"><div class="bar-label">Hecate</div><div class="bar-track"><div class="bar-fill he" style="width:54.7%">496.6s</div></div></div>
+      </div>
+      <div class="cd-t" style="margin-top:20px">Throughput</div>
+      <div class="bar-chart">
+        <div class="bar-row"><div class="bar-label">Samples/sec (Py)</div><div class="bar-track"><div class="bar-fill py" style="width:54.6%">0.55</div></div></div>
+        <div class="bar-row"><div class="bar-label">Samples/sec (He)</div><div class="bar-track"><div class="bar-fill he" style="width:100%">1.007</div></div></div>
+        <div class="bar-row"><div class="bar-label">Steps/sec (Py)</div><div class="bar-track"><div class="bar-fill py" style="width:54.8%">0.034</div></div></div>
+        <div class="bar-row"><div class="bar-label">Steps/sec (He)</div><div class="bar-track"><div class="bar-fill he" style="width:100%">0.062</div></div></div>
+      </div>
     </div>
   </div>
 
-  <!-- Run Summary Table -->
-  <div class="section">
-    <div class="section-title">Run Configuration Comparison</div>
-    <div class="card">
+  <div class="g2 mb">
+    <div class="cd">
+      <div class="cd-t">Generation Speed (transformers.generate)</div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(rgba(79,195,247,.8) 0% 72.7%,rgba(118,185,0,.8) 72.7% 100%)">
+          <div class="donut-inner"><div class="dv">2.66×</div><div class="dl">speedup</div></div>
+        </div>
+        <div class="donut-legend">
+          <div><div class="dot" style="background:var(--py)"></div>Pytche: <strong>19.52s</strong></div>
+          <div><div class="dot" style="background:var(--he)"></div>Hecate: <strong>7.33s</strong></div>
+        </div>
+      </div>
+    </div>
+    <div class="cd">
+      <div class="cd-t">Profiling Breakdown (Final Step)</div>
+      <div class="bar-chart">
+        <div class="bar-row"><div class="bar-label">generate (Py)</div><div class="bar-track"><div class="bar-fill py" style="width:100%">19.52s</div></div></div>
+        <div class="bar-row"><div class="bar-label">generate (He)</div><div class="bar-track"><div class="bar-fill he" style="width:37.6%">7.33s</div></div></div>
+        <div class="bar-row"><div class="bar-label">compute_loss (Py)</div><div class="bar-track"><div class="bar-fill py" style="width:0.83%">&nbsp;</div></div><div class="bar-val">0.162s</div></div>
+        <div class="bar-row"><div class="bar-label">compute_loss (He)</div><div class="bar-track"><div class="bar-fill he" style="width:0.52%">&nbsp;</div></div><div class="bar-val">0.102s</div></div>
+        <div class="bar-row"><div class="bar-label">logps+entropy (Py)</div><div class="bar-track"><div class="bar-fill py" style="width:0.57%">&nbsp;</div></div><div class="bar-val">0.111s</div></div>
+        <div class="bar-row"><div class="bar-label">logps+entropy (He)</div><div class="bar-track"><div class="bar-fill he" style="width:0.23%">&nbsp;</div></div><div class="bar-val">0.045s</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-t">Detailed Performance Metrics</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>Metric</th><th class="vp">Pytche</th><th class="vh">Hecate</th><th>Difference</th><th>Speedup</th></tr></thead>
+      <tbody>
+        <tr><td>Total Runtime</td><td>908.6 s</td><td>496.6 s</td><td class="vd">-412.0 s</td><td class="vg">1.83×</td></tr>
+        <tr><td>Samples / sec</td><td>0.55</td><td>1.007</td><td class="vd">+0.457</td><td class="vg">1.83×</td></tr>
+        <tr><td>Steps / sec</td><td>0.034</td><td>0.062</td><td class="vd">+0.028</td><td class="vg">1.82×</td></tr>
+        <tr><td>Step 1 (warmup)</td><td>52.75 s</td><td>30.42 s</td><td class="vd">-22.33 s</td><td class="vg">1.73×</td></tr>
+        <tr><td>Avg Steady-State Step</td><td>24.77 s</td><td>13.11 s</td><td class="vd">-11.66 s</td><td class="vg">1.89×</td></tr>
+        <tr><td>Final generate time</td><td>19.52 s</td><td>7.33 s</td><td class="vd">-12.19 s</td><td class="vg">2.66×</td></tr>
+        <tr><td>Final compute_loss</td><td>0.162 s</td><td>0.102 s</td><td class="vd">-0.060 s</td><td class="vg">1.59×</td></tr>
+        <tr><td>Final logps+entropy</td><td>0.111 s</td><td>0.045 s</td><td class="vd">-0.066 s</td><td class="vg">2.47×</td></tr>
+        <tr><td>Weight Loading</td><td>4.15 s (75 it/s)</td><td>7.78 s (40 it/s)</td><td class="vd">+3.63 s</td><td class="vb">0.53× (I/O)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======== TAB 3: TRAINING METRICS ======== -->
+<div class="pane" id="p3">
+
+  <div class="sec-t">Per-Step Training Metrics — Pytche</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>Step</th><th>Epoch</th><th>Loss</th><th>Grad Norm</th><th>LR</th><th>Tokens</th><th>Reward</th><th>Entropy</th><th>Step (s)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0.1613</td><td>0</td><td>0</td><td>4.355e-6</td><td>56,330</td><td class="vb">-1.000</td><td>0.1464</td><td>52.75</td></tr>
+        <tr><td>2</td><td>0.3226</td><td>0</td><td>0</td><td>3.548e-6</td><td>112,300</td><td class="vb">-0.972</td><td>0.1460</td><td>25.15</td></tr>
+        <tr><td>3</td><td>0.4839</td><td>0</td><td>0</td><td>2.742e-6</td><td>168,900</td><td class="vb">-1.000</td><td>0.1521</td><td>25.17</td></tr>
+        <tr><td>4</td><td>0.6452</td><td>0</td><td>0</td><td>1.935e-6</td><td>225,700</td><td class="vb">-0.972</td><td>0.1563</td><td>24.38</td></tr>
+        <tr><td>5</td><td>0.8065</td><td>0</td><td>0</td><td>1.129e-6</td><td>282,700</td><td class="vb">-0.972</td><td>0.1511</td><td>25.25</td></tr>
+        <tr><td>6</td><td>0.9677</td><td>0</td><td>0</td><td>3.226e-7</td><td>339,000</td><td class="vb">-1.000</td><td>0.1452</td><td>23.90</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec-t">Per-Step Training Metrics — Hecate</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>Step</th><th>Epoch</th><th>Loss</th><th>Grad Norm</th><th>LR</th><th>Tokens</th><th>Reward</th><th>Entropy</th><th>Step (s)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0.1613</td><td>0</td><td>0</td><td>4.355e-6</td><td>56,330</td><td class="vb">-1.000</td><td>0.1474</td><td>30.42</td></tr>
+        <tr><td>2</td><td>0.3226</td><td>0</td><td>0</td><td>3.548e-6</td><td>112,300</td><td class="vb">-1.000</td><td>0.1523</td><td>13.09</td></tr>
+        <tr><td>3</td><td>0.4839</td><td>0</td><td>0</td><td>2.742e-6</td><td>168,900</td><td class="vb">-1.002</td><td>0.1537</td><td>13.48</td></tr>
+        <tr><td>4</td><td>0.6452</td><td>0</td><td>0</td><td>1.935e-6</td><td>225,700</td><td class="vb">-1.000</td><td>0.1543</td><td>12.75</td></tr>
+        <tr><td>5</td><td>0.8065</td><td>0</td><td>0</td><td>1.129e-6</td><td>282,700</td><td class="vb">-1.002</td><td>0.1494</td><td>13.33</td></tr>
+        <tr><td>6</td><td>0.9677</td><td>0</td><td>0</td><td>3.226e-7</td><td>339,000</td><td class="vb">-1.000</td><td>0.1495</td><td>12.88</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="g2 mb">
+    <div class="cd">
+      <div class="cd-t">Entropy Over Steps</div>
+      <div style="display:flex;align-items:flex-end;gap:10px;height:120px;padding:10px 0">
+        <!-- Pytche entropy bars (scaled: 0.14=0%, 0.16=100%) -->
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div style="width:100%;display:flex;align-items:flex-end;gap:3px;height:100px">
+            <div style="flex:1;background:var(--py);border-radius:3px 3px 0 0;height:32%"></div>
+            <div style="flex:1;background:var(--py);border-radius:3px 3px 0 0;height:30%"></div>
+            <div style="flex:1;background:var(--py);border-radius:3px 3px 0 0;height:61%"></div>
+            <div style="flex:1;background:var(--py);border-radius:3px 3px 0 0;height:82%"></div>
+            <div style="flex:1;background:var(--py);border-radius:3px 3px 0 0;height:56%"></div>
+            <div style="flex:1;background:var(--py);border-radius:3px 3px 0 0;height:26%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--py);font-weight:600">Pytche (0.145–0.156)</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div style="width:100%;display:flex;align-items:flex-end;gap:3px;height:100px">
+            <div style="flex:1;background:var(--he);border-radius:3px 3px 0 0;height:37%"></div>
+            <div style="flex:1;background:var(--he);border-radius:3px 3px 0 0;height:62%"></div>
+            <div style="flex:1;background:var(--he);border-radius:3px 3px 0 0;height:69%"></div>
+            <div style="flex:1;background:var(--he);border-radius:3px 3px 0 0;height:72%"></div>
+            <div style="flex:1;background:var(--he);border-radius:3px 3px 0 0;height:47%"></div>
+            <div style="flex:1;background:var(--he);border-radius:3px 3px 0 0;height:48%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--he);font-weight:600">Hecate (0.147–0.154)</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--t2);text-align:center">Steps 1–6 · Entropy remained flat (no policy change)</div>
+    </div>
+
+    <div class="cd">
+      <div class="cd-t">Learning Rate Schedule (Cosine Decay)</div>
+      <div class="bar-chart">
+        <div class="bar-row"><div class="bar-label">Step 1</div><div class="bar-track"><div class="bar-fill" style="width:100%;background:linear-gradient(90deg,rgba(255,183,77,.3),rgba(255,183,77,.8))">4.355e-6</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 2</div><div class="bar-track"><div class="bar-fill" style="width:81.5%;background:linear-gradient(90deg,rgba(255,183,77,.3),rgba(255,183,77,.8))">3.548e-6</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 3</div><div class="bar-track"><div class="bar-fill" style="width:63%;background:linear-gradient(90deg,rgba(255,183,77,.3),rgba(255,183,77,.8))">2.742e-6</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 4</div><div class="bar-track"><div class="bar-fill" style="width:44.4%;background:linear-gradient(90deg,rgba(255,183,77,.3),rgba(255,183,77,.8))">1.935e-6</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 5</div><div class="bar-track"><div class="bar-fill" style="width:25.9%;background:linear-gradient(90deg,rgba(255,183,77,.3),rgba(255,183,77,.8))">1.129e-6</div></div></div>
+        <div class="bar-row"><div class="bar-label">Step 6</div><div class="bar-track"><div class="bar-fill" style="width:7.4%;background:linear-gradient(90deg,rgba(255,183,77,.3),rgba(255,183,77,.8))">&nbsp;</div></div><div class="bar-val" style="color:var(--warn)">3.226e-7</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cd">
+    <div class="cd-t">Cumulative Tokens Processed</div>
+    <div class="bar-chart">
+      <div class="bar-row"><div class="bar-label">Step 1</div><div class="bar-track"><div class="bar-fill he" style="width:16.1%">56.3K</div></div></div>
+      <div class="bar-row"><div class="bar-label">Step 2</div><div class="bar-track"><div class="bar-fill he" style="width:32.1%">112.3K</div></div></div>
+      <div class="bar-row"><div class="bar-label">Step 3</div><div class="bar-track"><div class="bar-fill he" style="width:48.3%">168.9K</div></div></div>
+      <div class="bar-row"><div class="bar-label">Step 4</div><div class="bar-track"><div class="bar-fill he" style="width:64.6%">225.7K</div></div></div>
+      <div class="bar-row"><div class="bar-label">Step 5</div><div class="bar-track"><div class="bar-fill he" style="width:80.9%">282.7K</div></div></div>
+      <div class="bar-row"><div class="bar-label">Step 6</div><div class="bar-track"><div class="bar-fill he" style="width:97%">339K</div></div></div>
+      <div style="font-size:11px;color:var(--t2);margin-top:4px">Final total: <strong style="color:var(--he)">350,200</strong> tokens processed</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======== TAB 4: REWARD ANALYSIS ======== -->
+<div class="pane" id="p4">
+
+  <div class="g4">
+    <div class="kpi b"><div class="ic">❌</div><div class="v">-1.0</div><div class="l">Correctness</div><div class="s">Never solved a problem</div></div>
+    <div class="kpi b"><div class="ic">📝</div><div class="v">-0.5</div><div class="l">Format</div><div class="s">Wrong output format</div></div>
+    <div class="kpi"><div class="ic">💭</div><div class="v">+0.5</div><div class="l">Reasoning</div><div class="s">Thinking tokens present</div></div>
+    <div class="kpi b"><div class="ic">📊</div><div class="v">0</div><div class="l">Reward Std Dev</div><div class="s">No variance → no gradient</div></div>
+  </div>
+
+  <div class="g2 mb">
+    <div class="cd">
+      <div class="cd-t">Reward Components — Pytche</div>
       <table>
-        <thead>
-          <tr><th>Parameter</th><th>Pytche Cluster</th><th>Hecate Cluster</th><th>Notes</th></tr>
-        </thead>
+        <thead><tr><th>Step</th><th>Correctness</th><th>Format</th><th>Reasoning</th><th>Total</th></tr></thead>
         <tbody>
-          <tr><td>Cluster</td><td class="val-pytche">Pytche</td><td class="val-hecate">Hecate</td><td>Different GPU hardware</td></tr>
-          <tr><td>Command</td><td colspan="2" style="font-family:monospace;font-size:12px;">accelerate launch --num_processes=4 --multi_gpu ~/finetune_grpo.py</td><td>Identical</td></tr>
-          <tr><td>GPUs</td><td class="val-pytche">4</td><td class="val-hecate">4</td><td>Same count</td></tr>
-          <tr><td>Strategy</td><td colspan="2">DDP (find_unused_parameters=True)</td><td>Identical</td></tr>
-          <tr><td>Mixed Precision</td><td colspan="2">No (default)</td><td>Could enable for speedup</td></tr>
-          <tr><td>Dynamo Backend</td><td colspan="2">No (default)</td><td>Could enable torch.compile</td></tr>
-          <tr><td>CUDA Version</td><td colspan="2">13.4 (bnb fallback to 13.2)</td><td>Identical</td></tr>
-          <tr><td>WandB User</td><td colspan="2">balabala76</td><td>Same account</td></tr>
-          <tr><td>WandB Project</td><td colspan="2">qwen3-grpo-math</td><td>Same project</td></tr>
-          <tr><td>Run Name</td><td colspan="2">grpo-qwen3-1.7b-gsm8k</td><td>Identical</td></tr>
-          <tr><td>Start Time (UTC)</td><td class="val-pytche">05:47:21</td><td class="val-hecate">06:03:23</td><td>~16 min apart</td></tr>
-          <tr><td>Max New Tokens</td><td colspan="2"><span class="val-bad">256</span></td><td>⚠️ Root cause of failure</td></tr>
-          <tr><td>Output Dir</td><td colspan="2">/home/bbalakreshna/grpo-results</td><td>Identical</td></tr>
-          <tr><td>HuggingFace Repo</td><td colspan="2"><a href="https://huggingface.co/Balab2021/Qwen3-1.7B-GRPO-Math" target="_blank">Balab2021/Qwen3-1.7B-GRPO-Math</a></td><td>Pushed from both</td></tr>
+          <tr><td>1</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.500</td><td class="vb">-1.000</td></tr>
+          <tr><td>2</td><td class="vb">-0.981</td><td class="vb">-0.491</td><td class="vg">+0.500</td><td class="vb">-0.972</td></tr>
+          <tr><td>3</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.500</td><td class="vb">-1.000</td></tr>
+          <tr><td>4</td><td class="vb">-0.981</td><td class="vb">-0.491</td><td class="vg">+0.500</td><td class="vb">-0.972</td></tr>
+          <tr><td>5</td><td class="vb">-0.981</td><td class="vb">-0.491</td><td class="vg">+0.500</td><td class="vb">-0.972</td></tr>
+          <tr><td>6</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.500</td><td class="vb">-1.000</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cd">
+      <div class="cd-t">Reward Components — Hecate</div>
+      <table>
+        <thead><tr><th>Step</th><th>Correctness</th><th>Format</th><th>Reasoning</th><th>Total</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.500</td><td class="vb">-1.000</td></tr>
+          <tr><td>2</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.500</td><td class="vb">-1.000</td></tr>
+          <tr><td>3</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.498</td><td class="vb">-1.002</td></tr>
+          <tr><td>4</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.500</td><td class="vb">-1.000</td></tr>
+          <tr><td>5</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.498</td><td class="vb">-1.002</td></tr>
+          <tr><td>6</td><td class="vb">-1.000</td><td class="vb">-0.500</td><td class="vg">+0.500</td><td class="vb">-1.000</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- WandB Links -->
-  <div class="section">
-    <div class="section-title">WandB Run Links</div>
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title">🔵 Pytche Cluster Runs</div>
-        <div class="wandb-links">
-          <a class="wandb-link" href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/pg4fq2zt" target="_blank">🚀 pg4fq2zt</a>
-          <a class="wandb-link" href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/20pxmumv" target="_blank">🚀 20pxmumv</a>
-          <a class="wandb-link" href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/lccp10b2" target="_blank">🚀 lccp10b2</a>
-          <a class="wandb-link" href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/2o3xxgw0" target="_blank">🚀 2o3xxgw0</a>
+  <div class="cd mb">
+    <div class="cd-t">Reward Component Breakdown (visual)</div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;padding:16px 0">
+      <div style="text-align:center">
+        <div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(var(--bad) 0% 50%, var(--warn) 50% 75%, var(--ok) 75% 100%);display:flex;align-items:center;justify-content:center;margin:0 auto">
+          <div style="width:70px;height:70px;background:var(--card);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column">
+            <div style="font-size:16px;font-weight:800;color:var(--bad)">-1.0</div>
+            <div style="font-size:9px;color:var(--t2)">total</div>
+          </div>
         </div>
-      </div>
-      <div class="card">
-        <div class="card-title">🟢 Hecate Cluster Runs</div>
-        <div class="wandb-links">
-          <a class="wandb-link" href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/421p93uu" target="_blank">🚀 421p93uu</a>
-          <a class="wandb-link" href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/mm3xtcrn" target="_blank">🚀 mm3xtcrn</a>
-          <a class="wandb-link" href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/7upkm8w0" target="_blank">🚀 7upkm8w0</a>
-          <a class="wandb-link" href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/nayf6psp" target="_blank">🚀 nayf6psp</a>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-</div>
-
-<!-- ============ TAB: PERFORMANCE ============ -->
-<div id="tab-performance" class="tab-content">
-<div class="container">
-
-  <div class="kpi-strip">
-    <div class="kpi-card">
-      <div class="kpi-icon">🕐</div>
-      <div class="kpi-value">908.6s</div>
-      <div class="kpi-label">Pytche Runtime</div>
-      <div class="kpi-sub">~15 min 9 sec</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">🕐</div>
-      <div class="kpi-value">496.6s</div>
-      <div class="kpi-label">Hecate Runtime</div>
-      <div class="kpi-sub">~8 min 17 sec</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">🚀</div>
-      <div class="kpi-value">1.83×</div>
-      <div class="kpi-label">Speedup Factor</div>
-      <div class="kpi-sub">Hecate is faster</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">⏱️</div>
-      <div class="kpi-value">412s</div>
-      <div class="kpi-label">Time Saved</div>
-      <div class="kpi-sub">45.3% reduction</div>
-    </div>
-  </div>
-
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">Step Time Comparison (seconds)</div>
-      <div class="chart-container">
-        <canvas id="chart-step-time"></canvas>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Total Runtime Breakdown</div>
-      <div class="chart-container">
-        <canvas id="chart-runtime-bar"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">Throughput Comparison</div>
-      <div class="chart-container chart-container-sm">
-        <canvas id="chart-throughput"></canvas>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Generation Speed (transformers.generate)</div>
-      <div class="chart-container chart-container-sm">
-        <canvas id="chart-gen-speed"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Detailed Performance Metrics</div>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Metric</th><th class="val-pytche">Pytche</th><th class="val-hecate">Hecate</th><th>Difference</th><th>Speedup</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Total Runtime</td><td>908.6 s</td><td>496.6 s</td><td class="val-delta">-412.0 s</td><td class="val-good">1.83×</td></tr>
-          <tr><td>Samples / sec</td><td>0.55</td><td>1.007</td><td class="val-delta">+0.457</td><td class="val-good">1.83×</td></tr>
-          <tr><td>Steps / sec</td><td>0.034</td><td>0.062</td><td class="val-delta">+0.028</td><td class="val-good">1.82×</td></tr>
-          <tr><td>Step 1 (warmup)</td><td>52.75 s</td><td>30.42 s</td><td class="val-delta">-22.33 s</td><td class="val-good">1.73×</td></tr>
-          <tr><td>Step 2</td><td>25.15 s</td><td>13.09 s</td><td class="val-delta">-12.06 s</td><td class="val-good">1.92×</td></tr>
-          <tr><td>Step 3</td><td>25.17 s</td><td>13.48 s</td><td class="val-delta">-11.69 s</td><td class="val-good">1.87×</td></tr>
-          <tr><td>Step 4</td><td>24.38 s</td><td>12.75 s</td><td class="val-delta">-11.63 s</td><td class="val-good">1.91×</td></tr>
-          <tr><td>Step 5</td><td>25.25 s</td><td>13.33 s</td><td class="val-delta">-11.92 s</td><td class="val-good">1.89×</td></tr>
-          <tr><td>Step 6</td><td>23.90 s</td><td>12.88 s</td><td class="val-delta">-11.02 s</td><td class="val-good">1.86×</td></tr>
-          <tr><td>Avg Steady-State Step</td><td>24.77 s</td><td>13.11 s</td><td class="val-delta">-11.66 s</td><td class="val-good">1.89×</td></tr>
-          <tr><td>Final generate time</td><td>19.52 s</td><td>7.33 s</td><td class="val-delta">-12.19 s</td><td class="val-good">2.66×</td></tr>
-          <tr><td>Final compute_loss time</td><td>0.162 s</td><td>0.102 s</td><td class="val-delta">-0.060 s</td><td class="val-good">1.59×</td></tr>
-          <tr><td>Final logps+entropy time</td><td>0.111 s</td><td>0.045 s</td><td class="val-delta">-0.066 s</td><td class="val-good">2.47×</td></tr>
-          <tr><td>Weight Loading</td><td>4.15 s (75 it/s)</td><td>7.78 s (40 it/s)</td><td class="val-delta">+3.63 s</td><td class="val-bad">0.53× (I/O)</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-</div>
-
-<!-- ============ TAB: TRAINING METRICS ============ -->
-<div id="tab-training" class="tab-content">
-<div class="container">
-
-  <div class="section">
-    <div class="section-title">Per-Step Training Metrics — Pytche</div>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Step</th><th>Epoch</th><th>Loss</th><th>Grad Norm</th><th>LR</th><th>Tokens</th><th>Reward</th><th>Entropy</th><th>Step (s)</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>1</td><td>0.1613</td><td>0</td><td>0</td><td>4.355e-6</td><td>56,330</td><td class="val-bad">-1.000</td><td>0.1464</td><td>52.75</td></tr>
-          <tr><td>2</td><td>0.3226</td><td>0</td><td>0</td><td>3.548e-6</td><td>112,300</td><td class="val-bad">-0.972</td><td>0.1460</td><td>25.15</td></tr>
-          <tr><td>3</td><td>0.4839</td><td>0</td><td>0</td><td>2.742e-6</td><td>168,900</td><td class="val-bad">-1.000</td><td>0.1521</td><td>25.17</td></tr>
-          <tr><td>4</td><td>0.6452</td><td>0</td><td>0</td><td>1.935e-6</td><td>225,700</td><td class="val-bad">-0.972</td><td>0.1563</td><td>24.38</td></tr>
-          <tr><td>5</td><td>0.8065</td><td>0</td><td>0</td><td>1.129e-6</td><td>282,700</td><td class="val-bad">-0.972</td><td>0.1511</td><td>25.25</td></tr>
-          <tr><td>6</td><td>0.9677</td><td>0</td><td>0</td><td>3.226e-7</td><td>339,000</td><td class="val-bad">-1.000</td><td>0.1452</td><td>23.90</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Per-Step Training Metrics — Hecate</div>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Step</th><th>Epoch</th><th>Loss</th><th>Grad Norm</th><th>LR</th><th>Tokens</th><th>Reward</th><th>Entropy</th><th>Step (s)</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>1</td><td>0.1613</td><td>0</td><td>0</td><td>4.355e-6</td><td>56,330</td><td class="val-bad">-1.000</td><td>0.1474</td><td>30.42</td></tr>
-          <tr><td>2</td><td>0.3226</td><td>0</td><td>0</td><td>3.548e-6</td><td>112,300</td><td class="val-bad">-1.000</td><td>0.1523</td><td>13.09</td></tr>
-          <tr><td>3</td><td>0.4839</td><td>0</td><td>0</td><td>2.742e-6</td><td>168,900</td><td class="val-bad">-1.002</td><td>0.1537</td><td>13.48</td></tr>
-          <tr><td>4</td><td>0.6452</td><td>0</td><td>0</td><td>1.935e-6</td><td>225,700</td><td class="val-bad">-1.000</td><td>0.1543</td><td>12.75</td></tr>
-          <tr><td>5</td><td>0.8065</td><td>0</td><td>0</td><td>1.129e-6</td><td>282,700</td><td class="val-bad">-1.002</td><td>0.1494</td><td>13.33</td></tr>
-          <tr><td>6</td><td>0.9677</td><td>0</td><td>0</td><td>3.226e-7</td><td>339,000</td><td class="val-bad">-1.000</td><td>0.1495</td><td>12.88</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">Entropy Over Training Steps</div>
-      <div class="chart-container chart-container-sm">
-        <canvas id="chart-entropy"></canvas>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Learning Rate Schedule</div>
-      <div class="chart-container chart-container-sm">
-        <canvas id="chart-lr"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Cumulative Tokens Processed</div>
-    <div class="chart-container chart-container-sm">
-      <canvas id="chart-tokens"></canvas>
-    </div>
-  </div>
-
-</div>
-</div>
-
-<!-- ============ TAB: REWARD ANALYSIS ============ -->
-<div id="tab-rewards" class="tab-content">
-<div class="container">
-
-  <div class="kpi-strip">
-    <div class="kpi-card danger">
-      <div class="kpi-icon">❌</div>
-      <div class="kpi-value">-1.0</div>
-      <div class="kpi-label">Correctness Reward</div>
-      <div class="kpi-sub">Never solved a problem</div>
-    </div>
-    <div class="kpi-card danger">
-      <div class="kpi-icon">📝</div>
-      <div class="kpi-value">-0.5</div>
-      <div class="kpi-label">Format Reward</div>
-      <div class="kpi-sub">Wrong output format</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">💭</div>
-      <div class="kpi-value">+0.5</div>
-      <div class="kpi-label">Reasoning Reward</div>
-      <div class="kpi-sub">Thinking tokens present</div>
-    </div>
-    <div class="kpi-card danger">
-      <div class="kpi-icon">📊</div>
-      <div class="kpi-value">0</div>
-      <div class="kpi-label">Reward Std Dev</div>
-      <div class="kpi-sub">No variance → no gradient</div>
-    </div>
-  </div>
-
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">Reward Components (Pytche)</div>
-      <div class="chart-container">
-        <canvas id="chart-reward-pytche"></canvas>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Reward Components (Hecate)</div>
-      <div class="chart-container">
-        <canvas id="chart-reward-hecate"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Total Reward Trajectory — Both Clusters</div>
-    <div class="chart-container">
-      <canvas id="chart-reward-total"></canvas>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Reward Function Breakdown</div>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Reward Function</th><th>Pytche Mean</th><th>Hecate Mean</th><th>Analysis</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>correctness_reward_fn</strong></td>
-            <td class="val-bad">-1.0 to -0.981</td>
-            <td class="val-bad">-1.0</td>
-            <td>Model never produced correct answers. No completions terminated before 256 tokens, so boxed answers were never generated.</td>
-            <td><span class="badge badge-danger">FAILED</span></td>
-          </tr>
-          <tr>
-            <td><strong>format_reward_fn</strong></td>
-            <td class="val-bad">-0.5 to -0.491</td>
-            <td class="val-bad">-0.5</td>
-            <td>Output format doesn't match expected pattern (likely \boxed{} or specific answer delimiters). Completions truncated before formatting.</td>
-            <td><span class="badge badge-danger">FAILED</span></td>
-          </tr>
-          <tr>
-            <td><strong>reasoning_reward_fn</strong></td>
-            <td class="val-good">+0.5</td>
-            <td>+0.498 to +0.5</td>
-            <td>Thinking/reasoning tokens are being generated. This is the only positive signal — model enters reasoning mode but can't finish.</td>
-            <td><span class="badge badge-ok">PARTIAL</span></td>
-          </tr>
-          <tr>
-            <td><strong>Combined reward</strong></td>
-            <td class="val-bad">-1.0 to -0.972</td>
-            <td class="val-bad">-1.0 to -1.002</td>
-            <td>Overwhelming negative signal. Reward variance ≈ 0 within groups → GRPO advantage = 0 → zero gradients.</td>
-            <td><span class="badge badge-danger">NO LEARNING</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Zero-Std Reward Fraction (frac_reward_zero_std)</div>
-    <div class="chart-container chart-container-sm">
-      <canvas id="chart-zero-std"></canvas>
-    </div>
-  </div>
-
-</div>
-</div>
-
-<!-- ============ TAB: DIAGNOSTICS ============ -->
-<div id="tab-diagnostics" class="tab-content">
-<div class="container">
-
-  <div class="section">
-    <div class="section-title">Critical Findings</div>
-    <div class="card">
-      <div class="finding">
-        <div class="finding-icon critical">🚨</div>
-        <div>
-          <div class="finding-title">100% Completion Clipping — Root Cause of Training Failure</div>
-          <div class="finding-desc">Every single completion across all steps hit the <code>max_new_tokens=256</code> cap. <code>clipped_ratio=1.0</code> and <code>mean_terminated_length=0</code> confirm no completion ever produced an EOS token or answer delimiter. GSM8K problems require chain-of-thought reasoning that typically needs 400–800 tokens. At 256 tokens the model can start reasoning but never finish or produce a boxed answer.</div>
-        </div>
-      </div>
-      <div class="finding">
-        <div class="finding-icon critical">🚨</div>
-        <div>
-          <div class="finding-title">Zero Gradient Flow — GRPO Advantage Collapse</div>
-          <div class="finding-desc">Loss = 0 and grad_norm = 0 for every step on both clusters. GRPO computes advantages from the relative reward within each group. When all completions receive identical rewards (reward_std = 0), the advantage for every token is zero, producing no gradient signal. This is evidenced by <code>frac_reward_zero_std ≈ 1.0</code> (98.75–100% of groups had zero reward variance).</div>
-        </div>
-      </div>
-      <div class="finding">
-        <div class="finding-icon critical">🚨</div>
-        <div>
-          <div class="finding-title">Correctness Reward Flatlined at -1.0</div>
-          <div class="finding-desc">The correctness reward function consistently returned -1.0 (with rare -0.981 outliers on Pytche). The model never solved a single GSM8K problem because it couldn't finish generating a complete answer within the token budget.</div>
-        </div>
-      </div>
-      <div class="finding">
-        <div class="finding-icon warning">⚠️</div>
-        <div>
-          <div class="finding-title">Format Reward Consistently Negative</div>
-          <div class="finding-desc">Format reward stuck at -0.5, indicating the model never produced the expected output format (e.g., <code>\boxed{answer}</code>). This is a direct consequence of truncation — the model generates reasoning tokens but runs out of budget before reaching the answer formatting step.</div>
-        </div>
-      </div>
-      <div class="finding">
-        <div class="finding-icon info">ℹ️</div>
-        <div>
-          <div class="finding-title">Reasoning Reward is the Only Positive Signal</div>
-          <div class="finding-desc">The reasoning reward function returned +0.5 consistently, confirming the model does enter a thinking/reasoning mode. This is a positive sign — the model knows to reason, it just can't complete the reasoning within the token limit.</div>
-        </div>
-      </div>
-      <div class="finding">
-        <div class="finding-icon warning">⚠️</div>
-        <div>
-          <div class="finding-title">Clip Ratio is Zero — Policy Never Diverged</div>
-          <div class="finding-desc">Both <code>clip_ratio/high</code> and <code>clip_ratio/low</code> remained 0 throughout training. Since no gradient updates occurred, the policy ratio π/π_ref stayed at 1.0, and the PPO clipping mechanism was never triggered.</div>
+        <div style="margin-top:10px;font-size:12px;color:var(--t2)">Reward Distribution</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:6px;font-size:10px">
+          <span><span style="display:inline-block;width:8px;height:8px;background:var(--bad);border-radius:2px"></span> Correct</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:var(--warn);border-radius:2px"></span> Format</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:var(--ok);border-radius:2px"></span> Reasoning</span>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Completion Statistics</div>
-    <div class="card">
-      <div class="chart-container chart-container-sm">
-        <canvas id="chart-completion"></canvas>
+  <div class="sec-t">Reward Function Analysis</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>Function</th><th>Pytche Mean</th><th>Hecate Mean</th><th>Analysis</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><strong>correctness_reward_fn</strong></td><td class="vb">-1.0 to -0.981</td><td class="vb">-1.0</td><td>Completions truncated before producing boxed answer</td><td><span class="bg bg-b">FAILED</span></td></tr>
+        <tr><td><strong>format_reward_fn</strong></td><td class="vb">-0.5 to -0.491</td><td class="vb">-0.5</td><td>No \boxed{} or answer delimiters generated</td><td><span class="bg bg-b">FAILED</span></td></tr>
+        <tr><td><strong>reasoning_reward_fn</strong></td><td class="vg">+0.5</td><td class="vg">+0.498 to +0.5</td><td>Model enters thinking mode — only positive signal</td><td><span class="bg bg-g">PARTIAL</span></td></tr>
+        <tr><td><strong>Combined</strong></td><td class="vb">-0.972 to -1.0</td><td class="vb">-1.0 to -1.002</td><td>Zero variance → GRPO advantage = 0 → no gradients</td><td><span class="bg bg-b">NO LEARNING</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cd">
+    <div class="cd-t">Zero-Std Reward Fraction (frac_reward_zero_std)</div>
+    <div class="bar-chart">
+      <div class="bar-row"><div class="bar-label">Py Step 1</div><div class="bar-track"><div class="bar-fill py" style="width:100%">100%</div></div></div>
+      <div class="bar-row"><div class="bar-label">He Step 1</div><div class="bar-track"><div class="bar-fill he" style="width:100%">100%</div></div></div>
+      <div class="bar-row"><div class="bar-label">Py Step 2</div><div class="bar-track"><div class="bar-fill py" style="width:98.75%">98.75%</div></div></div>
+      <div class="bar-row"><div class="bar-label">He Step 2</div><div class="bar-track"><div class="bar-fill he" style="width:100%">100%</div></div></div>
+      <div class="bar-row"><div class="bar-label">Py Step 3</div><div class="bar-track"><div class="bar-fill py" style="width:100%">100%</div></div></div>
+      <div class="bar-row"><div class="bar-label">He Step 3</div><div class="bar-track"><div class="bar-fill he" style="width:98.75%">98.75%</div></div></div>
+    </div>
+    <div style="font-size:11px;color:var(--t2);margin-top:8px">≈100% of groups had zero reward variance across all steps → GRPO advantages are zero</div>
+  </div>
+</div>
+
+<!-- ======== TAB 5: MODEL ARCHITECTURE ======== -->
+<div class="pane" id="p5">
+
+  <div class="g4">
+    <div class="kpi"><div class="ic">🧠</div><div class="v">1.7B</div><div class="l">Total Parameters</div><div class="s">1,720,454,144</div></div>
+    <div class="kpi"><div class="ic">📐</div><div class="v">Transformer</div><div class="l">Architecture</div><div class="s">Decoder-Only (Causal LM)</div></div>
+    <div class="kpi"><div class="ic">🏗️</div><div class="v">Qwen3</div><div class="l">Model Family</div><div class="s">Alibaba Cloud</div></div>
+    <div class="kpi"><div class="ic">📏</div><div class="v">32K</div><div class="l">Max Context Length</div><div class="s">32,768 tokens</div></div>
+  </div>
+
+  <!-- Architecture Flow Diagram -->
+  <div class="sec-t">Model Pipeline</div>
+  <div class="cd">
+    <div class="arch-flow">
+      <div class="arch-node"><div class="arch-node-t">Input Text</div><div class="arch-node-s">GSM8K math prompt</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node"><div class="arch-node-t">Tokenizer</div><div class="arch-node-s">BPE · 151,936 vocab</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node hl"><div class="arch-node-t">Qwen3-1.7B</div><div class="arch-node-s">28 Transformer layers</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node"><div class="arch-node-t">LM Head</div><div class="arch-node-s">Linear → 151,936</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node"><div class="arch-node-t">GRPO</div><div class="arch-node-s">Policy optimization</div></div>
+    </div>
+  </div>
+
+  <!-- Architecture Details -->
+  <div class="g2 mb">
+    <div class="cd">
+      <div class="cd-t">🏛️ Core Architecture</div>
+      <div class="arch-block">
+        <div class="arch-block-title"><span class="arch-icon">📦</span> General</div>
+        <div class="arch-detail">
+          <span class="ak">Model Type</span><span class="av">Qwen3ForCausalLM</span>
+          <span class="ak">Architecture</span><span class="av">Decoder-Only Transformer</span>
+          <span class="ak">Hidden Size</span><span class="av">2,048</span>
+          <span class="ak">Num Hidden Layers</span><span class="av">28</span>
+          <span class="ak">Intermediate Size</span><span class="av">6,144 (FFN)</span>
+          <span class="ak">Num Attention Heads</span><span class="av">16</span>
+          <span class="ak">Num Key-Value Heads</span><span class="av">8 (GQA)</span>
+          <span class="ak">Head Dimension</span><span class="av">128</span>
+          <span class="ak">Max Position Embeddings</span><span class="av">32,768</span>
+          <span class="ak">RoPE Base</span><span class="av">10,000,000</span>
+          <span class="ak">RoPE Type</span><span class="av">default (Rotary)</span>
+          <span class="ak">Activation Function</span><span class="av">SiLU (Swish)</span>
+          <span class="ak">RMS Norm Epsilon</span><span class="av">1e-6</span>
+          <span class="ak">Tie Word Embeddings</span><span class="av">Yes</span>
+        </div>
+      </div>
+      <div class="arch-block" style="margin-top:12px">
+        <div class="arch-block-title"><span class="arch-icon">🔤</span> Tokenizer</div>
+        <div class="arch-detail">
+          <span class="ak">Type</span><span class="av">BPE (Byte-Pair Encoding)</span>
+          <span class="ak">Vocabulary Size</span><span class="av">151,936</span>
+          <span class="ak">EOS Token</span><span class="av">&lt;|endoftext|&gt; (151643)</span>
+          <span class="ak">PAD Token</span><span class="av">&lt;|endoftext|&gt; (151643)</span>
+          <span class="ak">Special Tokens</span><span class="av">&lt;|im_start|&gt;, &lt;|im_end|&gt;, &lt;think&gt;, &lt;/think&gt;</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cd">
+      <div class="cd-t">⚙️ GRPO Training Configuration</div>
+      <div class="arch-block">
+        <div class="arch-block-title"><span class="arch-icon">🎓</span> Training Setup</div>
+        <div class="arch-detail">
+          <span class="ak">Method</span><span class="av">GRPO (Group Relative Policy Optimization)</span>
+          <span class="ak">Framework</span><span class="av">HuggingFace TRL + Accelerate</span>
+          <span class="ak">Distributed</span><span class="av">DDP (4 GPUs, 1 Node)</span>
+          <span class="ak">Dataset</span><span class="av">GSM8K (500 samples)</span>
+          <span class="ak">Epochs</span><span class="av">1</span>
+          <span class="ak">Total Steps</span><span class="av">31</span>
+          <span class="ak">Max New Tokens</span><span class="av">256 ⚠️</span>
+          <span class="ak">Precision</span><span class="av">FP32 (no mixed precision)</span>
+          <span class="ak">LR Schedule</span><span class="av">Cosine Decay</span>
+          <span class="ak">Peak LR</span><span class="av">4.355e-6</span>
+          <span class="ak">Min LR</span><span class="av">3.226e-7</span>
+          <span class="ak">Quantization</span><span class="av">BitsAndBytes (bnb)</span>
+        </div>
+      </div>
+      <div class="arch-block" style="margin-top:12px">
+        <div class="arch-block-title"><span class="arch-icon">🎯</span> Reward Functions</div>
+        <div class="arch-detail">
+          <span class="ak">correctness_reward_fn</span><span class="av">Checks if answer matches GSM8K solution</span>
+          <span class="ak">format_reward_fn</span><span class="av">Checks for expected output format</span>
+          <span class="ak">reasoning_reward_fn</span><span class="av">Checks for thinking/reasoning tokens</span>
+          <span class="ak">Reward Weights</span><span class="av">Correctness dominant</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Environment & Warnings</div>
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title">Common Warnings (Both Clusters)</div>
-        <ul class="env-list">
-          <li><span class="env-key">KernelPreference enum</span><span class="env-val badge badge-warn">Deprecated</span></li>
-          <li><span class="env-key">ScaleCalculationMode enum</span><span class="env-val badge badge-warn">Deprecated</span></li>
-          <li><span class="env-key">register_opaque_type</span><span class="env-val badge badge-warn">Deprecated → register_custom_class</span></li>
-          <li><span class="env-key">all_gather_into_tensor</span><span class="env-val badge badge-warn">Deprecated → all_gather_single</span></li>
-          <li><span class="env-key">find_unused_parameters</span><span class="env-val badge badge-warn">True (perf overhead)</span></li>
-          <li><span class="env-key">destroy_process_group</span><span class="env-val badge badge-warn">Not called at exit</span></li>
-          <li><span class="env-key">BNB CUDA binary</span><span class="env-val badge badge-warn">No 13.4 → fallback 13.2</span></li>
-        </ul>
+  <!-- Parameter Breakdown -->
+  <div class="sec-t">Parameter Distribution</div>
+  <div class="cd">
+    <div class="cd-t">Parameters by Component</div>
+    <table>
+      <thead><tr><th>Component</th><th>Shape</th><th>Parameters</th><th>% of Total</th><th>Trainable</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Token Embeddings</strong> (embed_tokens)</td><td>151,936 × 2,048</td><td>311,165,952</td><td>18.1%</td><td class="vg">Yes</td></tr>
+        <tr><td><strong>Attention Q Proj</strong> (×28 layers)</td><td>2,048 × 2,048</td><td>117,440,512</td><td>6.8%</td><td class="vg">Yes</td></tr>
+        <tr><td><strong>Attention K Proj</strong> (×28, GQA 8 heads)</td><td>2,048 × 1,024</td><td>58,720,256</td><td>3.4%</td><td class="vg">Yes</td></tr>
+        <tr><td><strong>Attention V Proj</strong> (×28, GQA 8 heads)</td><td>2,048 × 1,024</td><td>58,720,256</td><td>3.4%</td><td class="vg">Yes</td></tr>
+        <tr><td><strong>Attention O Proj</strong> (×28 layers)</td><td>2,048 × 2,048</td><td>117,440,512</td><td>6.8%</td><td class="vg">Yes</td></tr>
+        <tr><td><strong>FFN Gate Proj</strong> (×28 layers)</td><td>2,048 × 6,144</td><td>352,321,536</td><td>20.5%</td><td class="vg">Yes</td></tr>
+        <tr><td><strong>FFN Up Proj</strong> (×28 layers)</td><td>2,048 × 6,144</td><td>352,321,536</td><td>20.5%</td><td class="vg">Yes</td></tr>
+        <tr><td><strong>FFN Down Proj</strong> (×28 layers)</td><td>6,144 × 2,048</td><td>352,321,536</td><td>20.5%</td><td class="vg">Yes</td></tr>
+        <tr><td><strong>LM Head</strong> (tied with embed)</td><td>— (shared)</td><td>0 (tied)</td><td>—</td><td>—</td></tr>
+        <tr><td><strong>RMSNorm + biases</strong></td><td>various</td><td>~230K</td><td>&lt;0.1%</td><td class="vg">Yes</td></tr>
+        <tr><td colspan="2" style="font-weight:800">Total</td><td style="font-weight:800">~1,720,454,144</td><td style="font-weight:800">100%</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cd">
+    <div class="cd-t">Parameter Size by Layer Type</div>
+    <div class="bar-chart">
+      <div class="bar-row"><div class="bar-label">FFN (Gate+Up+Down)</div><div class="bar-track"><div class="bar-fill he" style="width:61.5%">1.06B (61.5%)</div></div></div>
+      <div class="bar-row"><div class="bar-label">Embeddings</div><div class="bar-track"><div class="bar-fill" style="width:18.1%;background:linear-gradient(90deg,rgba(66,165,245,.3),rgba(66,165,245,.8))">311M (18.1%)</div></div></div>
+      <div class="bar-row"><div class="bar-label">Attention (Q/K/V/O)</div><div class="bar-track"><div class="bar-fill" style="width:20.4%;background:linear-gradient(90deg,rgba(255,183,77,.3),rgba(255,183,77,.8))">352M (20.4%)</div></div></div>
+      <div class="bar-row"><div class="bar-label">Norms + biases</div><div class="bar-track"><div class="bar-fill" style="width:0.5%;background:rgba(156,163,175,.6)">&nbsp;</div></div><div class="bar-val">&lt;0.1%</div></div>
+    </div>
+  </div>
+
+  <!-- Architecture Specifics -->
+  <div class="sec-t">Architectural Design Choices</div>
+  <div class="g2">
+    <div class="cd">
+      <div class="cd-t">🔑 Grouped Query Attention (GQA)</div>
+      <p style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:12px">
+        Qwen3-1.7B uses <strong style="color:var(--t1)">Grouped Query Attention</strong> with 16 query heads sharing 8 key-value heads (2:1 ratio). This reduces KV-cache memory by 50% compared to standard MHA while maintaining most of the model quality, enabling faster inference and longer context windows.
+      </p>
+      <div class="arch-detail">
+        <span class="ak">Query Heads</span><span class="av">16</span>
+        <span class="ak">KV Heads</span><span class="av">8</span>
+        <span class="ak">GQA Ratio</span><span class="av">2:1</span>
+        <span class="ak">Head Dim</span><span class="av">128</span>
+        <span class="ak">KV Cache Savings</span><span class="av">50% vs MHA</span>
       </div>
-      <div class="card">
-        <div class="card-title">Environment Details</div>
-        <ul class="env-list">
-          <li><span class="env-key">Python</span><span class="env-val">3.12</span></li>
-          <li><span class="env-key">CUDA</span><span class="env-val">13.4</span></li>
-          <li><span class="env-key">WandB</span><span class="env-val">0.28.2</span></li>
-          <li><span class="env-key">Mixed Precision</span><span class="env-val">Disabled</span></li>
-          <li><span class="env-key">Dynamo</span><span class="env-val">Disabled</span></li>
-          <li><span class="env-key">DDP Strategy</span><span class="env-val">find_unused_params=True</span></li>
-          <li><span class="env-key">Num Machines</span><span class="env-val">1</span></li>
-        </ul>
+    </div>
+    <div class="cd">
+      <div class="cd-t">🌀 Rotary Position Embeddings (RoPE)</div>
+      <p style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:12px">
+        Uses <strong style="color:var(--t1)">RoPE</strong> with a very high base frequency of <strong style="color:var(--t1)">10,000,000</strong> (vs standard 10,000), allowing natural extrapolation to longer sequences. Combined with a 32K max position, this supports extended reasoning chains needed for math tasks.
+      </p>
+      <div class="arch-detail">
+        <span class="ak">Position Encoding</span><span class="av">Rotary (RoPE)</span>
+        <span class="ak">θ Base</span><span class="av">10,000,000</span>
+        <span class="ak">Max Positions</span><span class="av">32,768</span>
+        <span class="ak">Scaling Type</span><span class="av">Default (no NTK/YaRN)</span>
       </div>
     </div>
   </div>
 
-</div>
-</div>
-
-<!-- ============ TAB: RECOMMENDATIONS ============ -->
-<div id="tab-recommendations" class="tab-content">
-<div class="container">
-
-  <div class="section">
-    <div class="section-title">Action Items for Next Training Run</div>
-
-    <div style="display:grid; gap:16px;">
-      <div class="rec-card">
-        <div><span class="rec-num">1</span><div class="rec-title">Increase max_new_tokens to 512–1024</div></div>
-        <div class="rec-desc"><strong>Priority: CRITICAL.</strong> This is the root cause. GSM8K chain-of-thought solutions typically require 400–800 tokens. At 256 tokens, 100% of completions are truncated before producing an answer. Set <code>max_new_tokens=768</code> as a starting point. This will increase step time proportionally but is essential for any learning to occur.</div>
+  <div class="g2 mb">
+    <div class="cd">
+      <div class="cd-t">⚡ SwiGLU FFN</div>
+      <p style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:12px">
+        The feed-forward network uses <strong style="color:var(--t1)">SwiGLU</strong> (SiLU gating), which splits the intermediate computation into gate and up projections. With an intermediate size of 6,144 and hidden size 2,048, the expansion ratio is 3:1. SwiGLU provides better gradient flow and training stability than standard ReLU FFNs.
+      </p>
+      <div class="arch-detail">
+        <span class="ak">Activation</span><span class="av">SiLU (Swish)</span>
+        <span class="ak">Gate + Up → Down</span><span class="av">2048 → 6144 → 2048</span>
+        <span class="ak">Expansion Ratio</span><span class="av">3.0×</span>
+        <span class="ak">FFN % of Params</span><span class="av">61.5%</span>
       </div>
-
-      <div class="rec-card">
-        <div><span class="rec-num">2</span><div class="rec-title">Increase GRPO group size (num_generations)</div></div>
-        <div class="rec-desc"><strong>Priority: HIGH.</strong> GRPO needs reward variance within each group to compute meaningful advantages. With uniform rewards (all completions equally bad), advantages are zero → no gradients. Increase the number of completions per prompt (e.g., from 4 to 8 or 16) to increase the chance of at least one completion being correct, creating the contrast GRPO needs.</div>
-      </div>
-
-      <div class="rec-card">
-        <div><span class="rec-num">3</span><div class="rec-title">SFT warm-start before GRPO</div></div>
-        <div class="rec-desc"><strong>Priority: HIGH.</strong> The base Qwen3-1.7B model doesn't produce correctly formatted GSM8K solutions out of the box. A short supervised fine-tuning (SFT) phase on 100–500 examples with correct chain-of-thought format would move the model into a regime where some completions earn positive reward, enabling GRPO to learn.</div>
-      </div>
-
-      <div class="rec-card">
-        <div><span class="rec-num">4</span><div class="rec-title">Enable mixed precision (bf16 or fp16)</div></div>
-        <div class="rec-desc"><strong>Priority: MEDIUM.</strong> Both runs used full precision. Enabling <code>--mixed_precision=bf16</code> in the accelerate config would reduce memory usage and potentially improve throughput, especially for the generation phase which dominates step time (80%+).</div>
-      </div>
-
-      <div class="rec-card">
-        <div><span class="rec-num">5</span><div class="rec-title">Disable find_unused_parameters</div></div>
-        <div class="rec-desc"><strong>Priority: LOW.</strong> The DDP warning shows no unused parameters were found. Setting <code>find_unused_parameters=False</code> would skip an extra autograd graph traversal each step, providing a small but free performance gain.</div>
-      </div>
-
-      <div class="rec-card">
-        <div><span class="rec-num">6</span><div class="rec-title">Use Hecate cluster for future runs</div></div>
-        <div class="rec-desc"><strong>Priority: LOW.</strong> Hecate delivered 1.83× faster training with 2.66× faster generation. For longer runs with proper hyperparameters, this translates to significant wall-clock savings. Prefer Hecate unless it's capacity-constrained.</div>
+    </div>
+    <div class="cd">
+      <div class="cd-t">🧠 Thinking / Reasoning Mode</div>
+      <p style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:12px">
+        Qwen3 models support a <strong style="color:var(--t1)">dual-mode</strong> architecture with explicit thinking tokens. The tokenizer includes special <code>&lt;think&gt;</code> and <code>&lt;/think&gt;</code> tokens that bracket chain-of-thought reasoning. This is why the <code>reasoning_reward_fn</code> returned +0.5 — the model enters thinking mode but was truncated at 256 tokens before producing a final answer.
+      </p>
+      <div class="arch-detail">
+        <span class="ak">Thinking Tokens</span><span class="av">&lt;think&gt; / &lt;/think&gt;</span>
+        <span class="ak">Chat Template</span><span class="av">ChatML-style (im_start/im_end)</span>
+        <span class="ak">Reasoning Status</span><span class="av vg">Active (detected in output)</span>
+        <span class="ak">Issue</span><span class="av vb">Truncated before answer</span>
       </div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Suggested Hyperparameters for Next Run</div>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Parameter</th><th>Current</th><th>Suggested</th><th>Rationale</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>max_new_tokens</td><td class="val-bad">256</td><td class="val-good">768</td><td>Allow full CoT solutions</td></tr>
-          <tr><td>num_generations</td><td>4 (assumed)</td><td class="val-good">8–16</td><td>Increase reward variance in groups</td></tr>
-          <tr><td>num_train_epochs</td><td>1</td><td class="val-good">3–5</td><td>More passes for learning</td></tr>
-          <tr><td>mixed_precision</td><td class="val-bad">no</td><td class="val-good">bf16</td><td>Faster + lower VRAM</td></tr>
-          <tr><td>find_unused_parameters</td><td class="val-bad">True</td><td class="val-good">False</td><td>Remove unnecessary overhead</td></tr>
-          <tr><td>Cluster</td><td>Either</td><td class="val-good">Hecate</td><td>1.83× faster</td></tr>
-        </tbody>
-      </table>
+  <div class="sec-t">Single Transformer Layer Anatomy</div>
+  <div class="cd">
+    <div class="arch-flow">
+      <div class="arch-node"><div class="arch-node-t">Input</div><div class="arch-node-s">Hidden [B, L, 2048]</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node"><div class="arch-node-t">RMSNorm</div><div class="arch-node-s">ε=1e-6</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node hl"><div class="arch-node-t">GQA Attention</div><div class="arch-node-s">16Q / 8KV heads</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node"><div class="arch-node-t">+ Residual</div><div class="arch-node-s">Skip connection</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node"><div class="arch-node-t">RMSNorm</div><div class="arch-node-s">ε=1e-6</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node hl"><div class="arch-node-t">SwiGLU FFN</div><div class="arch-node-s">2048→6144→2048</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node"><div class="arch-node-t">+ Residual</div><div class="arch-node-s">Skip connection</div></div>
+    </div>
+    <div style="text-align:center;font-size:11px;color:var(--t2);margin-top:6px">×28 layers stacked · Pre-norm architecture · Tied embeddings</div>
+  </div>
+
+  <div class="cd">
+    <div class="cd-t">Model Files (safetensors)</div>
+    <table>
+      <thead><tr><th>File</th><th>Size</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td>model-00001-of-00002.safetensors</td><td>3.53 GB</td><td>Layers 0–20 weights</td></tr>
+        <tr><td>model-00002-of-00002.safetensors</td><td>0.53 GB</td><td>Layers 21–27 + embeddings + head</td></tr>
+        <tr><td>model.safetensors.index.json</td><td>25.6 KB</td><td>311 weight tensors index</td></tr>
+        <tr><td colspan="2" style="font-weight:700">Total model size</td><td style="font-weight:700">~4.06 GB (FP32)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======== TAB 6: DIAGNOSTICS ======== -->
+<div class="pane" id="p6">
+
+  <div class="sec-t">Critical Findings</div>
+  <div class="cd">
+    <div class="find">
+      <div class="find-ic cr">🚨</div>
+      <div><div class="find-tt">100% Completion Clipping — Root Cause of Training Failure</div>
+      <div class="find-ds">Every completion hit the <code>max_new_tokens=256</code> cap. <code>clipped_ratio=1.0</code> and <code>mean_terminated_length=0</code> confirm nothing ever produced an EOS token. GSM8K chain-of-thought solutions need 400–800 tokens. The model starts reasoning but can never finish.</div></div>
+    </div>
+    <div class="find">
+      <div class="find-ic cr">🚨</div>
+      <div><div class="find-tt">Zero Gradient Flow — GRPO Advantage Collapse</div>
+      <div class="find-ds">Loss = 0 and grad_norm = 0 for every step. GRPO computes advantages from relative reward within each group. When all completions get identical rewards (reward_std = 0), advantages are zero → no gradient signal. <code>frac_reward_zero_std ≈ 1.0</code>.</div></div>
+    </div>
+    <div class="find">
+      <div class="find-ic cr">🚨</div>
+      <div><div class="find-tt">Correctness Reward Flatlined at -1.0</div>
+      <div class="find-ds">The model never solved a single GSM8K problem — it can't produce a correct answer if it can't finish generating one. Rare -0.981 outliers on Pytche suggest a tiny fraction of completions may have partially matched.</div></div>
+    </div>
+    <div class="find">
+      <div class="find-ic wr">⚠️</div>
+      <div><div class="find-tt">Format Reward Stuck at -0.5</div>
+      <div class="find-ds">Expected output format (e.g. <code>\boxed{answer}</code>) never appears because completions are truncated before the answer formatting step.</div></div>
+    </div>
+    <div class="find">
+      <div class="find-ic in">ℹ️</div>
+      <div><div class="find-tt">Reasoning Reward is the Only Positive Signal</div>
+      <div class="find-ds">+0.5 consistently — the model does enter thinking mode with <code>&lt;think&gt;</code> tokens. This is encouraging: the model knows HOW to reason, it just needs more tokens to finish.</div></div>
+    </div>
+    <div class="find">
+      <div class="find-ic wr">⚠️</div>
+      <div><div class="find-tt">Clip Ratio Zero — Policy Never Diverged</div>
+      <div class="find-ds">PPO clipping was never triggered because the policy ratio π/π_ref stayed at 1.0 (no updates occurred).</div></div>
     </div>
   </div>
 
+  <div class="sec-t">Completion Diagnostics</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>Metric</th><th>Actual Value</th><th>Ideal Value</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Mean Completion Length</td><td class="vb">256</td><td class="vg">~450</td><td><span class="bg bg-b">Max-capped</span></td></tr>
+        <tr><td>Min Completion Length</td><td class="vb">256</td><td class="vg">~100</td><td><span class="bg bg-b">Max-capped</span></td></tr>
+        <tr><td>Max Completion Length</td><td class="vb">256</td><td class="vg">~800</td><td><span class="bg bg-b">Max-capped</span></td></tr>
+        <tr><td>Clipped Ratio</td><td class="vb">100%</td><td class="vg">&lt;10%</td><td><span class="bg bg-b">CRITICAL</span></td></tr>
+        <tr><td>Mean Terminated Length</td><td class="vb">0</td><td class="vg">~400</td><td><span class="bg bg-b">None terminated</span></td></tr>
+        <tr><td>Max Terminated Length</td><td class="vb">0</td><td class="vg">~750</td><td><span class="bg bg-b">None terminated</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec-t">Environment &amp; Warnings</div>
+  <div class="g2">
+    <div class="cd">
+      <div class="cd-t">Common Warnings (Both Clusters)</div>
+      <ul class="el">
+        <li><span class="env-key">KernelPreference enum</span><span><span class="bg bg-w">Deprecated</span></span></li>
+        <li><span class="env-key">ScaleCalculationMode enum</span><span><span class="bg bg-w">Deprecated</span></span></li>
+        <li><span class="env-key">register_opaque_type</span><span><span class="bg bg-w">→ register_custom_class</span></span></li>
+        <li><span class="env-key">all_gather_into_tensor</span><span><span class="bg bg-w">→ all_gather_single</span></span></li>
+        <li><span class="env-key">find_unused_parameters</span><span><span class="bg bg-w">True (perf overhead)</span></span></li>
+        <li><span class="env-key">destroy_process_group</span><span><span class="bg bg-w">Not called at exit</span></span></li>
+        <li><span class="env-key">BNB CUDA binary</span><span><span class="bg bg-w">No 13.4 → fallback 13.2</span></span></li>
+      </ul>
+    </div>
+    <div class="cd">
+      <div class="cd-t">Environment Details</div>
+      <ul class="el">
+        <li><span>Python</span><span style="font-weight:600">3.12</span></li>
+        <li><span>CUDA</span><span style="font-weight:600">13.4</span></li>
+        <li><span>WandB</span><span style="font-weight:600">0.28.2</span></li>
+        <li><span>Mixed Precision</span><span style="font-weight:600">Disabled</span></li>
+        <li><span>Dynamo</span><span style="font-weight:600">Disabled</span></li>
+        <li><span>DDP Strategy</span><span style="font-weight:600">find_unused_params=True</span></li>
+        <li><span>Num Machines</span><span style="font-weight:600">1</span></li>
+        <li><span>Weight Format</span><span style="font-weight:600">safetensors (311 tensors)</span></li>
+      </ul>
+    </div>
+  </div>
 </div>
+
+<!-- ======== TAB 7: RECOMMENDATIONS ======== -->
+<div class="pane" id="p7">
+
+  <div class="sec-t">Action Items for Next Training Run</div>
+
+  <div class="rec">
+    <div><span class="rec-n">1</span><div class="rec-t">Increase max_new_tokens to 512–1024</div></div>
+    <div class="rec-d"><strong>Priority: CRITICAL.</strong> This is the root cause. GSM8K chain-of-thought solutions typically require 400–800 tokens (especially with <code>&lt;think&gt;</code> blocks). At 256 tokens, 100% of completions are truncated. Set <code>max_new_tokens=768</code> as a starting point. This will increase step time proportionally (~3× longer generation) but is essential for any learning.</div>
+  </div>
+
+  <div class="rec">
+    <div><span class="rec-n">2</span><div class="rec-t">Increase GRPO group size (num_generations)</div></div>
+    <div class="rec-d"><strong>Priority: HIGH.</strong> GRPO needs reward variance within each group to compute meaningful advantages. With all completions equally bad, advantages are zero → no gradients. Increase the number of completions per prompt (e.g., from 4 to 8 or 16) to increase the chance of at least one completion being correct.</div>
+  </div>
+
+  <div class="rec">
+    <div><span class="rec-n">3</span><div class="rec-t">SFT warm-start before GRPO</div></div>
+    <div class="rec-d"><strong>Priority: HIGH.</strong> The base Qwen3-1.7B doesn't produce correctly formatted GSM8K solutions out of the box. A short supervised fine-tuning phase on 100–500 examples with correct chain-of-thought format would move the model into a regime where some completions earn positive reward, enabling GRPO to learn.</div>
+  </div>
+
+  <div class="rec">
+    <div><span class="rec-n">4</span><div class="rec-t">Enable mixed precision (bf16)</div></div>
+    <div class="rec-d"><strong>Priority: MEDIUM.</strong> Both runs used full precision. Enabling <code>--mixed_precision=bf16</code> in the accelerate config would reduce memory usage and improve throughput — especially for the generation phase which dominates step time (80%+). Qwen3 was trained in bf16 natively.</div>
+  </div>
+
+  <div class="rec">
+    <div><span class="rec-n">5</span><div class="rec-t">Disable find_unused_parameters</div></div>
+    <div class="rec-d"><strong>Priority: LOW.</strong> DDP warns no unused parameters were found. Setting <code>find_unused_parameters=False</code> skips an extra autograd graph traversal each step — a small but free performance gain.</div>
+  </div>
+
+  <div class="rec">
+    <div><span class="rec-n">6</span><div class="rec-t">Use Hecate cluster for future runs</div></div>
+    <div class="rec-d"><strong>Priority: LOW.</strong> Hecate delivered 1.83× faster training with 2.66× faster generation. For longer runs with proper hyperparameters (more tokens, more epochs), this translates to significant wall-clock savings.</div>
+  </div>
+
+  <div class="sec-t" style="margin-top:30px">Suggested Hyperparameters for Next Run</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>Parameter</th><th>Current</th><th>Suggested</th><th>Rationale</th></tr></thead>
+      <tbody>
+        <tr><td>max_new_tokens</td><td class="vb">256</td><td class="vg">768</td><td>Allow full CoT + answer</td></tr>
+        <tr><td>num_generations</td><td>4 (assumed)</td><td class="vg">8–16</td><td>Increase reward variance in groups</td></tr>
+        <tr><td>num_train_epochs</td><td>1</td><td class="vg">3–5</td><td>More passes for learning</td></tr>
+        <tr><td>mixed_precision</td><td class="vb">no</td><td class="vg">bf16</td><td>Faster + lower VRAM</td></tr>
+        <tr><td>train_samples</td><td>500</td><td class="vg">2,000–7,473</td><td>More diverse training signal</td></tr>
+        <tr><td>find_unused_params</td><td class="vb">True</td><td class="vg">False</td><td>Remove unnecessary overhead</td></tr>
+        <tr><td>Cluster</td><td>Either</td><td class="vg">Hecate</td><td>1.83× faster</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
-<!-- ============ CHARTS ============ -->
-<script>
-const chartDefaults = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { labels: { color: '#a0b0c0', font: { size: 12 } } },
-    tooltip: {
-      backgroundColor: '#1e2a3a',
-      titleColor: '#e8e8e8',
-      bodyColor: '#a0b0c0',
-      borderColor: '#2a3f55',
-      borderWidth: 1,
-      cornerRadius: 8,
-      padding: 12,
-    }
-  },
-  scales: {
-    x: { ticks: { color: '#a0b0c0' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-    y: { ticks: { color: '#a0b0c0' }, grid: { color: 'rgba(255,255,255,0.05)' } }
-  }
-};
-
-const stepLabels = ['Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6'];
-
-// Step Time Chart
-new Chart(document.getElementById('chart-step-time'), {
-  type: 'line',
-  data: {
-    labels: stepLabels,
-    datasets: [
-      { label: 'Pytche', data: [52.75, 25.15, 25.17, 24.38, 25.25, 23.90], borderColor: '#4fc3f7', backgroundColor: 'rgba(79,195,247,0.1)', fill: true, tension: 0.3, pointRadius: 5, pointHoverRadius: 8 },
-      { label: 'Hecate', data: [30.42, 13.09, 13.48, 12.75, 13.33, 12.88], borderColor: '#76b900', backgroundColor: 'rgba(118,185,0,0.1)', fill: true, tension: 0.3, pointRadius: 5, pointHoverRadius: 8 }
-    ]
-  },
-  options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, title: { display: true, text: 'Seconds', color: '#a0b0c0' } } } }
-});
-
-// Runtime Bar
-new Chart(document.getElementById('chart-runtime-bar'), {
-  type: 'bar',
-  data: {
-    labels: ['Total Runtime', 'Step 1 (Warmup)', 'Avg Steady Step', 'Final Generate', 'Final Compute Loss'],
-    datasets: [
-      { label: 'Pytche', data: [908.6, 52.75, 24.77, 19.52, 0.162], backgroundColor: 'rgba(79,195,247,0.7)', borderColor: '#4fc3f7', borderWidth: 1, borderRadius: 6 },
-      { label: 'Hecate', data: [496.6, 30.42, 13.11, 7.33, 0.102], backgroundColor: 'rgba(118,185,0,0.7)', borderColor: '#76b900', borderWidth: 1, borderRadius: 6 }
-    ]
-  },
-  options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, title: { display: true, text: 'Seconds', color: '#a0b0c0' } } } }
-});
-
-// Throughput
-new Chart(document.getElementById('chart-throughput'), {
-  type: 'bar',
-  data: {
-    labels: ['Samples / sec', 'Steps / sec'],
-    datasets: [
-      { label: 'Pytche', data: [0.55, 0.034], backgroundColor: 'rgba(79,195,247,0.7)', borderRadius: 6 },
-      { label: 'Hecate', data: [1.007, 0.062], backgroundColor: 'rgba(118,185,0,0.7)', borderRadius: 6 }
-    ]
-  },
-  options: chartDefaults
-});
-
-// Generation Speed
-new Chart(document.getElementById('chart-gen-speed'), {
-  type: 'doughnut',
-  data: {
-    labels: ['Pytche generate (s)', 'Hecate generate (s)'],
-    datasets: [{ data: [19.52, 7.33], backgroundColor: ['rgba(79,195,247,0.8)', 'rgba(118,185,0,0.8)'], borderWidth: 0, hoverOffset: 10 }]
-  },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0b0c0' } }, tooltip: chartDefaults.plugins.tooltip } }
-});
-
-// Entropy
-new Chart(document.getElementById('chart-entropy'), {
-  type: 'line',
-  data: {
-    labels: stepLabels,
-    datasets: [
-      { label: 'Pytche', data: [0.1464, 0.1460, 0.1521, 0.1563, 0.1511, 0.1452], borderColor: '#4fc3f7', tension: 0.3, pointRadius: 5 },
-      { label: 'Hecate', data: [0.1474, 0.1523, 0.1537, 0.1543, 0.1494, 0.1495], borderColor: '#76b900', tension: 0.3, pointRadius: 5 }
-    ]
-  },
-  options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, title: { display: true, text: 'Entropy', color: '#a0b0c0' }, min: 0.14, max: 0.16 } } }
-});
-
-// Learning Rate
-new Chart(document.getElementById('chart-lr'), {
-  type: 'line',
-  data: {
-    labels: stepLabels,
-    datasets: [
-      { label: 'Learning Rate', data: [4.355e-6, 3.548e-6, 2.742e-6, 1.935e-6, 1.129e-6, 3.226e-7], borderColor: '#ffb74d', backgroundColor: 'rgba(255,183,77,0.1)', fill: true, tension: 0.3, pointRadius: 5 }
-    ]
-  },
-  options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, title: { display: true, text: 'LR', color: '#a0b0c0' } } } }
-});
-
-// Tokens
-new Chart(document.getElementById('chart-tokens'), {
-  type: 'bar',
-  data: {
-    labels: stepLabels,
-    datasets: [
-      { label: 'Cumulative Tokens', data: [56330, 112300, 168900, 225700, 282700, 339000], backgroundColor: 'rgba(118,185,0,0.6)', borderRadius: 6 }
-    ]
-  },
-  options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, title: { display: true, text: 'Tokens', color: '#a0b0c0' } } } }
-});
-
-// Reward Components Pytche
-new Chart(document.getElementById('chart-reward-pytche'), {
-  type: 'bar',
-  data: {
-    labels: stepLabels,
-    datasets: [
-      { label: 'Correctness', data: [-1, -0.981, -1, -0.981, -0.981, -1], backgroundColor: 'rgba(239,83,80,0.7)', borderRadius: 4 },
-      { label: 'Format', data: [-0.5, -0.491, -0.5, -0.491, -0.491, -0.5], backgroundColor: 'rgba(255,183,77,0.7)', borderRadius: 4 },
-      { label: 'Reasoning', data: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5], backgroundColor: 'rgba(102,187,106,0.7)', borderRadius: 4 }
-    ]
-  },
-  options: chartDefaults
-});
-
-// Reward Components Hecate
-new Chart(document.getElementById('chart-reward-hecate'), {
-  type: 'bar',
-  data: {
-    labels: stepLabels,
-    datasets: [
-      { label: 'Correctness', data: [-1, -1, -1, -1, -1, -1], backgroundColor: 'rgba(239,83,80,0.7)', borderRadius: 4 },
-      { label: 'Format', data: [-0.5, -0.5, -0.5, -0.5, -0.5, -0.5], backgroundColor: 'rgba(255,183,77,0.7)', borderRadius: 4 },
-      { label: 'Reasoning', data: [0.5, 0.5, 0.498, 0.5, 0.498, 0.5], backgroundColor: 'rgba(102,187,106,0.7)', borderRadius: 4 }
-    ]
-  },
-  options: chartDefaults
-});
-
-// Total Reward
-new Chart(document.getElementById('chart-reward-total'), {
-  type: 'line',
-  data: {
-    labels: stepLabels,
-    datasets: [
-      { label: 'Pytche', data: [-1, -0.972, -1, -0.972, -0.972, -1], borderColor: '#4fc3f7', tension: 0.3, pointRadius: 6, pointHoverRadius: 9, borderWidth: 3 },
-      { label: 'Hecate', data: [-1, -1, -1.002, -1, -1.002, -1], borderColor: '#76b900', tension: 0.3, pointRadius: 6, pointHoverRadius: 9, borderWidth: 3 }
-    ]
-  },
-  options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, title: { display: true, text: 'Total Reward', color: '#a0b0c0' }, min: -1.1, max: -0.9 } } }
-});
-
-// Zero-std fraction
-new Chart(document.getElementById('chart-zero-std'), {
-  type: 'bar',
-  data: {
-    labels: stepLabels,
-    datasets: [
-      { label: 'Pytche', data: [1, 0.9875, 1, 0.9875, 0.9875, 1], backgroundColor: 'rgba(79,195,247,0.6)', borderRadius: 4 },
-      { label: 'Hecate', data: [1, 1, 0.9875, 1, 0.9875, 1], backgroundColor: 'rgba(118,185,0,0.6)', borderRadius: 4 }
-    ]
-  },
-  options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, title: { display: true, text: 'Fraction', color: '#a0b0c0' }, min: 0.95, max: 1.01 } } }
-});
-
-// Completion stats
-new Chart(document.getElementById('chart-completion'), {
-  type: 'radar',
-  data: {
-    labels: ['Mean Length', 'Min Length', 'Max Length', 'Clipped %', 'Terminated Mean', 'Terminated Max'],
-    datasets: [
-      { label: 'Actual', data: [256, 256, 256, 100, 0, 0], borderColor: '#ef5350', backgroundColor: 'rgba(239,83,80,0.15)', pointBackgroundColor: '#ef5350' },
-      { label: 'Ideal', data: [450, 100, 800, 10, 400, 750], borderColor: '#66bb6a', backgroundColor: 'rgba(102,187,106,0.1)', pointBackgroundColor: '#66bb6a', borderDash: [5,5] }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    scales: { r: { grid: { color: 'rgba(255,255,255,0.08)' }, pointLabels: { color: '#a0b0c0', font: { size: 11 } }, ticks: { display: false }, angleLines: { color: 'rgba(255,255,255,0.08)' } } },
-    plugins: { legend: { labels: { color: '#a0b0c0' } }, tooltip: chartDefaults.plugins.tooltip }
-  }
-});
-
-// Tab switching
-function switchTab(id) {
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-  event.target.classList.add('active');
-  // Trigger chart resize after tab becomes visible
-  setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
-}
-</script>
+<div style="text-align:center;padding:20px;font-size:11px;color:var(--t2);border-top:1px solid var(--bdr);margin-top:20px">
+  Generated by NVIDIA AI Personal Assistant · 08/20/2026 · Qwen3-1.7B GRPO Training Report
+</div>
 
 </body>
 </html>
