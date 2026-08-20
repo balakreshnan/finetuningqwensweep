@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fine-Tuning Sweep — Evidence Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0A0E1A; --panel:#101726; --panel-2:#151E31; --raise:#1A2437;
+    --line:#232E48; --line-2:#33405E;
+    --text:#E7ECF6; --muted:#93A0BC; --faint:#5D6A86;
+    --brand:#45D6E0;
+    --measured:#2FE08A; --documented:#F2B14C; --narrative:#7C9CFF; --target:#B98BFF;
+    --shadow:0 20px 50px -20px rgba(0,0,0,.65);
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+    --disp:'Space Grotesk',var(--sans);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  body{
+    margin:0;background:var(--ink);color:var(--text);
+    font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(900px 500px at 82% -8%, rgba(69,214,224,.10), transparent 60%),
+      radial-gradient(700px 600px at 8% 12%, rgba(124,156,255,.07), transparent 60%),
+      linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px) 0 0/100% 46px;
+  }
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 24px}
+  a{color:inherit}
+  ::selection{background:rgba(69,214,224,.28)}
+  h1,h2,h3{font-family:var(--disp);font-weight:600;letter-spacing:-.01em;margin:0}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--brand)}
+
+  /* ---------- NAV ---------- */
+  header.nav{position:sticky;top:0;z-index:60;backdrop-filter:blur(12px);
+    background:rgba(10,14,26,.78);border-bottom:1px solid var(--line)}
+  .nav-inner{max-width:1180px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;gap:20px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:-.01em}
+  .brand .dot{width:11px;height:11px;border-radius:2px;background:var(--brand);box-shadow:0 0 0 3px rgba(69,214,224,.18);animation:pulse 3.4s ease-in-out infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(69,214,224,0)}}
+  .nav-links{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+  .nav-links a{font-family:var(--mono);font-size:12.5px;color:var(--muted);text-decoration:none;padding:7px 11px;border-radius:7px;transition:.2s}
+  .nav-links a:hover{color:var(--text);background:var(--panel-2)}
+  .nav-links a.active{color:var(--ink);background:var(--brand);font-weight:500}
+  .menu-btn{display:none;margin-left:auto;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    font-family:var(--mono);font-size:12px;padding:8px 12px;border-radius:8px;cursor:pointer}
+  @media(max-width:860px){.nav-links{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;
+    background:var(--ink);border-bottom:1px solid var(--line);padding:10px 24px 16px;gap:2px}
+    .nav-links.open{display:flex}.menu-btn{display:block}}
+
+  /* ---------- HERO ---------- */
+  .hero{padding:74px 0 30px}
+  .repo-tag{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12px;color:var(--muted);
+    border:1px solid var(--line);border-radius:999px;padding:6px 14px;margin-bottom:26px}
+  .repo-tag b{color:var(--text);font-weight:500}
+  .hero h1{font-size:clamp(2.5rem,6vw,4.6rem);line-height:1.02;font-weight:700;max-width:16ch}
+  .hero h1 .g{color:var(--brand)}
+  .hero .lede{margin-top:22px;max-width:60ch;font-size:1.12rem;color:var(--muted)}
+  .hero .lede b{color:var(--text);font-weight:500}
+
+  .signal{margin-top:44px;display:grid;grid-template-columns:1.15fr .85fr;gap:20px;align-items:stretch}
+  @media(max-width:820px){.signal{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+  .signal-main{padding:26px 26px 22px}
+  .signal-main .cap{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:20px}
+  .bars{display:flex;flex-direction:column;gap:14px}
+  .bar-row{display:grid;grid-template-columns:150px 1fr 42px;align-items:center;gap:14px}
+  .bar-row .lab{font-family:var(--mono);font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .swatch{width:10px;height:10px;border-radius:3px;flex:none}
+  .track{height:11px;border-radius:6px;background:#0c1220;overflow:hidden;border:1px solid var(--line)}
+  .fill{height:100%;width:0;border-radius:6px;transition:width 1.1s cubic-bezier(.2,.8,.2,1)}
+  .bar-row .num{font-family:var(--mono);font-size:14px;text-align:right;color:var(--text)}
+  .signal-side{padding:26px;display:flex;flex-direction:column;justify-content:center;gap:6px;position:relative;overflow:hidden}
+  .signal-side .big{font-family:var(--disp);font-weight:700;font-size:5.4rem;line-height:.9;color:var(--measured)}
+  .signal-side .big small{font-size:1.4rem;color:var(--faint);font-weight:500}
+  .signal-side .sub{font-size:.98rem;color:var(--muted);max-width:26ch}
+  .signal-side::after{content:"finite eval";position:absolute;right:-8px;bottom:8px;font-family:var(--mono);
+    font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--line-2);transform:rotate(-90deg);transform-origin:right}
+
+  .toggle-row{margin-top:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .switch{display:inline-flex;align-items:center;gap:11px;cursor:pointer;font-family:var(--mono);font-size:12.5px;color:var(--muted);user-select:none}
+  .switch .tk{width:42px;height:23px;border-radius:20px;background:#0c1220;border:1px solid var(--line-2);position:relative;transition:.25s}
+  .switch .tk::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--faint);transition:.25s}
+  .switch.on .tk{background:rgba(47,224,138,.2);border-color:var(--measured)}
+  .switch.on .tk::after{left:21px;background:var(--measured)}
+  .switch.on{color:var(--text)}
+
+  /* github cta */
+  .gh-btn{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;color:var(--ink);
+    background:var(--brand);border:1px solid var(--brand);border-radius:10px;padding:11px 17px;text-decoration:none;
+    font-weight:500;transition:.2s;box-shadow:0 8px 24px -10px rgba(69,214,224,.6)}
+  .gh-btn:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 12px 30px -10px rgba(69,214,224,.7)}
+  .gh-btn svg{width:17px;height:17px;fill:var(--ink)}
+  .gh-nav{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12.5px;color:var(--muted);
+    text-decoration:none;padding:7px 11px;border:1px solid var(--line);border-radius:7px;transition:.2s}
+  .gh-nav:hover{color:var(--brand);border-color:var(--brand)}
+  .gh-nav svg{width:14px;height:14px;fill:currentColor}
+  a.repo-tag{text-decoration:none;cursor:pointer;transition:.2s}
+  a.repo-tag:hover{border-color:var(--brand);color:var(--text)}
+
+  /* body dim mode */
+  body.provenance .dimmable{opacity:.14;filter:saturate(.2)}
+  body.provenance .dimmable{transition:opacity .4s,filter .4s}
+
+  /* ---------- SECTIONS ---------- */
+  section{padding:66px 0;position:relative}
+  .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:34px;flex-wrap:wrap}
+  .sec-head .num{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .sec-head h2{font-size:clamp(1.7rem,3.4vw,2.5rem)}
+  .sec-head p{color:var(--muted);max-width:52ch;margin:8px 0 0}
+  hr.rule{border:0;border-top:1px solid var(--line);margin:0}
+
+  /* findings */
+  .findings{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  @media(max-width:760px){.findings{grid-template-columns:1fr}}
+  .finding{padding:22px 22px 20px;border-radius:14px;background:var(--panel);border:1px solid var(--line);position:relative;overflow:hidden}
+  .finding::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--brand);opacity:.7}
+  .finding[data-t="measured"]::before{background:var(--measured)}
+  .finding[data-t="documented"]::before{background:var(--documented)}
+  .finding[data-t="narrative"]::before{background:var(--narrative)}
+  .finding h3{font-size:1.06rem;margin-bottom:7px;display:flex;gap:10px;align-items:baseline}
+  .finding h3 .k{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .finding p{margin:0;font-size:.94rem;color:var(--muted)}
+  .finding p b{color:var(--text);font-weight:600}
+  .finding .stat{font-family:var(--mono);color:var(--measured)}
+
+  /* ---------- TIMELINE ---------- */
+  .tl{position:relative;margin-top:10px;padding-left:4px}
+  .tl::before{content:"";position:absolute;left:14px;top:6px;bottom:6px;width:2px;
+    background:linear-gradient(180deg,var(--measured),var(--documented) 30%,var(--narrative) 55%,var(--documented) 78%,var(--brand));opacity:.55}
+  .tl-item{position:relative;padding:0 0 26px 46px;opacity:0;transform:translateY(14px);transition:opacity .5s,transform .5s}
+  .tl-item.in{opacity:1;transform:none}
+  .tl-item:last-child{padding-bottom:0}
+  .tl-node{position:absolute;left:6px;top:3px;width:18px;height:18px;border-radius:50%;background:var(--ink);
+    border:2px solid var(--brand);box-shadow:0 0 0 4px rgba(69,214,224,.1);display:grid;place-items:center}
+  .tl-node::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--brand)}
+  .tl-item[data-t="measured"] .tl-node{border-color:var(--measured);box-shadow:0 0 0 4px rgba(47,224,138,.12)}
+  .tl-item[data-t="measured"] .tl-node::after{background:var(--measured)}
+  .tl-item[data-t="documented"] .tl-node{border-color:var(--documented);box-shadow:0 0 0 4px rgba(242,177,76,.12)}
+  .tl-item[data-t="documented"] .tl-node::after{background:var(--documented)}
+  .tl-item[data-t="narrative"] .tl-node{border-color:var(--narrative);box-shadow:0 0 0 4px rgba(124,156,255,.12)}
+  .tl-item[data-t="narrative"] .tl-node::after{background:var(--narrative)}
+  .tl-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 18px 15px;transition:.18s}
+  .tl-card:hover{border-color:var(--line-2);transform:translateX(3px)}
+  .tl-card .ph{display:flex;align-items:center;gap:10px;margin-bottom:5px;flex-wrap:wrap}
+  .tl-card .ph .n{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .tl-card .ph h3{font-size:1.08rem}
+  .tl-card .ph .tier{margin-left:auto}
+  .tl-card .hw{font-family:var(--mono);font-size:11.5px;color:var(--brand);margin-bottom:7px}
+  .tl-card p{margin:0;font-size:.93rem;color:var(--muted)}
+  .tl-card p b{color:var(--text);font-weight:600}
+  @media(max-width:520px){.tl-card .ph .tier{margin-left:0}}
+
+  /* ---------- EXPLORER ---------- */
+  .controls{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;margin-bottom:24px}
+  .fgroup{display:flex;flex-direction:column;gap:9px}
+  .fgroup .glab{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:7px 12px;cursor:pointer;transition:.18s;white-space:nowrap}
+  .chip:hover{border-color:var(--line-2);color:var(--text)}
+  .chip.sel{color:var(--ink);background:var(--brand);border-color:var(--brand);font-weight:500}
+  .fgroup.ev .chip.sel[data-v="measured"]{background:var(--measured)}
+  .fgroup.ev .chip.sel[data-v="documented"]{background:var(--documented)}
+  .fgroup.ev .chip.sel[data-v="narrative"]{background:var(--narrative);color:var(--ink)}
+  .fgroup.ev .chip.sel[data-v="target"]{background:var(--target);color:var(--ink)}
+  .count-line{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-bottom:18px}
+  .count-line b{color:var(--brand)}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+  @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.grid{grid-template-columns:1fr}}
+  .exp{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:17px 17px 15px;cursor:pointer;
+    transition:transform .18s,border-color .18s,box-shadow .18s;position:relative;display:flex;flex-direction:column;gap:11px}
+  .exp:hover{transform:translateY(-3px);border-color:var(--line-2);box-shadow:var(--shadow)}
+  .exp .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .exp .id{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.04em}
+  .tier{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap;border:1px solid}
+  .tier.measured{color:var(--measured);border-color:rgba(47,224,138,.4);background:rgba(47,224,138,.08)}
+  .tier.documented{color:var(--documented);border-color:rgba(242,177,76,.4);background:rgba(242,177,76,.08)}
+  .tier.narrative{color:var(--narrative);border-color:rgba(124,156,255,.4);background:rgba(124,156,255,.08)}
+  .tier.target{color:var(--target);border-color:rgba(185,139,255,.4);background:rgba(185,139,255,.08)}
+  .exp h3{font-size:1.02rem;line-height:1.25}
+  .exp .model{font-family:var(--mono);font-size:11.5px;color:var(--muted);word-break:break-word}
+  .exp .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+  .pill{font-family:var(--mono);font-size:10.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+  .empty{grid-column:1/-1;text-align:center;padding:50px 20px;color:var(--faint);font-family:var(--mono);font-size:13px}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;z-index:100;background:rgba(4,7,14,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:24px}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--panel-2);border:1px solid var(--line-2);border-radius:18px;max-width:560px;width:100%;max-height:88vh;overflow:auto;box-shadow:var(--shadow)}
+  .modal-head{padding:24px 26px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel-2);z-index:2}
+  .modal-head .id{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .modal-head h3{font-size:1.4rem;margin:6px 0 12px}
+  .modal-body{padding:22px 26px 26px}
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 16px;font-size:.9rem}
+  .kv dt{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding-top:2px}
+  .kv dd{margin:0;font-family:var(--mono);font-size:12.5px;color:var(--text);word-break:break-word}
+  .modal .note{margin-top:20px;padding:14px 16px;border-radius:10px;font-size:.88rem;color:var(--muted);background:var(--panel);border:1px solid var(--line)}
+  .modal .note b{color:var(--text)}
+  .close{position:absolute;top:18px;right:20px;background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:18px;line-height:1;display:grid;place-items:center}
+  .close:hover{color:var(--text);border-color:var(--line-2)}
+
+  /* ---------- SWEEP CHART ---------- */
+  .sweep{display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:start}
+  @media(max-width:840px){.sweep{grid-template-columns:1fr}}
+  .chartcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}
+  .chartcard .legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:6px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .chartcard .legend span{display:inline-flex;align-items:center;gap:7px}
+  .chartcard .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .bargroup rect{transition:opacity .2s}
+  .run1card{background:linear-gradient(180deg,rgba(47,224,138,.09),var(--panel));border:1px solid rgba(47,224,138,.3);border-radius:16px;padding:24px}
+  .run1card .eyebrow{color:var(--measured)}
+  .run1card h3{font-size:1.3rem;margin:8px 0 16px}
+  .metricrow{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .metric{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px}
+  .metric .v{font-family:var(--disp);font-weight:600;font-size:1.7rem}
+  .metric .l{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+  .run1card p{color:var(--muted);font-size:.9rem;margin:16px 0 0}
+  .tip{position:fixed;z-index:120;pointer-events:none;background:var(--raise);border:1px solid var(--line-2);border-radius:9px;
+    padding:9px 12px;font-family:var(--mono);font-size:11.5px;color:var(--text);box-shadow:var(--shadow);opacity:0;transition:opacity .12s;max-width:220px}
+
+  /* ---------- PERFORMANCE ---------- */
+  .pstats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+  @media(max-width:760px){.pstats{grid-template-columns:repeat(2,1fr)}}
+  .pstat{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px 18px 16px;position:relative;overflow:hidden}
+  .pstat .v{font-family:var(--disp);font-weight:700;font-size:2.3rem;line-height:1}
+  .pstat .l{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:6px}
+  .pstat.hl .v{color:var(--brand)}
+
+  .distcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:22px}
+  .distcard .dhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px;flex-wrap:wrap;gap:10px}
+  .distbar{display:flex;height:46px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#0c1220}
+  .distseg{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--ink);
+    font-weight:600;transition:flex-grow .9s cubic-bezier(.2,.8,.2,1);min-width:0;white-space:nowrap;overflow:hidden}
+  .distlegend{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .distlegend span{display:inline-flex;align-items:center;gap:8px}
+  .distlegend i{width:11px;height:11px;border-radius:3px}
+  .distlegend b{color:var(--text);font-weight:600}
+
+  .gpucmp{display:grid;grid-template-columns:1.15fr .85fr;gap:22px;align-items:stretch;margin-bottom:22px}
+  @media(max-width:840px){.gpucmp{grid-template-columns:1fr}}
+  .gpucmp .side{background:linear-gradient(180deg,rgba(69,214,224,.07),var(--panel));border:1px solid rgba(69,214,224,.3);border-radius:16px;padding:24px;display:flex;flex-direction:column}
+  .gpucmp .side .ratio{font-family:var(--disp);font-weight:700;font-size:3.6rem;line-height:.95;color:var(--brand)}
+  .gpucmp .side .ratio small{font-size:1.2rem;color:var(--muted);font-weight:500}
+  .gpucmp .side h4{font-family:var(--disp);font-size:1.05rem;margin:14px 0 4px;font-weight:600}
+  .gpucmp .side p{font-size:.9rem;color:var(--muted);margin:0 0 14px}
+  .gpucmp .side .cau{margin-top:auto;font-family:var(--mono);font-size:11px;color:var(--documented);
+    border-top:1px solid var(--line);padding-top:12px;line-height:1.6}
+
+  .trendcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:22px}
+  .trendgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+  @media(max-width:680px){.trendgrid{grid-template-columns:1fr}}
+  .trendgrid .t{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:16px}
+  .trendgrid .t .v{font-family:var(--disp);font-weight:600;font-size:1.5rem}
+  .trendgrid .t .v em{font-style:normal;color:var(--measured)}
+  .trendgrid .t .d{font-size:.86rem;color:var(--muted);margin-top:5px}
+
+  .ctable-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;margin-bottom:22px;-webkit-overflow-scrolling:touch}
+  table.ctable{border-collapse:collapse;width:100%;min-width:720px;font-size:.86rem}
+  table.ctable th{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+    text-align:left;padding:13px 14px;border-bottom:1px solid var(--line-2);background:var(--panel-2);position:sticky;top:0}
+  table.ctable td{padding:12px 14px;border-bottom:1px solid var(--line);color:var(--muted);vertical-align:top}
+  table.ctable tr:last-child td{border-bottom:0}
+  table.ctable tr:hover td{background:rgba(69,214,224,.03)}
+  table.ctable .m{font-family:var(--mono);color:var(--text);font-size:.82rem}
+  table.ctable .sz{font-family:var(--mono);color:var(--brand);font-size:.82rem;white-space:nowrap}
+  table.ctable .rt{font-family:var(--mono);color:var(--measured);font-size:.82rem;white-space:nowrap}
+  table.ctable .rt.none{color:var(--faint)}
+
+  .perf-two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.perf-two{grid-template-columns:1fr}}
+  .perf-block{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .perf-block h4{font-family:var(--disp);font-size:1.05rem;margin:0 0 14px;display:flex;align-items:center;gap:9px}
+  .perf-block h4 .ic{font-family:var(--mono);font-size:11px;color:var(--brand)}
+  .perf-block ul{list-style:none;padding:0;margin:0;display:grid;gap:11px}
+  .perf-block li{display:grid;grid-template-columns:auto 1fr;gap:11px;font-size:.9rem;color:var(--muted);align-items:start}
+  .perf-block li .mk{color:var(--brand);font-family:var(--mono);font-size:12px;padding-top:1px}
+  .perf-block li b{color:var(--text);font-weight:600}
+  .perf-block.chk li .mk{color:var(--measured)}
+
+  /* ---------- CLUSTERS ---------- */
+  .clusters{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+  @media(max-width:820px){.clusters{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.clusters{grid-template-columns:1fr}}
+  .cl{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;position:relative;overflow:hidden}
+  .cl .gpu{font-family:var(--mono);font-size:11px;color:var(--brand);letter-spacing:.1em;text-transform:uppercase}
+  .cl h3{font-size:1.3rem;margin:6px 0 4px;font-family:var(--disp)}
+  .cl .desc{font-size:.9rem;color:var(--muted);margin:8px 0 14px}
+  .cl .rt{font-family:var(--mono);font-size:12px;display:flex;align-items:center;gap:9px;color:var(--text)}
+  .cl .rt .b{color:var(--faint)}
+  .cl .cnt{position:absolute;top:16px;right:18px;font-family:var(--disp);font-weight:700;font-size:2.4rem;color:var(--line-2)}
+
+  /* ---------- GALLERY ---------- */
+  .gal-controls{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:22px}
+  .galgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:900px){.galgrid{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:640px){.galgrid{grid-template-columns:repeat(2,1fr)}}
+  .shot{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--panel);position:relative;cursor:pointer;transition:.18s}
+  .shot:hover{border-color:var(--line-2);transform:translateY(-2px)}
+  .shot .imgwrap{aspect-ratio:16/10;background:#0b1220;position:relative;overflow:hidden}
+  .shot img{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .4s}
+  .shot img.loaded{opacity:1}
+  .shot .ph{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:center;padding:10px}
+  .shot .cap{padding:10px 12px;font-family:var(--mono);font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;gap:6px;align-items:center}
+  .shot .cap .fam{color:var(--text)}
+  .shot .cap .hw{color:var(--faint)}
+  .lightbox{position:fixed;inset:0;z-index:110;background:rgba(4,7,14,.88);display:none;align-items:center;justify-content:center;padding:30px;cursor:zoom-out}
+  .lightbox.open{display:flex}
+  .lightbox figure{margin:0;max-width:1000px;text-align:center}
+  .lightbox img{max-width:100%;max-height:78vh;border-radius:12px;border:1px solid var(--line-2)}
+  .lightbox figcaption{margin-top:14px;font-family:var(--mono);font-size:12.5px;color:var(--muted);max-width:70ch}
+  .lightbox figcaption b{color:var(--text)}
+
+  /* ---------- METHODS ---------- */
+  .tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:22px}
+  .tab{font-family:var(--mono);font-size:12.5px;color:var(--muted);background:var(--panel);border:1px solid var(--line);
+    border-radius:9px;padding:9px 15px;cursor:pointer;transition:.18s}
+  .tab.sel{color:var(--ink);background:var(--brand);border-color:var(--brand);font-weight:500}
+  .tab:hover:not(.sel){color:var(--text);border-color:var(--line-2)}
+  .method-panel{display:none;animation:fade .3s ease}
+  .method-panel.show{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .method-panel ul{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+  .method-panel li{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+    display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
+  .method-panel li .mk{font-family:var(--mono);font-size:12px;color:var(--brand);padding-top:2px}
+  .method-panel li p{margin:0;font-size:.95rem;color:var(--muted)}
+  .method-panel li p b{color:var(--text);font-weight:600}
+
+  /* ---------- NEXT / LIMITS ---------- */
+  .steps{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  @media(max-width:760px){.steps{grid-template-columns:1fr}}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start}
+  .step .n{font-family:var(--disp);font-weight:700;font-size:1.6rem;color:var(--brand);line-height:1;min-width:34px}
+  .step h3{font-size:1.02rem;margin-bottom:5px}
+  .step p{margin:0;font-size:.92rem;color:var(--muted)}
+  .limits{display:grid;gap:10px;max-width:820px}
+  .limit{display:grid;grid-template-columns:auto 1fr;gap:13px;align-items:start;font-size:.95rem;color:var(--muted);
+    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--documented);border-radius:10px;padding:15px 18px}
+  .limit .x{color:var(--documented);font-family:var(--mono);font-size:12px;padding-top:2px}
+
+  /* ---------- FOOTER ---------- */
+  footer{border-top:1px solid var(--line);padding:44px 0 60px;margin-top:20px}
+  footer .fgrid{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;align-items:flex-start}
+  footer h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:0 0 14px}
+  .sources{display:flex;flex-wrap:wrap;gap:8px;max-width:640px}
+  .sources a{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-decoration:none;border:1px solid var(--line);
+    border-radius:7px;padding:5px 10px;transition:.18s}
+  .sources a:hover{color:var(--brand);border-color:var(--brand)}
+  footer .meta{font-family:var(--mono);font-size:11.5px;color:var(--faint);line-height:1.9}
+  footer .meta b{color:var(--muted);font-weight:500}
+  .disclaimer{margin-top:28px;font-size:.82rem;color:var(--faint);max-width:70ch}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <div class="brand"><span class="dot"></span> finetuningqwensweep<span class="mono" style="color:var(--faint);font-weight:400;font-size:12px">/audit</span></div>
+    <button class="menu-btn" id="menuBtn">Menu</button>
+    <nav class="nav-links" id="navLinks">
+      <a href="#overview" class="active">Overview</a>
+      <a href="#timeline">Timeline</a>
+      <a href="#experiments">Experiments</a>
+      <a href="#sweep">Sweep</a>
+      <a href="#performance">Performance</a>
+      <a href="#clusters">Clusters</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#methods">Methods</a>
+      <a href="#next">Next</a>
+      <a class="gh-nav" href="https://github.com/balakreshnan/finetuningqwensweep" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero" id="overview" style="padding-top:74px">
+  <div class="wrap">
+    <a class="repo-tag mono" href="https://github.com/balakreshnan/finetuningqwensweep" target="_blank" rel="noopener"><span class="dot" style="width:8px;height:8px;border-radius:2px;background:var(--measured);display:inline-block"></span> <b>balakreshnan/finetuningqwensweep</b> · snapshot d04f1ef · 2026-08-19</a>
+    <h1>25 runs logged.<br>Four <span class="g">measured</span>.<br>One finite eval.</h1>
+    <p class="lede">An inventory that keeps <b>machine-readable measured runs</b> apart from documented recipes, narrative smoke tests, and target configs. Missing GPU and metric metadata is left unspecified — never inferred. Everything below is graded by how much it's actually proven.</p>
+
+    <div class="signal">
+      <div class="card signal-main dimmable">
+        <div class="cap">
+          <span class="eyebrow">Evidence tiers · 25 records</span>
+          <span class="mono" style="font-size:11.5px;color:var(--faint)">how proven?</span>
+        </div>
+        <div class="bars" id="bars">
+          <div class="bar-row"><span class="lab"><span class="swatch" style="background:var(--measured)"></span>Measured CSV</span><span class="track"><span class="fill" style="background:var(--measured)" data-w="16"></span></span><span class="num">4</span></div>
+          <div class="bar-row"><span class="lab"><span class="swatch" style="background:var(--documented)"></span>Documented</span><span class="track"><span class="fill" style="background:var(--documented)" data-w="68"></span></span><span class="num">17</span></div>
+          <div class="bar-row"><span class="lab"><span class="swatch" style="background:var(--narrative)"></span>Narrative</span><span class="track"><span class="fill" style="background:var(--narrative)" data-w="12"></span></span><span class="num">3</span></div>
+          <div class="bar-row"><span class="lab"><span class="swatch" style="background:var(--target)"></span>Target config</span><span class="track"><span class="fill" style="background:var(--target)" data-w="4"></span></span><span class="num">1</span></div>
+        </div>
+      </div>
+      <div class="card signal-side">
+        <div class="big" id="bigNum">1<small>/25</small></div>
+        <div class="sub">records carry a finite committed eval loss — <b style="color:var(--text)">run1_balanced</b>. The other three sweep rows report <span class="mono" style="color:var(--documented)">NaN</span>.</div>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <a class="gh-btn" href="https://github.com/balakreshnan/finetuningqwensweep" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>View repo on GitHub</a>
+      <label class="switch" id="provToggle"><span class="tk"></span> Dim everything that isn't measured</label>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- FINDINGS -->
+<section id="findings-sec">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">01 — Executive readout</div>
+        <h2>What the repository actually proves</h2>
+        <p>Execution evidence is strong; evaluation evidence is thin. The headline claims, ranked by confidence.</p>
+      </div>
+    </div>
+    <div class="findings">
+      <div class="finding" data-t="measured">
+        <h3><span class="k">A</span> The one finite result</h3>
+        <p><b>run1_balanced</b> — train <span class="stat">1.3373</span>, eval <span class="stat">1.4324</span>, perplexity <span class="stat">4.19</span>, <span class="stat">46.6 min</span>, <span class="stat">6.485 samples/s</span>. The only committed finite eval in the repo.</p>
+      </div>
+      <div class="finding" data-t="documented">
+        <h3><span class="k">B</span> Lower train loss ≠ better</h3>
+        <p>The other three sweep rows report <b>NaN eval loss</b>. Their lower train losses should <b>not</b> be read as superior generalization — the evaluation simply didn't produce a finite number.</p>
+      </div>
+      <div class="finding" data-t="documented">
+        <h3><span class="k">C</span> Config drift in the suite</h3>
+        <p>The current fixed W&amp;B suite diverges from the historical CSV: <b>run3_low_lr</b> now uses LoRA <b>r16</b> (was r8), and a higher-capacity <b>r32</b> point was added.</p>
+      </div>
+      <div class="finding" data-t="narrative">
+        <h3><span class="k">D</span> GRPO runs, but numbers don't ship</h3>
+        <p>GRPO+QLoRA is demonstrated on Qwen3-1.7B / GSM8K across Pytche and Hecate, yet no portable reward/accuracy tables are committed. The <b>15 / 6 / 40 min</b> figures are narrative, not benchmarks.</p>
+      </div>
+      <div class="finding" data-t="documented">
+        <h3><span class="k">E</span> 25 screenshots, two provenance flags</h3>
+        <p>The <b>nemo3nano-ft</b> shots belong to the <b>8×H100</b> recipe (not Pytche/Blackwell), and the GRPO doc calls a Qwen3-1.7B + GSM8K text run "multimodal." Both are corrected here.</p>
+      </div>
+      <div class="finding" data-t="measured">
+        <h3><span class="k">F</span> The obvious next move</h3>
+        <p>Rerun the four historical Qwen configs through the current <b>finite-eval guard</b> with immutable run manifests before expanding the sweep. Recover validation first, scale second.</p>
+      </div>
+      <div class="finding" data-t="documented">
+        <h3><span class="k">G</span> Portfolio skews small</h3>
+        <p><b>21 of 25 records (84%)</b> use models ≤3B — one 7B VLM and three 30B-A3B Nemotron variants sit above that. Hardware conclusions from small runs may not transfer to 30B-class MoE.</p>
+      </div>
+      <div class="finding" data-t="narrative">
+        <h3><span class="k">H</span> The one GPU signal</h3>
+        <p>The matched GRPO smoke pair — <b>4×Rubin ~6 min vs 4×B200 ~15 min</b> — is a <span class="stat" style="color:var(--narrative)">2.5×</span> directional wall-clock ratio. H100 and GH200 have no matched runtime evidence yet.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- TIMELINE -->
+<section id="timeline">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">02 — Evolution</div>
+        <h2>Project timeline</h2>
+        <p>Runs aren't date-stamped, so this reconstructs the provenance-maturity arc from the report's own words — "pre-Tyche," "newer pipelines improve provenance," "next will be Blackwell." The one hard date is the snapshot: 2026-08-19.</p>
+      </div>
+    </div>
+    <div class="tl" id="tl"></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- EXPLORER -->
+<section id="experiments">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">03 — Inventory</div>
+        <h2>Experiment explorer</h2>
+        <p>All 25 commit-pinned records. Filter by method family, cluster, or evidence tier — tap any card for the full config.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="fgroup">
+        <span class="glab">Method family</span>
+        <div class="chips" data-filter="family">
+          <span class="chip sel" data-v="all">All</span>
+          <span class="chip" data-v="SFT">SFT</span>
+          <span class="chip" data-v="GRPO">GRPO</span>
+          <span class="chip" data-v="Multimodal">Multimodal</span>
+          <span class="chip" data-v="Megatron">Megatron</span>
+          <span class="chip" data-v="Video">Video</span>
+        </div>
+      </div>
+      <div class="fgroup ev">
+        <span class="glab">Evidence tier</span>
+        <div class="chips" data-filter="tier">
+          <span class="chip sel" data-v="all">All</span>
+          <span class="chip" data-v="measured">Measured</span>
+          <span class="chip" data-v="documented">Documented</span>
+          <span class="chip" data-v="narrative">Narrative</span>
+          <span class="chip" data-v="target">Target</span>
+        </div>
+      </div>
+      <div class="fgroup">
+        <span class="glab">Cluster</span>
+        <div class="chips" data-filter="cluster">
+          <span class="chip sel" data-v="all">All</span>
+          <span class="chip" data-v="Pytche">Pytche</span>
+          <span class="chip" data-v="Hecate">Hecate</span>
+          <span class="chip" data-v="GH200">GH200</span>
+          <span class="chip" data-v="H100">H100</span>
+          <span class="chip" data-v="EOS">EOS</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="count-line mono">Showing <b id="expCount">25</b> of 25 records</div>
+    <div class="grid" id="expGrid"></div>
+  </div>
+</section>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <button class="close" id="modalClose">✕</button>
+    <div class="modal-head">
+      <div class="id mono" id="mId"></div>
+      <h3 id="mTitle"></h3>
+      <span class="tier" id="mTier"></span>
+    </div>
+    <div class="modal-body">
+      <dl class="kv" id="mKV"></dl>
+      <div class="note" id="mNote"></div>
+    </div>
+  </div>
+</div>
+
+<hr class="rule">
+
+<!-- SWEEP -->
+<section id="sweep">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">04 — Measured</div>
+        <h2>Historical Qwen sweep</h2>
+        <p>Four Qwen2.5-3B / OASST1 SFT+QLoRA runs — the only committed machine-readable outcomes. Hover the bars.</p>
+      </div>
+    </div>
+    <div class="sweep">
+      <div class="chartcard">
+        <div class="legend">
+          <span><i style="background:var(--measured)"></i> Train loss</span>
+          <span><i style="background:var(--narrative)"></i> Eval loss</span>
+          <span><i style="background:var(--documented);opacity:.5"></i> Eval = NaN (non-finite)</span>
+        </div>
+        <svg id="sweepChart" viewBox="0 0 560 320" width="100%" role="img" aria-label="Train and eval loss across four sweep runs"></svg>
+      </div>
+      <div class="run1card">
+        <span class="eyebrow">Only finite point · run1_balanced</span>
+        <h3>r16 / a32 / d0.1 · 2 epochs</h3>
+        <div class="metricrow">
+          <div class="metric"><div class="v" style="color:var(--measured)">1.4324</div><div class="l">Eval loss</div></div>
+          <div class="metric"><div class="v">4.19</div><div class="l">Perplexity</div></div>
+          <div class="metric"><div class="v">0.0951</div><div class="l">Loss gap</div></div>
+          <div class="metric"><div class="v">6.485</div><div class="l">Samples / s</div></div>
+        </div>
+        <p>The remaining three runs (r8 configs) reach lower <em>train</em> loss but log non-finite eval — so they can't be ranked for generalization. Recovering their eval numbers is the priority rerun.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- PERFORMANCE -->
+<section id="performance">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">05 — Performance</div>
+        <h2>Model size, runtime &amp; GPU signal</h2>
+        <p>What the numbers support about hardware — and where they stop. Runtime counts as a hardware signal only when model, dataset slice, epochs, GPU count, and recipe are nominally matched.</p>
+      </div>
+    </div>
+
+    <div class="pstats">
+      <div class="pstat hl"><div class="v">84%</div><div class="l">Records ≤ 3B params</div></div>
+      <div class="pstat"><div class="v">7</div><div class="l">Records w/ measured runtime</div></div>
+      <div class="pstat"><div class="v">1</div><div class="l">Matched GPU pair (GRPO)</div></div>
+      <div class="pstat"><div class="v">2.5×</div><div class="l">Rubin vs B200 wall-clock</div></div>
+    </div>
+
+    <!-- distribution -->
+    <div class="distcard">
+      <div class="dhead">
+        <span class="eyebrow">Portfolio shape · 25 records by nominal size</span>
+        <span class="mono" style="font-size:11.5px;color:var(--faint)">small-model regime dominates</span>
+      </div>
+      <div class="distbar" id="distBar">
+        <div class="distseg" style="background:var(--measured)" data-g="0">≤3B · 21</div>
+        <div class="distseg" style="background:var(--documented)" data-g="0">7B · 1</div>
+        <div class="distseg" style="background:var(--target)" data-g="0">30B-A3B · 3</div>
+      </div>
+      <div class="distlegend">
+        <span><i style="background:var(--measured)"></i> <b>21</b> dense ≤3B — Qwen / Llama / Cosmos, rapid-iteration recipes</span>
+        <span><i style="background:var(--documented)"></i> <b>1</b> dense 7B — Qwen2.5-VL vision-language</span>
+        <span><i style="background:var(--target)"></i> <b>3</b> MoE 30B-A3B — Nemotron (~3B active per token)</span>
+      </div>
+    </div>
+
+    <!-- GPU comparison -->
+    <div class="gpucmp">
+      <div class="chartcard">
+        <div class="legend">
+          <span><i style="background:var(--brand)"></i> Wall-clock runtime (min)</span>
+          <span class="mono" style="color:var(--faint)">Qwen3-1.7B · GSM8K-500 · 1 ep · 4 GPU</span>
+        </div>
+        <svg id="gpuChart" viewBox="0 0 560 240" width="100%" role="img" aria-label="GRPO smoke runtime by cluster"></svg>
+      </div>
+      <div class="side">
+        <div class="ratio">2.5×<small> faster</small></div>
+        <h4>Rubin / Hecate vs B200 / Pytche</h4>
+        <p>6 min vs 15 min on the nominally matched GRPO smoke run — an operational proxy of ~0.40 vs 1.00 GPU-hours. The strongest cross-cluster signal in the repo.</p>
+        <div class="cau">⚠ Not a universal GPU ranking. Container digest, software versions, I/O, warm/cold start, token counts, and per-rank utilization aren't controlled. Lyris's ~40 min uses a selectable SKU — an environment note, not an architecture result.</div>
+      </div>
+    </div>
+
+    <!-- historical timing trend -->
+    <div class="trendcard">
+      <span class="eyebrow" style="color:var(--measured)">Historical Qwen timing trend · measured CSV</span>
+      <p style="color:var(--muted);font-size:.93rem;margin:10px 0 0">Wall time tracks training work, not the tested LoRA hyperparameters — so these timings characterize the sweep, not any specific accelerator (GPU identity isn't recorded).</p>
+      <div class="trendgrid">
+        <div class="t"><div class="v">45.5<em style="font-size:1rem"> min</em></div><div class="d">2-epoch average across 3 runs (span 44.9–46.6 min)</div></div>
+        <div class="t"><div class="v"><em>1.49×</em></div><div class="d">3-epoch run at 67.6 min — almost exactly the 1.5× expected from 3 vs 2 epochs</div></div>
+        <div class="t"><div class="v">6.649<em style="font-size:1rem"> s/s</em></div><div class="d">Mean throughput, CoV just 1.43% (6.485–6.719) — very stable</div></div>
+      </div>
+    </div>
+
+    <!-- coverage table -->
+    <div class="ctable-wrap">
+      <table class="ctable" id="coverageTable">
+        <thead><tr><th>Model / family</th><th>Size</th><th>Type</th><th>Dataset</th><th>Hardware</th><th>Runtime</th><th>Performance read</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- insights + benchmark fields -->
+    <div class="perf-two">
+      <div class="perf-block">
+        <h4><span class="ic">◇</span> GPU &amp; size trend insights</h4>
+        <ul>
+          <li><span class="mk">→</span><p><b>Small-model iteration dominates</b> the evidence base — good for sweep design, risky to extrapolate to 30B-class models.</p></li>
+          <li><span class="mk">→</span><p><b>MoE reframes "size."</b> 30B-A3B is ~30B total but ~3B active per token — routing, memory, and communication all matter; dense-only comparison misleads.</p></li>
+          <li><span class="mk">→</span><p><b>GH200 can be under-filled</b> by a 2B QLoRA workload — increase microbatch before accumulation; data movement can bottleneck before compute.</p></li>
+          <li><span class="mk">→</span><p><b>H100 evidence is feasibility-heavy.</b> 8×H100 Nemotron/Cosmos runs prove execution but lack matched tokens/s to rank vs B200 or Rubin.</p></li>
+          <li><span class="mk">→</span><p><b>Quality must accompany speed.</b> The faster GRPO run isn't automatically better — pair runtime with held-out exact match and reward decomposition.</p></li>
+        </ul>
+      </div>
+      <div class="perf-block chk">
+        <h4><span class="ic">✓</span> Minimum fields for the next GPU benchmark</h4>
+        <ul>
+          <li><span class="mk">✓</span><p>Same commit, model revision, dataset fingerprint/split, seed, sequence/completion length, global batch, generated-token count.</p></li>
+          <li><span class="mk">✓</span><p>Exact GPU SKU/count, node/interconnect, container digest, CUDA/PyTorch/TRL/Transformers versions, attention backend.</p></li>
+          <li><span class="mk">✓</span><p>End-to-end <b>and</b> steady-state step time, samples/s or tokens/s, generation tokens/s, peak HBM, per-rank utilization, power, GPU-hours.</p></li>
+          <li><span class="mk">✓</span><p>≥3 repeats per GPU, warm/cold-start separated; report median/p90 plus quality on the same held-out set.</p></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- CLUSTERS -->
+<section id="clusters">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">06 — Hardware</div>
+        <h2>Clusters &amp; accelerators</h2>
+        <p>Runtime figures are observed narratives, not normalized benchmarks — software, container, and token conditions aren't locked, so cross-cluster ratios stay directional.</p>
+      </div>
+    </div>
+    <div class="clusters" id="clusterGrid"></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- EVIDENCE GALLERY -->
+<section id="evidence">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">07 — Screenshots</div>
+        <h2>Image evidence catalog</h2>
+        <p>25 commit-pinned PNGs, live from GitHub. They prove pipelines <em>ran</em> — not that they generalized. Values are never read from pixels; numbers come from surrounding text.</p>
+      </div>
+    </div>
+    <div class="gal-controls" id="galControls">
+      <span class="chip sel" data-v="all">All · 25</span>
+      <span class="chip" data-v="grpo">GRPO · 10</span>
+      <span class="chip" data-v="nemolight">Nemotron 3.5 · 8</span>
+      <span class="chip" data-v="nemonano">Nemotron 3 Nano · 4</span>
+      <span class="chip" data-v="smi">nvidia-smi · 2</span>
+      <span class="chip" data-v="cosmos">Cosmos · 1</span>
+    </div>
+    <div class="galgrid" id="galGrid"></div>
+  </div>
+</section>
+
+<div class="lightbox" id="lightbox">
+  <figure>
+    <img id="lbImg" src="" alt="">
+    <figcaption id="lbCap"></figcaption>
+  </figure>
+</div>
+
+<hr class="rule">
+
+<!-- METHODS -->
+<section id="methods">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">08 — Insight</div>
+        <h2>Method-specific notes</h2>
+        <p>What each fine-tuning method taught, and where its evidence is soft.</p>
+      </div>
+    </div>
+    <div class="tabs" id="methodTabs">
+      <span class="tab sel" data-m="sft">SFT / QLoRA</span>
+      <span class="tab" data-m="grpo">GRPO / QLoRA</span>
+      <span class="tab" data-m="mm">Multimodal / Video</span>
+    </div>
+    <div class="method-panel show" data-m="sft">
+      <ul>
+        <li><span class="mk">→</span><p>Changing rank r16→r8 <b>didn't move two-epoch wall time</b> (~45–47 min) — but other regularization changed at the same time, so rank sensitivity is not isolated.</p></li>
+        <li><span class="mk">→</span><p><b>Finite evaluation is the binding data-quality issue.</b> The fixed script wins: safer eval defaults, deterministic seeds, and a failure path for non-finite eval.</p></li>
+        <li><span class="mk">→</span><p>QLoRA drives memory-efficient adaptation of Qwen, Llama, and Nemotron; pure LoRA appears in the BF16 multimodal / video recipes.</p></li>
+      </ul>
+    </div>
+    <div class="method-panel" data-m="grpo">
+      <ul>
+        <li><span class="mk">→</span><p>Smoke recipe: Qwen3-1.7B, GSM8K-500, LR <b>5e-6</b>, 2 generations, batch 4 / accum 2, 1 epoch, completion 256, r16/a32/d0.05.</p></li>
+        <li><span class="mk">→</span><p>Reward = correctness + boxed-format + a line-count heuristic. <b>Log the line-count term separately</b> — it can reward verbosity without correctness.</p></li>
+        <li><span class="mk">→</span><p>Scaled target: 1,500 examples, 4 generations, 2 epochs, completion 384, batch 2 / accum 4. The ~2h duration is a <b>target, not a measured result</b>.</p></li>
+      </ul>
+    </div>
+    <div class="method-panel" data-m="mm">
+      <ul>
+        <li><span class="mk">→</span><p>Qwen2.5-VL fixes images to <b>448×448</b> and trims dataset length to a multiple of world-size × batch to reduce rank desync.</p></li>
+        <li><span class="mk">→</span><p>Qwen3-VL fixed-v2 avoids truncating expanded vision-token sequences; memory is held with resolution, batch size, and checkpointing instead.</p></li>
+        <li><span class="mk">→</span><p>Cosmos video recipes are promising but need stronger run manifests and, in one Hecate doc, reconciliation between YAML structure and Python access (<span class="mono">trainer</span> vs <span class="mono">data</span>).</p></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- NEXT -->
+<section id="next">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">09 — Roadmap</div>
+        <h2>Recommended next experiments</h2>
+        <p>Recover validity, then isolate variables, then benchmark hardware — in that order.</p>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div><h3>Validation recovery</h3><p>Rerun the exact four historical Qwen configs through the fixed evaluation path with seed 42; export <span class="mono">run_summary.json</span> per run.</p></div></div>
+      <div class="step"><div class="n">2</div><div><h3>One-factor rank sweep</h3><p>Hold LR / dropout / weight decay constant and compare r8 / r16 / r32 to isolate adapter-capacity effects.</p></div></div>
+      <div class="step"><div class="n">3</div><div><h3>Learning-rate sweep</h3><p>Around the only finite point: 5e-5, 7.5e-5, 1e-4, 1.25e-4 with identical rank/regularization and ≥3 seeds.</p></div></div>
+      <div class="step"><div class="n">4</div><div><h3>Controlled GRPO benchmark</h3><p>Same commit, container digest, dataset fingerprint, seed, and rewards on B200 vs Rubin; log tokens/s, utilization, peak VRAM, GSM8K exact match.</p></div></div>
+      <div class="step"><div class="n">5</div><div><h3>SFT → GRPO comparison</h3><p>Evaluate base, SFT/QLoRA, and SFT+GRPO checkpoints on a held-out math set — does RL add accuracy, or only reward?</p></div></div>
+      <div class="step"><div class="n">6</div><div><h3>Immutable provenance</h3><p>Record commit, script SHA, model revision, dataset fingerprint, GPU name/count, CUDA/PyTorch/TRL versions, container digest, and W&amp;B run ID on every row.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- LIMITATIONS -->
+<section id="limits-sec">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="num mono">10 — Honesty</div>
+        <h2>Limitations</h2>
+        <p>Stated plainly, because the whole point of this inventory is not to over-claim.</p>
+      </div>
+    </div>
+    <div class="limits">
+      <div class="limit"><span class="x">!</span><div>Screenshot analysis is context- and provenance-based; exact values were <b>not</b> extracted from plot pixels. Treat screenshot conclusions as qualitative unless backed by committed CSV/JSON.</div></div>
+      <div class="limit"><span class="x">!</span><div>Only four rows have committed machine-readable outcome metrics.</div></div>
+      <div class="limit"><span class="x">!</span><div>Several documents contain screenshots or W&amp;B links without exported numeric history in the repository.</div></div>
+      <div class="limit"><span class="x">!</span><div>Cluster timing statements are not normalized for software versions, token counts, launch overhead, or utilization.</div></div>
+      <div class="limit"><span class="x">!</span><div>Some source files are recipes / templates rather than proof of completed runs; the evidence tier makes that distinction explicit.</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fgrid">
+      <div>
+        <h4>Primary sources</h4>
+        <div class="sources">
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/experiment_results.csv" target="_blank" rel="noopener">experiment_results.csv</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/finetune_qwen3b_4runs_wandb_fixed.py" target="_blank" rel="noopener">finetune_qwen3b_4runs_wandb_fixed.py</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/finetune_qwen35_2b_trl_wandb.py" target="_blank" rel="noopener">finetune_qwen35_2b_trl_wandb.py</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/b200_finetune.md" target="_blank" rel="noopener">b200_finetune.md</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/lyrispytchecluster.md" target="_blank" rel="noopener">lyrispytchecluster.md</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/pytchegrpo.md" target="_blank" rel="noopener">pytchegrpo.md</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/hecategrpo.md" target="_blank" rel="noopener">hecategrpo.md</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/hecatenemolight.md" target="_blank" rel="noopener">hecatenemolight.md</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/pytchenemonano3.md" target="_blank" rel="noopener">pytchenemonano3.md</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/README_Qwen3_VL_LLaVA_Finetuning.md" target="_blank" rel="noopener">README_Qwen3_VL_LLaVA_Finetuning.md</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/h1008GPUeos.md" target="_blank" rel="noopener">h1008GPUeos.md</a>
+          <a href="https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/hecatecosmos3nano.md" target="_blank" rel="noopener">hecatecosmos3nano.md</a>
+        </div>
+      </div>
+      <div class="meta">
+        <b>Repository</b><br><a href="https://github.com/balakreshnan/finetuningqwensweep" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">balakreshnan/finetuningqwensweep ↗</a><br><br>
+        <b>Snapshot</b><br>d04f1ef5cb0222f51452ac7b75364420ca40d076<br><br>
+        <b>Records</b><br>25 · 2026-08-19
+      </div>
+    </div>
+    <p class="disclaimer">Interactive audit of a fine-tuning experiment inventory. Runtime and screenshot statements are reproduced from repository text and are narrative rather than controlled benchmarks. Only four records carry committed machine-readable metrics; one carries a finite eval loss.</p>
+  </div>
+</footer>
+
+<div class="tip" id="tip"></div>
+
+<script>
+/* ============ DATA ============ */
+const EXPERIMENTS = [
+  {id:"QWEN-HIST-01",name:"run1_balanced",tier:"measured",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen2.5-3B-Instruct",dataset:"OpenAssistant/oasst1 (EN pairs)",cluster:"—",gpu:"Not recorded",steps:"2 ep · 1134 steps",lr:"1e-4",batch:"4 / 4",lora:"r16 / a32 / d0.1",train:"1.337",eval:"1.432",runtime:"46.6 min",status:"completed",note:"The only committed finite eval loss in the repository. Perplexity 4.19, throughput 6.485 samples/s. Loss gap 0.095.",src:"experiment_results.csv"},
+  {id:"QWEN-HIST-02",name:"run2_regularized",tier:"measured",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen2.5-3B-Instruct",dataset:"OpenAssistant/oasst1 (EN pairs)",cluster:"—",gpu:"Not recorded",steps:"2 ep · 1134 steps",lr:"1e-4",batch:"4 / 4",lora:"r8 / a16 / d0.1",train:"0.5928",eval:"NaN",runtime:"44.9 min",status:"completed · eval non-finite",note:"Lower train loss than run1, but eval is non-finite — cannot be ranked for generalization.",src:"experiment_results.csv"},
+  {id:"QWEN-HIST-03",name:"run3_low_lr",tier:"measured",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen2.5-3B-Instruct",dataset:"OpenAssistant/oasst1 (EN pairs)",cluster:"—",gpu:"Not recorded",steps:"3 ep · 1701 steps",lr:"5e-5",batch:"4 / 4",lora:"r8 / a16 / d0.1",train:"0.4955",eval:"NaN",runtime:"67.6 min",status:"completed · eval non-finite",note:"Lowest train loss in the historical sweep, but eval is non-finite. Note: the current fixed suite reruns this config at r16, not r8.",src:"experiment_results.csv"},
+  {id:"QWEN-HIST-04",name:"run4_strong_regularization",tier:"measured",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen2.5-3B-Instruct",dataset:"OpenAssistant/oasst1 (EN pairs)",cluster:"—",gpu:"Not recorded",steps:"2 ep · 1134 steps",lr:"7.5e-5",batch:"4 / 4",lora:"r8 / a16 / d0.15",train:"0.6386",eval:"NaN",runtime:"45.1 min",status:"completed · eval non-finite",note:"Strongest dropout in the sweep; eval still non-finite.",src:"experiment_results.csv"},
+  {id:"QWEN-FIX-01",name:"run1_balanced (fixed recipe)",tier:"documented",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen2.5-3B-Instruct",dataset:"OpenAssistant/oasst1",cluster:"H100",gpu:"H100 (documented env)",steps:"2 ep",lr:"1e-4",batch:"4 / 4",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"rerun recipe · result not committed",note:"Current fixed recipe with finite-eval guard and deterministic seeds. Dropout lowered to 0.05 vs historical 0.1.",src:"finetune_qwen3b_4runs_wandb_fixed.py"},
+  {id:"QWEN-FIX-02",name:"run2_conservative",tier:"documented",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen2.5-3B-Instruct",dataset:"OpenAssistant/oasst1",cluster:"H100",gpu:"H100 (documented env)",steps:"2 ep",lr:"7.5e-5",batch:"4 / 4",lora:"r16 / a32 / d0.08",train:"—",eval:"—",runtime:"—",status:"rerun recipe · result not committed",note:"Part of the fixed W&B suite that drifts from the historical CSV configs.",src:"finetune_qwen3b_4runs_wandb_fixed.py"},
+  {id:"QWEN-FIX-03",name:"run3_low_lr (fixed recipe)",tier:"documented",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen2.5-3B-Instruct",dataset:"OpenAssistant/oasst1",cluster:"H100",gpu:"H100 (documented env)",steps:"3 ep",lr:"5e-5",batch:"4 / 4",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"rerun recipe · result not committed",note:"Config drift: historical run3_low_lr used r8; the fixed recipe uses r16.",src:"finetune_qwen3b_4runs_wandb_fixed.py"},
+  {id:"QWEN-FIX-04",name:"run4_higher_capacity",tier:"documented",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen2.5-3B-Instruct",dataset:"OpenAssistant/oasst1",cluster:"H100",gpu:"H100 (documented env)",steps:"2 ep",lr:"6e-5",batch:"4 / 4",lora:"r32 / a64 / d0.08",train:"—",eval:"—",runtime:"—",status:"rerun recipe · result not committed",note:"New higher-capacity r32 point added to the fixed suite — no historical counterpart.",src:"finetune_qwen3b_4runs_wandb_fixed.py"},
+  {id:"B200-LORA-01",name:"Llama-3.2-1B LoRA SQuAD",tier:"documented",family:"SFT",method:"SFT + LoRA",model:"meta-llama/Llama-3.2-1B",dataset:"rajpurkar/squad train[:1000]",cluster:"B200",gpu:"GB200/B200 (SKU not captured)",steps:"50 ep",lr:"1e-4",batch:"4 / 4",lora:"r16 / a32 / d0.1",train:"—",eval:"—",runtime:"—",status:"documented · numeric metrics absent",note:"Pre-Tyche B200 document. Multi-GPU supported; final numeric metrics not committed.",src:"b200_finetune.md"},
+  {id:"B200-VL-01",name:"Qwen2.5-VL-7B multimodal LoRA",tier:"documented",family:"Multimodal",method:"Multimodal SFT + LoRA",model:"Qwen/Qwen2.5-VL-7B-Instruct",dataset:"the_cauldron / ai2d train[:500]",cluster:"B200",gpu:"GB200/B200 ×4",steps:"50 ep",lr:"2e-5",batch:"2 / —",lora:"r16 / a32 / d0.1",train:"—",eval:"—",runtime:"—",status:"documented · numeric metrics absent",note:"Images fixed to 448×448; dataset length trimmed to a multiple of world-size × batch to reduce rank desync.",src:"b200_finetune.md"},
+  {id:"LYRIS-SFT-01",name:"Llama-3.2-1B QLoRA SQuAD",tier:"documented",family:"SFT",method:"SFT + QLoRA",model:"meta-llama/Llama-3.2-1B-Instruct",dataset:"rajpurkar/squad train[:5000]",cluster:"Lyris / Pytche",gpu:"GB200/B200/B300 ×4",steps:"20 ep",lr:"2e-4",batch:"4 / 4",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"documented · metrics not committed",note:"nvidia-smi captures (vrsmi-1/2) confirm 4-GPU visibility during this job — coarse activity, not efficiency.",src:"lyrispytchecluster.md"},
+  {id:"GRPO-PYTCHE-01",name:"Qwen3-1.7B GSM8K GRPO smoke",tier:"narrative",family:"GRPO",method:"GRPO + QLoRA",model:"Qwen/Qwen3-1.7B",dataset:"openai/gsm8k train[:500]",cluster:"Pytche",gpu:"B200 ×4",steps:"1 ep",lr:"5e-6",batch:"4 / 2",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"~15 min",status:"completed per doc · W&B screenshots",note:"~15 min is narrative text, not a controlled benchmark. The doc mislabels this text/math run as 'multimodal' — the model is Qwen3-1.7B on GSM8K.",src:"pytchegrpo.md"},
+  {id:"GRPO-HECATE-01",name:"Qwen3-1.7B GSM8K GRPO smoke",tier:"narrative",family:"GRPO",method:"GRPO + QLoRA",model:"Qwen/Qwen3-1.7B",dataset:"openai/gsm8k train[:500]",cluster:"Hecate",gpu:"Rubin ×4",steps:"1 ep",lr:"5e-6",batch:"4 / 2",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"~6 min",status:"completed per doc · W&B screenshots",note:"Same nominal recipe as Pytche. ~6 min vs ~15 min is a 2.5× narrative ratio — a hypothesis for a controlled benchmark, not a hardware claim.",src:"hecategrpo.md"},
+  {id:"GRPO-LYRIS-01",name:"Qwen3-1.7B GSM8K GRPO smoke",tier:"narrative",family:"GRPO",method:"GRPO + QLoRA",model:"Qwen/Qwen3-1.7B",dataset:"openai/gsm8k train[:500]",cluster:"Lyris / Pytche",gpu:"GB200/B200/B300 ×4",steps:"1 ep",lr:"5e-6",batch:"4 / 2",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"~40 min",status:"documented as executed",note:"Generic-cluster document; ~40 min stated without locked software/container revisions.",src:"lyrispytchecluster.md"},
+  {id:"GRPO-LYRIS-02",name:"Qwen3-1.7B GSM8K GRPO scaled",tier:"target",family:"GRPO",method:"GRPO + QLoRA",model:"Qwen/Qwen3-1.7B",dataset:"openai/gsm8k train[:1500]",cluster:"Lyris / Pytche",gpu:"GB200/B200/B300 ×4",steps:"2 ep",lr:"5e-6",batch:"2 / 4",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"~120 min (target)",status:"target config · not measured",note:"Scaled to 1500 examples, 4 generations, completion 384. The ~2h duration is a target, not a committed measurement.",src:"lyrispytchecluster.md"},
+  {id:"NEMO-HECATE-01",name:"Nemotron-3.5 Lightning QLoRA SFT",tier:"documented",family:"SFT",method:"SFT + QLoRA",model:"NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",dataset:"rajpurkar/squad first 5000",cluster:"Hecate",gpu:"Rubin ×4",steps:"1 ep",lr:"2e-4",batch:"1 / 4",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"documented + 8 screenshots",note:"Recipe passes train_dataset only — no held-out eval. Falling training loss is not model improvement; add a SQuAD validation split (EM/F1).",src:"hecatenemolight.md"},
+  {id:"NEMO-PYTCHE-01",name:"Nemotron-3 Nano LoRA Dolly500",tier:"documented",family:"Megatron",method:"Megatron Bridge + LoRA",model:"NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",dataset:"databricks-dolly-15k: 500 / 50",cluster:"Pytche",gpu:"Blackwell-class ×4",steps:"200 steps",lr:"1e-4",batch:"micro 1 / global 8",lora:"framework recipe",train:"—",eval:"—",runtime:"—",status:"documented · metrics absent",note:"Blackwell-partition run distinct from the H100 recipe below.",src:"nemo3lightningpytche.md"},
+  {id:"NEMO-H100-01",name:"Nemotron-3 Nano LoRA H100 recipe",tier:"documented",family:"Megatron",method:"Megatron Bridge + LoRA",model:"NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",dataset:"Not specified in snippet",cluster:"H100",gpu:"H100 ×8",steps:"100 steps",lr:"—",batch:"global 128",lora:"framework recipe",train:"—",eval:"—",runtime:"—",status:"recipe",note:"The nemo3nano-ft-1..4 screenshots belong HERE (8×H100). The doc says Pytche/Blackwell is the next step — don't attribute those shots to Blackwell.",src:"pytchenemonano3.md"},
+  {id:"QWEN3VL-GH200-01",name:"Qwen3-VL-2B LLaVA smoke",tier:"documented",family:"Multimodal",method:"Multimodal SFT + QLoRA",model:"Qwen/Qwen3-VL-2B-Instruct",dataset:"llava-instruct-mix-vsft: 100 / 20",cluster:"GH200",gpu:"GH200 ×1",steps:"10 steps",lr:"2e-5",batch:"1 / 4",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"smoke recipe",note:"Fixed-v2 avoids truncating expanded vision-token sequences.",src:"README_Qwen3_VL_LLaVA_Finetuning.md"},
+  {id:"QWEN3VL-GH200-02",name:"Qwen3-VL-2B LLaVA recommended",tier:"documented",family:"Multimodal",method:"Multimodal SFT + QLoRA",model:"Qwen/Qwen3-VL-2B-Instruct",dataset:"llava-instruct-mix-vsft: 10000 / 500",cluster:"GH200",gpu:"GH200 ×1",steps:"1 ep",lr:"2e-5",batch:"4 / 4",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"recommended recipe · result not committed",note:"Docs note a 2B QLoRA workload can underutilize GH200. Writes run summaries + eval outputs when executed — better provenance.",src:"README_Qwen3_VL_LLaVA_Finetuning.md"},
+  {id:"QWEN35-01",name:"Qwen3.5-2B Capybara smoke",tier:"documented",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen3.5-2B",dataset:"trl-lib/Capybara: 200 / 50",cluster:"Not pinned",gpu:"CUDA ~16GB VRAM",steps:"20 steps",lr:"1e-4",batch:"1 / 16",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"smoke recipe",note:"Newer pipeline that records GPU/system info and run summaries when executed.",src:"finetune_qwen35_2b_trl_wandb.py"},
+  {id:"QWEN35-02",name:"Qwen3.5-2B Capybara default",tier:"documented",family:"SFT",method:"SFT + QLoRA",model:"Qwen/Qwen3.5-2B",dataset:"trl-lib/Capybara: 10000 / 500",cluster:"Not pinned",gpu:"CUDA ~16GB VRAM",steps:"1 ep",lr:"1e-4",batch:"1 / 16",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"recipe · run summary generated when executed",note:"Improved provenance: writes run summary / evaluation output on execution.",src:"finetune_qwen35_2b_trl_wandb.py"},
+  {id:"COSMOS-HECATE-01",name:"Cosmos Predict2 2B Video2World LoRA",tier:"documented",family:"Video",method:"Video FT + LoRA",model:"nvidia/Cosmos-Predict2-2B-Video2World",dataset:"sayakpaul/ucf101-subset",cluster:"Hecate / Vera Rubin",gpu:"Rubin ×8",steps:"3 ep",lr:"2e-5",batch:"4 / —",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"experimental template",note:"Code/config mismatch noted — reconcile YAML structure vs Python access (trainer vs data).",src:"hecatecosmos3nano.md"},
+  {id:"COSMOS-EOS-01",name:"Cosmos Predict2 2B V2W LoRA H100",tier:"documented",family:"Video",method:"Video FT + LoRA",model:"nvidia/Cosmos-Predict2-2B / Video2World",dataset:"ucf101-subset (~407 videos)",cluster:"EOS",gpu:"H100 ×8",steps:"3 ep",lr:"2e-5",batch:"4 / —",lora:"r16 / a32 / d0.05",train:"—",eval:"—",runtime:"—",status:"documented H100 8-GPU recipe",note:"Tied to W&B run bpxl1y8v (cosmos3nanofinetune-1). Training telemetry alone can't establish video quality — add sample grids + temporal-consistency eval.",src:"h1008GPUeos.md"},
+  {id:"COSMOS25-01",name:"Cosmos-Predict2.5 2B official V2W LoRA",tier:"documented",family:"Video",method:"Official Video2World LoRA",model:"NVIDIA Cosmos-Predict2.5-2B",dataset:"nvidia/Cosmos-NeMo-Assets",cluster:"Not pinned",gpu:"Data-center multi-GPU ×8",steps:"—",lr:"—",batch:"—",lora:"official recipe",train:"—",eval:"—",runtime:"—",status:"official-recipe launcher",note:"Orchestration script; metrics depend on an external run.",src:"finetune_cosmos_predict2_5_lora.py"}
+];
+
+const CLUSTERS = [
+  {name:"Pytche",gpu:"B200",count:6,desc:"GRPO smoke + Nemotron Nano Blackwell partition. Same GRPO recipe documented at ~15 min on 4 B200.",rt:"~15 min",rtl:"GRPO smoke · 4 GPU"},
+  {name:"Hecate",gpu:"Rubin",count:7,desc:"Vera Rubin. GRPO smoke, Nemotron-3.5 Lightning QLoRA, and Cosmos video. Directionally faster in the smoke narratives.",rt:"~6 min",rtl:"GRPO smoke · 4 GPU"},
+  {name:"GH200",gpu:"GH200",count:2,desc:"Qwen3-VL-2B multimodal on a single GPU. Docs note a 2B QLoRA workload can underutilize the accelerator.",rt:"1 GPU",rtl:"Qwen3-VL · 10k/500"},
+  {name:"H100",gpu:"H100",count:7,desc:"Bare-metal Qwen fixed suite, Nemotron Nano 8-GPU Megatron recipe, and the nemo3nano-ft screenshots.",rt:"8 GPU",rtl:"Nemotron Nano · Megatron"},
+  {name:"EOS",gpu:"H100",count:1,desc:"8-GPU Cosmos Predict2 2B Video2World LoRA. Tied to a concrete W&B run for logging provenance.",rt:"8 GPU",rtl:"Cosmos · ucf101"},
+  {name:"Lyris",gpu:"GB200/B200/B300",count:2,desc:"Selectable Blackwell SKUs. Llama QLoRA SQuAD + the scaled ~2h GRPO target config.",rt:"~40 min",rtl:"GRPO smoke · generic doc"}
+];
+
+const TIMELINE=[
+  {ph:"01",tier:"measured",title:"Foundation",hw:"Qwen2.5-3B · OASST1 · SFT+QLoRA · GPU not recorded",body:"Historical parameter sweep set a baseline, but only <b>one of four runs</b> has a finite eval loss. Reliable validation comes first."},
+  {ph:"02",tier:"documented",title:"Hardening",hw:"Qwen2.5-3B · OASST1 · H100-oriented recipe",body:"Fixed rerun recipes add safer evaluation and deterministic seeds. Recipe drift (r8 → r16/r32) <b>must be versioned</b>."},
+  {ph:"03",tier:"documented",title:"Scale-out",hw:"Llama-3.2-1B · SQuAD · B200 / Pytche / Hecate / H100",body:"Distributed LoRA/QLoRA across cluster families. GPU-activity screenshots <b>prove execution, not scaling efficiency</b> — collect per-rank throughput."},
+  {ph:"04",tier:"documented",title:"Multimodal",hw:"Qwen2.5-VL-7B · Qwen3-VL-2B · B200 / GH200",body:"Vision-language fine-tuning needs <b>task-level evaluation and visual-token correctness</b>, not just successful training."},
+  {ph:"05",tier:"narrative",title:"RL reasoning",hw:"Qwen3-1.7B · GSM8K · Pytche / Hecate / Lyris",body:"GRPO+QLoRA. Correctness/format/reasoning rewards define the objective; narrative runtimes (~15 / ~6 / ~40 min) are <b>directional until controlled</b>."},
+  {ph:"06",tier:"documented",title:"Large / MoE",hw:"Nemotron 30B-A3B · SQuAD/Dolly · Rubin / Blackwell / 8×H100",body:"PEFT on MoE families. Pair training/W&B evidence with <b>held-out metrics and exact hardware manifests</b>. Nano shots map to the 8×H100 run."},
+  {ph:"07",tier:"documented",title:"Video / world model",hw:"Cosmos Predict2 / 2.5 · UCF101 · EOS 8×H100 / Hecate",body:"Video2World LoRA. Evaluation should add <b>fixed-seed generated samples and temporal-quality metrics</b> alongside loss telemetry."},
+  {ph:"08",tier:"snapshot",title:"Next phase",hw:"Cross-model · H100 vs B200 vs GH200 vs Rubin",body:"Make experiments <b>controlled and comparable</b>: immutable manifests, W&B history export, controlled cluster benchmarks, LoRA/LR sweeps, SFT→GRPO, reward ablations."}
+];
+
+const RAW="https://raw.githubusercontent.com/balakreshnan/finetuningqwensweep/d04f1ef5cb0222f51452ac7b75364420ca40d076/images/";const GPUCMP=[
+  {env:"Hecate",gpu:"Rubin ×4",min:6,rel:"2.5×",gh:"0.40",ev:"narrative + screenshots",color:"var(--measured)"},
+  {env:"Pytche",gpu:"B200 ×4",min:15,rel:"1.0×",gh:"1.00",ev:"narrative + screenshots",color:"var(--brand)"},
+  {env:"Lyris",gpu:"GB200/B200/B300 ×4",min:40,rel:"0.375×",gh:"2.67",ev:"SKU not pinned",color:"var(--target)"}
+];
+
+const COVERAGE=[
+  {m:"Qwen2.5-3B-Instruct",sz:"3B",type:"Dense text",data:"OpenAssistant/oasst1",hw:"GPU not recorded; H100 rerun",rt:"44.9–67.6 min",read:"Only family with committed timing/throughput; historical GPU unknown."},
+  {m:"Llama-3.2-1B / Instruct",sz:"1B",type:"Dense text",data:"SQuAD 1k–5k",hw:"B200 / Pytche / Rubin docs",rt:"—",read:"Distributed-PEFT feasibility coverage; no portable runtime result."},
+  {m:"Qwen2.5-VL-7B-Instruct",sz:"7B",type:"Vision-language",data:"The Cauldron / AI2D, 500",hw:"4× B200/GB200",rt:"—",read:"Largest dense VLM in the inventory; outcome not exported."},
+  {m:"Qwen3-1.7B",sz:"1.7B",type:"Dense / GRPO",data:"GSM8K 500; 1.5k target",hw:"4× B200; 4× Rubin; generic",rt:"6 / 15 / 40 min",read:"Best cross-cluster signal — model/data/recipe nominally matched."},
+  {m:"Nemotron-3.5-Lightning-30B-A3B",sz:"30B / ~3B act",type:"MoE hybrid",data:"SQuAD 5,000",hw:"4× Rubin",rt:"—",read:"Large-MoE PEFT feasibility; held-out metrics & runtime missing."},
+  {m:"Nemotron-3-Nano-30B-A3B",sz:"30B / ~3B act",type:"MoE hybrid",data:"Dolly 500/50; H100 recipe",hw:"4× Blackwell Pytche; 8× H100",rt:"—",read:"Don't treat total 30B as dense 30B — active-parameter count matters."},
+  {m:"Qwen3-VL-2B-Instruct",sz:"2B",type:"Vision-language",data:"LLaVA 100/20; 10k/500",hw:"1× GH200",rt:"—",read:"Small model on a large accelerator can be utilization-limited."},
+  {m:"Qwen3.5-2B",sz:"2B",type:"Dense text",data:"Capybara 200/50; 10k/500",hw:"1× CUDA (~16GB)",rt:"—",read:"Good provenance: run summary records GPU/system info when executed."},
+  {m:"Cosmos Predict2 2B / V2W",sz:"2B",type:"Video / world",data:"UCF101 (~407 videos)",hw:"8× H100 EOS; 8× Rubin",rt:"—",read:"Execution evidence exists; no matched runtime/quality table."},
+  {m:"Cosmos Predict2.5 2B",sz:"2B",type:"Video / world",data:"Cosmos-NeMo-Assets",hw:"8-GPU orchestration",rt:"—",read:"Official-recipe launcher; performance depends on external telemetry."}
+];
+
+const IMAGES=[
+  {f:"qwengrpo-6.png",g:"grpo",fam:"GRPO · Pytche",hw:"B200 ×4",cap:"Placed after \"Took about 15 minutes\" — runtime context for the Pytche smoke run. The 15-min value is text, not a benchmark."},
+  {f:"qwengrpo-1.png",g:"grpo",fam:"GRPO · Pytche",hw:"B200 ×4",cap:"W&B metrics panel after \"Seeing wandb metrics\". Audit evidence — no exported history."},
+  {f:"qwengrpo-2.png",g:"grpo",fam:"GRPO · Pytche",hw:"B200 ×4",cap:"Run status. Does not establish reward quality or exact-match accuracy."},
+  {f:"qwengrpo-3.png",g:"grpo",fam:"GRPO · Pytche",hw:"B200 ×4",cap:"Metric dashboard exists for the run — trajectories should be exported as CSV/JSON."},
+  {f:"qwengrpo-4.png",g:"grpo",fam:"GRPO · Pytche",hw:"B200 ×4",cap:"Second W&B metrics view. Don't infer exact reward/loss from pixels."},
+  {f:"qwengrpo-5.png",g:"grpo",fam:"GRPO · Pytche",hw:"B200 ×4",cap:"Tied to W&B run bl00xnfc. Generic run name — cluster/GPU should be embedded in tags."},
+  {f:"qwengrpo-9.png",g:"grpo",fam:"GRPO · Hecate",hw:"Rubin ×4",cap:"First shot after \"Wait for the run to complete\" — Hecate/Rubin execution of the same recipe."},
+  {f:"qwengrpo-10.png",g:"grpo",fam:"GRPO · Hecate",hw:"Rubin ×4",cap:"More execution evidence. Portable reward history still missing from the repo."},
+  {f:"qwengrpo-7.png",g:"grpo",fam:"GRPO · Hecate",hw:"Rubin ×4",cap:"After \"Shows only 6 mins\" — supports the ~6-min narrative. Compare with Pytche only directionally."},
+  {f:"qwengrpo-8.png",g:"grpo",fam:"GRPO · Hecate",hw:"Rubin ×4",cap:"Second ~6-min view. No tokens/s, utilization, or exact-match export accompanies it."},
+  {f:"nemolightningft-1.png",g:"nemolight",fam:"Nemotron 3.5 Lightning",hw:"Rubin ×4",cap:"30B-A3B QLoRA executed on Hecate. Recipe supplies train only — no held-out generalization."},
+  {f:"nemolightningft-2.png",g:"nemolight",fam:"Nemotron 3.5 Lightning",hw:"Rubin ×4",cap:"Training execution shot 2. Cannot establish validation quality."},
+  {f:"nemolightningft-3.png",g:"nemolight",fam:"Nemotron 3.5 Lightning",hw:"Rubin ×4",cap:"Training execution shot 3. Add a SQuAD validation split (EM/F1)."},
+  {f:"nemolightningft-4.png",g:"nemolight",fam:"Nemotron 3.5 Lightning",hw:"Rubin ×4",cap:"Training execution shot 4 after the 4-process Accelerate launch."},
+  {f:"nemolightningft-6.png",g:"nemolight",fam:"Nemotron 3.5 Lightning",hw:"Rubin ×4",cap:"After the manual Hugging Face upload — artifact provenance. Not a substitute for eval metrics."},
+  {f:"nemolightningft-5.png",g:"nemolight",fam:"Nemotron 3.5 Lightning",hw:"Rubin ×4",cap:"W&B telemetry captured. No held-out eval, so training trends can't support a quality claim."},
+  {f:"nemolightningft-7.png",g:"nemolight",fam:"Nemotron 3.5 Lightning",hw:"Rubin ×4",cap:"W&B metrics view 7. Training health, not generalization."},
+  {f:"nemolightningft-8.png",g:"nemolight",fam:"Nemotron 3.5 Lightning",hw:"Rubin ×4",cap:"W&B metrics view 8 under the doc's \"wandb metrics\" heading."},
+  {f:"nemo3nano-ft-1.png",g:"nemonano",fam:"Nemotron 3 Nano",hw:"H100 ×8",cap:"Follows the 8×H100 Megatron-Bridge recipe. Doc says Pytche/Blackwell is NEXT — don't attribute to Blackwell."},
+  {f:"nemo3nano-ft-2.png",g:"nemonano",fam:"Nemotron 3 Nano",hw:"H100 ×8",cap:"H100 workflow evidence. Dataset metadata not pinned in the shown command."},
+  {f:"nemo3nano-ft-3.png",g:"nemonano",fam:"Nemotron 3 Nano",hw:"H100 ×8",cap:"Training/conversion evidence on 8×H100."},
+  {f:"nemo3nano-ft-4.png",g:"nemonano",fam:"Nemotron 3 Nano",hw:"H100 ×8",cap:"Training/conversion evidence 4. Not Blackwell benchmark evidence."},
+  {f:"vrsmi-1.png",g:"smi",fam:"nvidia-smi",hw:"Rubin ×4",cap:"GPUs visible/active during the multi-GPU QLoRA job. Coarse — no SM occupancy, tokens/s, or stalls."},
+  {f:"vrsmi-2.png",g:"smi",fam:"nvidia-smi",hw:"Rubin ×4",cap:"Second nvidia-smi snapshot. Answers \"are GPUs active?\", not \"are they efficient?\""},
+  {f:"cosmos3nanofinetune-1.png",g:"cosmos",fam:"Cosmos Predict2 2B",hw:"H100 ×8",cap:"Ties the EOS/H100 Cosmos recipe to W&B run bpxl1y8v. A single dashboard shot ≠ video quality."}
+];
+
+/* ============ HERO BARS ============ */
+function animateBars(){document.querySelectorAll('#bars .fill').forEach(f=>{f.style.width=f.dataset.w+'%'});}
+
+/* ============ EXPERIMENT EXPLORER ============ */
+const filters={family:"all",tier:"all",cluster:"all"};
+const grid=document.getElementById('expGrid');
+const countEl=document.getElementById('expCount');
+
+function clusterMatch(exp,val){
+  if(val==="all")return true;
+  return (exp.cluster||"").toLowerCase().includes(val.toLowerCase()) || (exp.gpu||"").toLowerCase().includes(val.toLowerCase());
+}
+function renderExp(){
+  const list=EXPERIMENTS.filter(e=>
+    (filters.family==="all"||e.family===filters.family)&&
+    (filters.tier==="all"||e.tier===filters.tier)&&
+    clusterMatch(e,filters.cluster)
+  );
+  countEl.textContent=list.length;
+  grid.innerHTML = list.length? list.map(e=>`
+    <div class="exp" data-id="${e.id}">
+      <div class="top">
+        <span class="id">${e.id}</span>
+        <span class="tier ${e.tier}">${e.tier}</span>
+      </div>
+      <h3>${e.name}</h3>
+      <div class="model">${e.model}</div>
+      <div class="meta">
+        <span class="pill">${e.family}</span>
+        <span class="pill">${e.gpu.split('(')[0].trim()||'—'}</span>
+        <span class="pill">${e.lora.split('/')[0].trim()}</span>
+      </div>
+    </div>`).join('')
+    : `<div class="empty">No records match this combination. Try widening a filter.</div>`;
+}
+document.querySelectorAll('.controls .chips').forEach(group=>{
+  const key=group.dataset.filter;
+  group.addEventListener('click',e=>{
+    const chip=e.target.closest('.chip'); if(!chip)return;
+    group.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+    chip.classList.add('sel'); filters[key]=chip.dataset.v; renderExp();
+  });
+});
+
+/* modal */
+const modalBg=document.getElementById('modalBg');
+function openModal(id){
+  const e=EXPERIMENTS.find(x=>x.id===id); if(!e)return;
+  document.getElementById('mId').textContent=e.id+" · "+e.src;
+  document.getElementById('mTitle').textContent=e.name;
+  const t=document.getElementById('mTier'); t.textContent=e.tier; t.className="tier "+e.tier;
+  document.getElementById('mKV').innerHTML=`
+    <dt>Method</dt><dd>${e.method}</dd>
+    <dt>Model</dt><dd>${e.model}</dd>
+    <dt>Dataset</dt><dd>${e.dataset}</dd>
+    <dt>Cluster</dt><dd>${e.cluster}</dd>
+    <dt>GPU</dt><dd>${e.gpu}</dd>
+    <dt>Schedule</dt><dd>${e.steps}</dd>
+    <dt>Learning rate</dt><dd>${e.lr}</dd>
+    <dt>Batch / accum</dt><dd>${e.batch}</dd>
+    <dt>LoRA</dt><dd>${e.lora}</dd>
+    <dt>Train loss</dt><dd>${e.train}</dd>
+    <dt>Eval loss</dt><dd style="color:${e.eval==='NaN'?'var(--documented)':(e.eval==='—'?'var(--faint)':'var(--measured)')}">${e.eval}</dd>
+    <dt>Runtime</dt><dd>${e.runtime}</dd>
+    <dt>Status</dt><dd>${e.status}</dd>`;
+  document.getElementById('mNote').innerHTML=`<b>Note · </b>${e.note}`;
+  modalBg.classList.add('open');
+}
+grid.addEventListener('click',e=>{const c=e.target.closest('.exp'); if(c)openModal(c.dataset.id);});
+document.getElementById('modalClose').onclick=()=>modalBg.classList.remove('open');
+modalBg.addEventListener('click',e=>{if(e.target===modalBg)modalBg.classList.remove('open');});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){modalBg.classList.remove('open');document.getElementById('lightbox').classList.remove('open');}});
+
+/* ============ SWEEP CHART (hand-rolled SVG) ============ */
+const sweep=[
+  {run:"run1_balanced",lora:"r16/a32/d0.1",train:1.3373,eval:1.4324,evalOk:true},
+  {run:"run2_regularized",lora:"r8/a16/d0.1",train:0.5928,eval:null,evalOk:false},
+  {run:"run3_low_lr",lora:"r8/a16/d0.1",train:0.4955,eval:null,evalOk:false},
+  {run:"run4_strong_reg",lora:"r8/a16/d0.15",train:0.6386,eval:null,evalOk:false}
+];
+function buildChart(){
+  const svg=document.getElementById('sweepChart');
+  const W=560,H=320,padL=44,padR=16,padT=16,padB=64;
+  const maxV=1.6, plotH=H-padT-padB, plotW=W-padL-padR;
+  const groupW=plotW/sweep.length, barW=34, gap=10;
+  const y=v=>padT+plotH-(v/maxV)*plotH;
+  let g=`<g font-family="IBM Plex Mono" font-size="10" fill="#5D6A86">`;
+  // gridlines
+  for(let i=0;i<=4;i++){const gv=i*0.4;const gy=y(gv);
+    g+=`<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="#232E48" stroke-width="1"/>`;
+    g+=`<text x="${padL-8}" y="${gy+3}" text-anchor="end">${gv.toFixed(1)}</text>`;}
+  g+=`</g><g>`;
+  sweep.forEach((d,i)=>{
+    const cx=padL+i*groupW+groupW/2;
+    const x1=cx-barW-gap/2, x2=cx+gap/2;
+    const th=plotH-(y(d.train)-padT);
+    g+=`<rect class="bar" x="${x1}" y="${y(d.train)}" width="${barW}" height="${th}" rx="4" fill="#2FE08A"
+         data-run="${d.run}" data-k="train" data-v="${d.train}"><title>${d.run} · train ${d.train}</title></rect>`;
+    if(d.evalOk){
+      const eh=plotH-(y(d.eval)-padT);
+      g+=`<rect class="bar" x="${x2}" y="${y(d.eval)}" width="${barW}" height="${eh}" rx="4" fill="#7C9CFF"
+           data-run="${d.run}" data-k="eval" data-v="${d.eval}"><title>${d.run} · eval ${d.eval}</title></rect>`;
+    } else {
+      // NaN marker: dashed empty bar
+      g+=`<rect x="${x2}" y="${padT}" width="${barW}" height="${plotH}" rx="4" fill="none"
+           stroke="#F2B14C" stroke-width="1.2" stroke-dasharray="3 3" opacity=".5"/>`;
+      g+=`<text x="${x2+barW/2}" y="${padT+plotH/2}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10"
+           fill="#F2B14C" transform="rotate(-90 ${x2+barW/2} ${padT+plotH/2})">NaN</text>`;
+    }
+    // labels
+    g+=`<text x="${cx}" y="${H-padB+20}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#93A0BC">${d.run.replace('run','r').replace('_balanced','1').replace('_regularized','2').replace('_low_lr','3').replace('_strong_reg','4')}</text>`;
+    g+=`<text x="${cx}" y="${H-padB+34}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#5D6A86">${d.lora}</text>`;
+  });
+  g+=`</g>`;
+  svg.innerHTML=g;
+  // tooltips
+  const tip=document.getElementById('tip');
+  svg.querySelectorAll('rect.bar').forEach(r=>{
+    r.style.cursor='crosshair';
+    r.addEventListener('mousemove',ev=>{
+      tip.innerHTML=`<b style="color:#E7ECF6">${r.dataset.run}</b><br>${r.dataset.k} loss · ${r.dataset.v}`;
+      tip.style.opacity=1; tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY-10)+'px';
+      r.style.opacity=.8;
+    });
+    r.addEventListener('mouseleave',()=>{tip.style.opacity=0;r.style.opacity=1;});
+  });
+}
+
+/* ============ TIMELINE ============ */
+function tierLabel(t){return t==='snapshot'?'audit':t;}
+document.getElementById('tl').innerHTML=TIMELINE.map(t=>`
+  <div class="tl-item" data-t="${t.tier==='snapshot'?'':t.tier}">
+    <span class="tl-node"></span>
+    <div class="tl-card">
+      <div class="ph">
+        <span class="n">Phase ${t.ph}</span>
+        <h3>${t.title}</h3>
+        <span class="tier ${t.tier==='snapshot'?'':t.tier}" ${t.tier==='snapshot'?'style="color:var(--brand);border-color:var(--brand);background:rgba(69,214,224,.08)"':''}>${tierLabel(t.tier)}</span>
+      </div>
+      <div class="hw">${t.hw}</div>
+      <p>${t.body}</p>
+    </div>
+  </div>`).join('');
+// reveal on scroll (staggered)
+const tlItems=document.querySelectorAll('.tl-item');
+const tlObs=new IntersectionObserver((entries)=>{
+  entries.forEach(en=>{
+    if(en.isIntersecting){
+      const i=[...tlItems].indexOf(en.target);
+      setTimeout(()=>en.target.classList.add('in'), Math.min(i,6)*70);
+      tlObs.unobserve(en.target);
+    }
+  });
+},{rootMargin:"0px 0px -12% 0px"});
+tlItems.forEach(i=>tlObs.observe(i));
+
+/* ============ PERFORMANCE ============ */
+function animateDist(){
+  const grows=[21,1,3];
+  document.querySelectorAll('#distBar .distseg').forEach((s,i)=>{s.style.flexGrow=grows[i];});
+}
+// set initial flex-grow 0 so it animates
+document.querySelectorAll('#distBar .distseg').forEach(s=>{s.style.flexGrow=0;s.style.flexBasis='0';});
+
+function buildGpuChart(){
+  const svg=document.getElementById('gpuChart');
+  const W=560,H=240,padL=96,padR=54,padT=14,padB=30;
+  const maxV=40, plotW=W-padL-padR, rowH=(H-padT-padB)/GPUCMP.length, barH=30;
+  const x=v=>padL+(v/maxV)*plotW;
+  let g=`<g font-family="IBM Plex Mono" font-size="10" fill="#5D6A86">`;
+  for(let i=0;i<=4;i++){const gv=i*10;const gx=x(gv);
+    g+=`<line x1="${gx}" y1="${padT}" x2="${gx}" y2="${H-padB}" stroke="#232E48" stroke-width="1"/>`;
+    g+=`<text x="${gx}" y="${H-padB+16}" text-anchor="middle">${gv}m</text>`;}
+  g+=`</g><g>`;
+  GPUCMP.forEach((d,i)=>{
+    const cy=padT+i*rowH+rowH/2;
+    const bw=x(d.min)-padL;
+    g+=`<text x="${padL-10}" y="${cy-3}" text-anchor="end" font-family="IBM Plex Mono" font-size="11" fill="#E7ECF6">${d.env}</text>`;
+    g+=`<text x="${padL-10}" y="${cy+10}" text-anchor="end" font-family="IBM Plex Mono" font-size="9" fill="#5D6A86">${d.gpu}</text>`;
+    g+=`<rect class="gbar" x="${padL}" y="${cy-barH/2}" width="${bw}" height="${barH}" rx="5" fill="${d.color}"
+         data-env="${d.env}" data-min="${d.min}" data-rel="${d.rel}" data-gh="${d.gh}" data-ev="${d.ev}"
+         style="cursor:crosshair"><title>${d.env} · ${d.min} min · ${d.rel}</title></rect>`;
+    g+=`<text x="${x(d.min)+8}" y="${cy+4}" font-family="IBM Plex Mono" font-size="11" fill="#E7ECF6">${d.min}m <tspan fill="#93A0BC">· ${d.rel}</tspan></text>`;
+  });
+  g+=`</g>`;
+  svg.innerHTML=g;
+  const tip=document.getElementById('tip');
+  svg.querySelectorAll('rect.gbar').forEach(r=>{
+    r.addEventListener('mousemove',ev=>{
+      tip.innerHTML=`<b style="color:#E7ECF6">${r.dataset.env}</b><br>${r.dataset.min} min · ${r.dataset.rel} speed<br>${r.dataset.gh} GPU-hours<br><span style="color:#93A0BC">${r.dataset.ev}</span>`;
+      tip.style.opacity=1;tip.style.left=(ev.clientX+14)+'px';tip.style.top=(ev.clientY-10)+'px';r.style.opacity=.8;
+    });
+    r.addEventListener('mouseleave',()=>{tip.style.opacity=0;r.style.opacity=1;});
+  });
+}
+
+document.querySelector('#coverageTable tbody').innerHTML=COVERAGE.map(c=>`
+  <tr>
+    <td class="m">${c.m}</td>
+    <td class="sz">${c.sz}</td>
+    <td>${c.type}</td>
+    <td>${c.data}</td>
+    <td>${c.hw}</td>
+    <td class="rt${c.rt==='—'?' none':''}">${c.rt}</td>
+    <td>${c.read}</td>
+  </tr>`).join('');
+
+/* ============ CLUSTERS ============ */
+document.getElementById('clusterGrid').innerHTML=CLUSTERS.map(c=>`
+  <div class="cl">
+    <span class="cnt">${c.count}</span>
+    <span class="gpu">${c.gpu}</span>
+    <h3>${c.name}</h3>
+    <div class="desc">${c.desc}</div>
+    <div class="rt"><span class="b">runtime</span> ${c.rt} <span class="b">·</span> ${c.rtl}</div>
+  </div>`).join('');
+
+/* ============ GALLERY ============ */
+const galGrid=document.getElementById('galGrid');
+function renderGal(filter="all"){
+  const list=IMAGES.filter(im=>filter==="all"||im.g===filter);
+  galGrid.innerHTML=list.map((im,i)=>`
+    <div class="shot" data-i="${IMAGES.indexOf(im)}">
+      <div class="imgwrap">
+        <div class="ph">loading<br>${im.f}</div>
+        <img data-src="${RAW+im.f}" alt="${im.fam}">
+      </div>
+      <div class="cap"><span class="fam">${im.fam}</span><span class="hw">${im.hw}</span></div>
+    </div>`).join('');
+  lazyLoad();
+}
+function lazyLoad(){
+  const imgs=galGrid.querySelectorAll('img[data-src]');
+  const io=new IntersectionObserver((entries,obs)=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){
+        const img=en.target; img.src=img.dataset.src;
+        img.onload=()=>{img.classList.add('loaded');const ph=img.previousElementSibling;if(ph)ph.style.display='none';};
+        img.onerror=()=>{const ph=img.previousElementSibling;if(ph)ph.textContent='image on GitHub';};
+        img.removeAttribute('data-src'); obs.unobserve(img);
+      }
+    });
+  },{rootMargin:"200px"});
+  imgs.forEach(i=>io.observe(i));
+}
+document.getElementById('galControls').addEventListener('click',e=>{
+  const chip=e.target.closest('.chip'); if(!chip)return;
+  document.querySelectorAll('#galControls .chip').forEach(c=>c.classList.remove('sel'));
+  chip.classList.add('sel'); renderGal(chip.dataset.v);
+});
+const lb=document.getElementById('lightbox');
+galGrid.addEventListener('click',e=>{
+  const shot=e.target.closest('.shot'); if(!shot)return;
+  const im=IMAGES[+shot.dataset.i];
+  document.getElementById('lbImg').src=RAW+im.f;
+  document.getElementById('lbCap').innerHTML=`<b>${im.fam} · ${im.hw}</b> — ${im.cap}`;
+  lb.classList.add('open');
+});
+lb.addEventListener('click',()=>lb.classList.remove('open'));
+
+/* ============ METHOD TABS ============ */
+document.getElementById('methodTabs').addEventListener('click',e=>{
+  const tab=e.target.closest('.tab'); if(!tab)return;
+  document.querySelectorAll('#methodTabs .tab').forEach(t=>t.classList.remove('sel'));
+  tab.classList.add('sel');
+  document.querySelectorAll('.method-panel').forEach(p=>p.classList.toggle('show',p.dataset.m===tab.dataset.m));
+});
+
+/* ============ PROVENANCE TOGGLE ============ */
+const provToggle=document.getElementById('provToggle');
+provToggle.addEventListener('click',()=>{
+  provToggle.classList.toggle('on');
+  document.body.classList.toggle('provenance');
+  // when on, tag non-measured experiment cards + tabs as dimmable dynamically
+  document.querySelectorAll('.exp').forEach(c=>{
+    const e=EXPERIMENTS.find(x=>x.id===c.dataset.id);
+    c.classList.toggle('dimmable', e && e.tier!=='measured');
+  });
+  document.querySelectorAll('.finding').forEach(f=>{
+    f.classList.toggle('dimmable', f.dataset.t!=='measured');
+  });
+  document.querySelectorAll('.tl-item').forEach(t=>{
+    t.classList.toggle('dimmable', t.dataset.t!=='measured');
+  });
+  document.querySelectorAll('.cl').forEach(c=>c.classList.add('dimmable'));
+  document.querySelectorAll('.shot').forEach(s=>s.classList.add('dimmable'));
+});
+
+/* ============ NAV: active section + mobile ============ */
+const navLinks=document.getElementById('navLinks');
+document.getElementById('menuBtn').onclick=()=>navLinks.classList.toggle('open');
+navLinks.addEventListener('click',e=>{if(e.target.tagName==='A')navLinks.classList.remove('open');});
+const secIds=['overview','timeline','experiments','sweep','performance','clusters','evidence','methods','next'];
+const spy=new IntersectionObserver(entries=>{
+  entries.forEach(en=>{
+    if(en.isIntersecting){
+      const id=en.target.id;
+      document.querySelectorAll('.nav-links a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+id));
+    }
+  });
+},{rootMargin:"-45% 0px -50% 0px"});
+secIds.forEach(id=>{const el=document.getElementById(id); if(el)spy.observe(el);});
+
+/* ============ INIT ============ */
+renderExp();
+buildChart();
+buildGpuChart();
+renderGal();
+// animate hero bars once visible
+const heroObs=new IntersectionObserver((en,o)=>{if(en[0].isIntersecting){animateBars();o.disconnect();}},{threshold:.3});
+heroObs.observe(document.getElementById('bars'));
+// animate portfolio distribution once visible
+const distObs=new IntersectionObserver((en,o)=>{if(en[0].isIntersecting){animateDist();o.disconnect();}},{threshold:.4});
+distObs.observe(document.getElementById('distBar'));
+</script>
+</body>
+</html>
