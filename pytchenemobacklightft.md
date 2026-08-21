@@ -31,6 +31,7 @@ sed -i 's/        return sample/        return {k: torch.tensor(v) for k, v in s
 ```
 
 - setup the run yaml
+- have space increase max_steps: 25 to 100
 
 ```
 cat << 'EOF' > /lustre/fsw/general_sa/bbalakreshna/finetune_nemotron.yaml
@@ -65,17 +66,17 @@ loss_fn:
   _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
 
 step_scheduler:
-  max_steps: 100
+  max_steps: 25
   local_batch_size: 1
   global_batch_size: 4
   ckpt_every_steps: 101
 
 checkpoint:
-  checkpoint_dir: /home/bbalakreshna/nemo_ckpt
+  checkpoint_dir: /lustre/fsw/general_sa/bbalakreshna/checkpoints
 
 optimizer:
-  _target_: torch.optim.AdamW
-  lr: 1.0e-5
+  _target_: torch.optim.SGD
+  lr: 1.0e-4
   weight_decay: 0.01
 
 seed: 42
@@ -99,13 +100,90 @@ nvidia-smi
 
 ```
 rm -rf /tmp/nemo_ckpt
+rm -rf /lustre/fsw/general_sa/bbalakreshna/checkpoints
+du -h /lustre/fsw/general_sa/bbalakreshna
 ```
 
 ```
-pkill -9 -u bbalakreshna python 2>/dev/null; sleep 3
-mkdir -p /home/bbalakreshna/nemo_ckpt
+rm -rf /lustre/fsw/general_sa/bbalakreshna/checkpoints/*
+mkdir /lustre/fsw/general_sa/bbalakreshna/checkpoints
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 python -m nemo_automodel.cli.app /lustre/fsw/general_sa/bbalakreshna/finetune_nemotron.yaml
+```
+
+![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningback-1.png)
+
+![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningback-2.png)
+
+![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningback-3.png)
+
+- worked for max_steps:25
+
+```
+ls -la /lustre/fsw/general_sa/bbalakreshna/checkpoints/
+du -sh /lustre/fsw/general_sa/bbalakreshna/checkpoints/
+```
+
+- upload checkpoints
+
+```
+CKPT_DIR=$(ls -d /lustre/fsw/general_sa/bbalakreshna/checkpoints/*/ | head -1)
+echo "Uploading: $CKPT_DIR"
+
+hf upload Balab2021/Nemotron-3.5-Lightning-30B-A3B-finetuned \
+  "$CKPT_DIR" \
+  --repo-type model
+```
+
+- extracts only the weights
+
+```
+cat << 'PYEOF' > /lustre/fsw/general_sa/bbalakreshna/export_hf.py
+import torch
+from torch.distributed.checkpoint import FileSystemReader
+from torch.distributed.checkpoint.state_dict_loader import load
+from nemo_automodel._transformers import NeMoAutoModelForCausalLM
+from transformers import AutoTokenizer
+
+# Load base model structure
+print("Loading base model...")
+model = NeMoAutoModelForCausalLM.from_pretrained(
+    "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+    torch_dtype=torch.bfloat16,
+    trust_remote_code=True,
+)
+
+# Load fine-tuned weights from DCP checkpoint
+ckpt_path = "/lustre/fsw/general_sa/bbalakreshna/checkpoints/epoch_0_step_24"
+print(f"Loading checkpoint from: {ckpt_path}")
+state_dict = {"model": model.state_dict()}
+load(state_dict, storage_reader=FileSystemReader(ckpt_path))
+model.load_state_dict(state_dict["model"])
+
+# Save in HF format (weights only, ~60GB)
+out_dir = "/lustre/fsw/general_sa/bbalakreshna/checkpoints/hf_export"
+print(f"Saving to: {out_dir}")
+model.save_pretrained(out_dir)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+    trust_remote_code=True,
+)
+tokenizer.save_pretrained(out_dir)
+print("Done!")
+PYEOF
+
+python /lustre/fsw/general_sa/bbalakreshna/export_hf.py
+```
+
+- upload to huggingface
+
+```
+du -sh /lustre/fsw/general_sa/bbalakreshna/checkpoints/hf_export/
+
+hf upload Balab2021/Nemotron-3.5-Lightning-30B-A3B-finetuned \
+  /lustre/fsw/general_sa/bbalakreshna/checkpoints/hf_export/ \
+  --repo-type model
 ```
 
 - create the data
