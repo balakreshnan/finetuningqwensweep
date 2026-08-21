@@ -24,18 +24,6 @@ du -sh ~/.cache/huggingface/hub/ 2>/dev/null
 - data set fix
 
 ```
-cat << 'EOF' > /home/bbalakreshna/.local/lib/python3.12/site-packages/nemo_automodel/components/datasets/llm/chat_collate.py
-import torch
-from torch.utils.data.dataloader import default_collate
-
-def chat_collate_fn(batch):
-    """Strip ___PAD_TOKEN_IDS___ metadata before collating."""
-    cleaned = [{k: v for k, v in sample.items() if k != "___PAD_TOKEN_IDS___"} for sample in batch]
-    return default_collate(cleaned)
-EOF
-```
-
-```
 sed -i '21a\import torch' /home/bbalakreshna/.local/lib/python3.12/site-packages/nemo_automodel/components/datasets/llm/chat_dataset.py
 
 # Replace "return sample" with tensor conversion + metadata strip
