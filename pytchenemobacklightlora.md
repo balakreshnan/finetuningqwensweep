@@ -147,7 +147,7 @@ loss_fn:
   _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
 
 step_scheduler:
-  max_steps: 25
+  max_steps: 100
   local_batch_size: 1
   global_batch_size: 4
   ckpt_every_steps: 101
@@ -170,9 +170,17 @@ EOF
 - Code is available in [pytchenemobacklightft.md](pytchenemobacklightft.md)
 
 - run the training
+- clear previous runs
 
 ```
 pkill -9 -u bbalakreshna python
+rm -rf /lustre/fsw/general_sa/bbalakreshna/checkpoints/
+mkdir /lustre/fsw/general_sa/bbalakreshna/checkpoints/
+```
+
+- to run the training
+
+```
 torchrun --nproc_per_node=4 \
   -m nemo_automodel.cli.app \
   /lustre/fsw/general_sa/bbalakreshna/finetune_nemotron.yaml
