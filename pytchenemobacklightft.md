@@ -1,4 +1,61 @@
+# Fine tuning (Full) Open Source model with Pytche - nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16
 
+## Pre-requiste
+
+- Need a Blackwell 4 GPU Machine
+- using nemo framework - nvcr.io#nvidia/nemo:26.08
+- To validate multi gpu fine tuning
+- Access to huggingface
+- Access to wandb for metrics
+- to validate multi model training
+- model used nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16
+
+## Steps
+
+- Log into terminal
+- Check the available machines to use
+
+```
+sinfo --summarize
+sacctmgr show associations user=$USER format=Account,Partition
+squeue -u $USER
+```
+
+- create enroot credentials
+
+```
+mkdir -p ~/.config/enroot
+touch ~/.config/enroot/.credentials
+```
+
+- now create the credentials file
+
+```
+cat > ~/.config/enroot/.credentials << 'EOF'
+machine gxxxxxx login xxx@xxxx.com password xxxxxxxxx
+machine nvcr.io login $oauthtoken password xxxxxxxx
+EOF
+```
+
+- Now lets get a interactive cluster to quick check
+- Depends on the availability
+- to get latest image use
+
+- SLURM interactive session
+
+```
+srun --account=general_sa \
+     --partition=36x2-a01r \
+     --nodes=1 \
+     --ntasks-per-node=1 \
+     --time=5:00:00 \
+     --job-name=general_sa-finetune:interactive \
+     --container-image=nvcr.io#nvidia/nemo:26.08 \
+     --container-mount-home \
+     --no-container-remap-root \
+     --mpi=pmix \
+     --pty bash
+```
 
 - setup space fist
 - to avoid disk space issues
@@ -19,6 +76,11 @@ du -sh /lustre/fsw/general_sa/bbalakreshna/.cache/huggingface/hub/
 df -h /lustre/fsw/general_sa/bbalakreshna/
 du -sh /lustre/fsw/general_sa/bbalakreshna/.cache/huggingface/hub/models--*
 du -sh ~/.cache/huggingface/hub/ 2>/dev/null
+```
+
+```
+ls -la /lustre/fsw/general_sa/bbalakreshna/checkpoints/
+du -sh /lustre/fsw/general_sa/bbalakreshna/checkpoints/
 ```
 
 - data set fix
