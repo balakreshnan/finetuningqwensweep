@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkpoint Storage Calculator - Deep Learning Optimizers</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #76b900; font-size: 2rem; margin-bottom: 8px; }
+        h2 { color: #76b900; font-size: 1.4rem; margin: 30px 0 15px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+        h3 { color: #aaa; font-size: 1rem; margin-bottom: 20px; font-weight: normal; }
+        .subtitle { color: #888; font-size: 0.95rem; margin-bottom: 30px; }
+
+        /* Calculator Section */
+        .calculator { background: #1a1a1a; border-radius: 12px; padding: 24px; margin-bottom: 30px; border: 1px solid #333; }
+        .calc-row { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+        .calc-row label { color: #ccc; font-size: 0.9rem; min-width: 120px; }
+        .calc-row input, .calc-row select { background: #2a2a2a; border: 1px solid #444; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 1rem; width: 200px; }
+        .calc-row input:focus, .calc-row select:focus { outline: none; border-color: #76b900; }
+        .slider-container { flex: 1; min-width: 300px; }
+        .slider-container input[type="range"] { width: 100%; accent-color: #76b900; }
+        .slider-value { color: #76b900; font-weight: bold; font-size: 1.2rem; min-width: 80px; text-align: right; }
+
+        /* Results Cards */
+        .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
+        .result-card { background: #222; border-radius: 10px; padding: 16px; text-align: center; border: 1px solid #333; transition: all 0.3s; }
+        .result-card:hover { border-color: #76b900; transform: translateY(-2px); }
+        .result-card.highlight { border-color: #76b900; background: #1a2a0a; }
+        .result-card .name { font-size: 0.8rem; color: #aaa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .result-card .value { font-size: 1.5rem; font-weight: bold; color: #fff; }
+        .result-card .unit { font-size: 0.8rem; color: #888; }
+        .result-card .bar { height: 4px; background: #333; border-radius: 2px; margin-top: 10px; overflow: hidden; }
+        .result-card .bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+        .savings { color: #76b900; font-size: 0.75rem; margin-top: 4px; }
+
+        /* Table */
+        .table-container { overflow-x: auto; border-radius: 10px; border: 1px solid #333; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { background: #1a1a1a; color: #76b900; padding: 12px 10px; text-align: left; font-weight: 600; position: sticky; top: 0; }
+        td { padding: 10px; border-top: 1px solid #222; }
+        tr:hover { background: #1a2a0a; }
+        tr:nth-child(even) { background: #111; }
+        tr:nth-child(even):hover { background: #1a2a0a; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-green { background: #1a3a0a; color: #76b900; }
+        .badge-yellow { background: #3a3a0a; color: #f5c542; }
+        .badge-red { background: #3a1a0a; color: #f55; }
+
+        /* Chart */
+        .chart-container { background: #1a1a1a; border-radius: 12px; padding: 24px; border: 1px solid #333; margin-bottom: 30px; }
+        .bar-chart { display: flex; align-items: end; gap: 8px; height: 250px; padding: 20px 0; }
+        .bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+        .bar-rect { width: 100%; min-width: 40px; border-radius: 6px 6px 0 0; transition: height 0.5s ease; cursor: pointer; position: relative; }
+        .bar-rect:hover { opacity: 0.85; }
+        .bar-label { font-size: 0.7rem; color: #aaa; margin-top: 8px; text-align: center; writing-mode: vertical-rl; text-orientation: mixed; max-height: 80px; overflow: hidden; }
+        .bar-value { font-size: 0.75rem; color: #fff; margin-bottom: 4px; font-weight: bold; }
+        .bar-legend { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+        .bar-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #aaa; }
+        .bar-legend-item .dot { width: 12px; height: 12px; border-radius: 3px; }
+
+        /* Formula */
+        .formula-box { background: #111; border: 1px solid #333; border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 0.85rem; color: #ccc; margin: 16px 0; }
+        .formula-box .highlight-text { color: #76b900; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .calc-row { flex-direction: column; align-items: stretch; }
+            .calc-row input, .calc-row select { width: 100%; }
+            .results-grid { grid-template-columns: repeat(2, 1fr); }
+            .bar-label { writing-mode: horizontal-tb; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🧠 Checkpoint Storage Calculator</h1>
+    <p class="subtitle">Deep Learning Optimizer Storage Requirements — Interactive Reference</p>
+
+    <!-- CALCULATOR -->
+    <h2>📐 Interactive Calculator</h2>
+    <div class="calculator">
+        <div class="calc-row">
+            <label>Model Size:</label>
+            <div class="slider-container">
+                <input type="range" id="modelSize" min="1" max="500" value="60" oninput="calculate()">
+            </div>
+            <span class="slider-value" id="modelSizeLabel">60 GB</span>
+        </div>
+        <div class="calc-row">
+            <label>Overhead:</label>
+            <div class="slider-container">
+                <input type="range" id="overhead" min="0" max="40" value="15" oninput="calculate()">
+            </div>
+            <span class="slider-value" id="overheadLabel">15 GB</span>
+        </div>
+        <div class="results-grid" id="resultsGrid"></div>
+    </div>
+
+    <!-- VISUAL CHART -->
+    <h2>📊 Visual Comparison</h2>
+    <div class="chart-container">
+        <div class="bar-chart" id="barChart"></div>
+        <div class="bar-legend">
+            <div class="bar-legend-item"><div class="dot" style="background:#4a90d9"></div> Model Weights</div>
+            <div class="bar-legend-item"><div class="dot" style="background:#f5c542"></div> Optimizer State</div>
+            <div class="bar-legend-item"><div class="dot" style="background:#888"></div> Overhead</div>
+        </div>
+    </div>
+
+    <!-- REFERENCE TABLE -->
+    <h2>📋 Detailed Reference Table</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Optimizer</th>
+                    <th>Extra State / Param</th>
+                    <th>Multiplier</th>
+                    <th>Convergence</th>
+                    <th>Best For</th>
+                    <th>PyTorch Class</th>
+                    <th>Storage Rating</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>AdamW</strong></td>
+                    <td>2x (1st moment m + 2nd moment v)</td>
+                    <td>3.0x – 3.3x</td>
+                    <td>⭐⭐⭐⭐⭐ Excellent</td>
+                    <td>General purpose, pre-training</td>
+                    <td><code>torch.optim.AdamW</code></td>
+                    <td><span class="badge badge-red">Heavy</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Adam8bit</strong></td>
+                    <td>2x quantized to 8-bit</td>
+                    <td>1.7x – 1.8x</td>
+                    <td>⭐⭐⭐⭐ Near-Adam</td>
+                    <td>Memory-constrained Adam-like training</td>
+                    <td><code>bitsandbytes.optim.Adam8bit</code></td>
+                    <td><span class="badge badge-yellow">Medium</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Adafactor</strong></td>
+                    <td>~0.5x (row + column factors)</td>
+                    <td>1.7x – 1.8x</td>
+                    <td>⭐⭐⭐⭐ Good</td>
+                    <td>Large transformers, T5-style models</td>
+                    <td><code>transformers.Adafactor</code></td>
+                    <td><span class="badge badge-yellow">Medium</span></td>
+                </tr>
+                <tr>
+                    <td><strong>SGD + Momentum</strong></td>
+                    <td>1x (momentum buffer)</td>
+                    <td>2.0x – 2.3x</td>
+                    <td>⭐⭐⭐ Decent</td>
+                    <td>Vision models, known good LR</td>
+                    <td><code>torch.optim.SGD(momentum=0.9)</code></td>
+                    <td><span class="badge badge-yellow">Medium</span></td>
+                </tr>
+                <tr>
+                    <td><strong>SGD (no momentum)</strong></td>
+                    <td>0x</td>
+                    <td>1.0x – 1.2x</td>
+                    <td>⭐⭐ Basic</td>
+                    <td>Short fine-tuning, storage-constrained</td>
+                    <td><code>torch.optim.SGD</code></td>
+                    <td><span class="badge badge-green">Light</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Lion</strong></td>
+                    <td>1x (momentum only)</td>
+                    <td>2.0x – 2.3x</td>
+                    <td>⭐⭐⭐⭐ Good</td>
+                    <td>Sign-based, efficient large models</td>
+                    <td><code>lion_pytorch.Lion</code></td>
+                    <td><span class="badge badge-yellow">Medium</span></td>
+                </tr>
+                <tr>
+                    <td><strong>LOMO / AdaLomo</strong></td>
+                    <td>0x (fused into gradient)</td>
+                    <td>1.0x – 1.1x</td>
+                    <td>⭐⭐⭐ Decent</td>
+                    <td>Full-param fine-tune on limited memory</td>
+                    <td><code>lomo_optim.LOMO</code></td>
+                    <td><span class="badge badge-green">Light</span></td>
+                </tr>
+                <tr>
+                    <td><strong>GaLore</strong></td>
+                    <td>~0.1x (low-rank projections)</td>
+                    <td>1.1x – 1.3x</td>
+                    <td>⭐⭐⭐ Decent</td>
+                    <td>Pre-training with limited memory</td>
+                    <td><code>galore_torch.GaLoreAdamW</code></td>
+                    <td><span class="badge badge-green">Light</span></td>
+                </tr>
+                <tr>
+                    <td><strong>LoRA / QLoRA</strong></td>
+                    <td>0x (only adapter trained)</td>
+                    <td>1.0x – 1.02x</td>
+                    <td>⭐⭐⭐⭐ Good</td>
+                    <td>Fine-tuning, fastest & smallest</td>
+                    <td><code>peft.LoraConfig</code></td>
+                    <td><span class="badge badge-green">Minimal</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- SCALED TABLE -->
+    <h2>📏 Scaled Storage Table (All Model Sizes)</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Model Size</th>
+                    <th>AdamW</th>
+                    <th>Adam8bit</th>
+                    <th>Adafactor</th>
+                    <th>SGD+mom</th>
+                    <th>SGD pure</th>
+                    <th>Lion</th>
+                    <th>LOMO</th>
+                    <th>GaLore</th>
+                    <th>LoRA</th>
+                </tr>
+            </thead>
+            <tbody id="scaledTable"></tbody>
+        </table>
+    </div>
+
+    <!-- FORMULA -->
+    <h2>🔬 Formula</h2>
+    <div class="formula-box">
+        <span class="highlight-text">Total Checkpoint</span> = Model_Weights × (1 + optimizer_state_multiplier) + overhead<br><br>
+        Optimizer state multipliers:<br>
+        &nbsp;&nbsp;AdamW:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.0x &nbsp;(m + v, both full precision)<br>
+        &nbsp;&nbsp;Adam8bit:&nbsp;&nbsp;&nbsp;&nbsp;0.5x &nbsp;(m + v quantized to 8-bit → 4x smaller)<br>
+        &nbsp;&nbsp;Adafactor:&nbsp;&nbsp;&nbsp;0.5x &nbsp;(row/col factors instead of full tensors)<br>
+        &nbsp;&nbsp;SGD+momentum:&nbsp;1.0x &nbsp;(one momentum buffer)<br>
+        &nbsp;&nbsp;SGD pure:&nbsp;&nbsp;&nbsp;&nbsp;0.0x &nbsp;(no state)<br>
+        &nbsp;&nbsp;Lion:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.0x &nbsp;(one momentum buffer)<br>
+        &nbsp;&nbsp;LOMO:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.0x &nbsp;(fused, no stored state)<br>
+        &nbsp;&nbsp;GaLore:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.1x &nbsp;(low-rank projections)<br>
+        &nbsp;&nbsp;LoRA:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.0x &nbsp;(adapter weights only, ~0.1-1% of model)<br><br>
+        <span class="highlight-text">Overhead</span> = gradient buffers + FSDP metadata + RNG states (~10-20 GB typical)
+    </div>
+</div>
+
+<script>
+const optimizers = [
+    { name: "AdamW", mult: 2.0, color: "#e74c3c" },
+    { name: "Adam8bit", mult: 0.5, color: "#e67e22" },
+    { name: "Adafactor", mult: 0.5, color: "#f1c40f" },
+    { name: "SGD+mom", mult: 1.0, color: "#3498db" },
+    { name: "SGD pure", mult: 0.0, color: "#2ecc71" },
+    { name: "Lion", mult: 1.0, color: "#9b59b6" },
+    { name: "LOMO", mult: 0.0, color: "#1abc9c" },
+    { name: "GaLore", mult: 0.1, color: "#16a085" },
+    { name: "LoRA", mult: 0.0, color: "#76b900", loraAdapter: 0.01 }
+];
+
+const modelSizes = [8, 15, 30, 60, 70, 120, 405];
+
+function calcTotal(modelGB, mult, overhead, loraAdapter) {
+    if (loraAdapter) return Math.round(modelGB * (1 + loraAdapter) + overhead * 0.05);
+    return Math.round(modelGB * (1 + mult) + overhead);
+}
+
+function calculate() {
+    const modelGB = parseInt(document.getElementById('modelSize').value);
+    const overhead = parseInt(document.getElementById('overhead').value);
+    document.getElementById('modelSizeLabel').textContent = modelGB + ' GB';
+    document.getElementById('overheadLabel').textContent = overhead + ' GB';
+
+    // Results grid
+    const grid = document.getElementById('resultsGrid');
+    const maxVal = calcTotal(modelGB, 2.0, overhead);
+    let html = '';
+    optimizers.forEach(opt => {
+        const total = calcTotal(modelGB, opt.mult, overhead, opt.loraAdapter);
+        const pct = (total / maxVal * 100).toFixed(0);
+        const savings = Math.round((1 - total / maxVal) * 100);
+        const isSmall = total <= modelGB * 1.5;
+        html += `
+            <div class="result-card ${isSmall ? 'highlight' : ''}">
+                <div class="name">${opt.name}</div>
+                <div class="value">${total}<span class="unit"> GB</span></div>
+                ${savings > 0 ? `<div class="savings">↓ ${savings}% vs AdamW</div>` : ''}
+                <div class="bar"><div class="bar-fill" style="width:${pct}%; background:${opt.color}"></div></div>
+            </div>
+        `;
+    });
+    grid.innerHTML = html;
+
+    // Bar chart
+    const chart = document.getElementById('barChart');
+    let chartHtml = '';
+    optimizers.forEach(opt => {
+        const total = calcTotal(modelGB, opt.mult, overhead, opt.loraAdapter);
+        const optState = opt.loraAdapter ? Math.round(modelGB * opt.loraAdapter) : Math.round(modelGB * opt.mult);
+        const oh = opt.loraAdapter ? 1 : overhead;
+        const heightPct = (total / maxVal * 100).toFixed(0);
+        const wPct = (modelGB / total * parseFloat(heightPct)).toFixed(0);
+        const oPct = (optState / total * parseFloat(heightPct)).toFixed(0);
+        const ohPct = (oh / total * parseFloat(heightPct)).toFixed(0);
+        chartHtml += `
+            <div class="bar-item">
+                <div class="bar-value">${total} GB</div>
+                <div class="bar-rect" style="height:${heightPct}%; background: linear-gradient(to top, #4a90d9 0%, #4a90d9 ${(modelGB/total*100).toFixed(0)}%, #f5c542 ${(modelGB/total*100).toFixed(0)}%, #f5c542 ${((modelGB+optState)/total*100).toFixed(0)}%, #888 ${((modelGB+optState)/total*100).toFixed(0)}%, #888 100%); border: 1px solid ${opt.color};" title="${opt.name}: ${modelGB}GB weights + ${optState}GB optimizer + ${oh}GB overhead"></div>
+                <div class="bar-label" style="writing-mode:horizontal-tb; font-size:0.7rem; margin-top:6px;">${opt.name}</div>
+            </div>
+        `;
+    });
+    chart.innerHTML = chartHtml;
+
+    // Scaled table
+    const tbody = document.getElementById('scaledTable');
+    let tableHtml = '';
+    modelSizes.forEach(size => {
+        const isCurrentSize = size === modelGB;
+        tableHtml += `<tr style="${isCurrentSize ? 'background:#1a2a0a; font-weight:bold;' : ''}">`;
+        tableHtml += `<td>${size} GB ${isCurrentSize ? '⬅' : ''}</td>`;
+        optimizers.forEach(opt => {
+            const val = calcTotal(size, opt.mult, Math.round(size * 0.25), opt.loraAdapter);
+            tableHtml += `<td>${val} GB</td>`;
+        });
+        tableHtml += `</tr>`;
+    });
+    tbody.innerHTML = tableHtml;
+}
+
+calculate();
+</script>
+</body>
+</html>
