@@ -193,3 +193,7 @@ du -sh /lustre/fsw/general_sa/bbalakreshna/checkpoints/
 ```
 
 ![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningpytchelora-1.png)
+
+![nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 fine tuning](images/nemolightningpytchelora-2.png)
+
+- next to different runs
