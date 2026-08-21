@@ -71,7 +71,7 @@ step_scheduler:
   ckpt_every_steps: 101
 
 checkpoint:
-  checkpoint_dir: /tmp/nemo_ckpt
+  checkpoint_dir: /home/bbalakreshna/nemo_ckpt
 
 optimizer:
   _target_: torch.optim.AdamW
@@ -98,11 +98,12 @@ nvidia-smi
 - run the expermiment
 
 ```
-python -m nemo_automodel.cli.app /lustre/fsw/general_sa/bbalakreshna/finetune_nemotron.yaml
+rm -rf /tmp/nemo_ckpt
 ```
 
 ```
-rm -rf /tmp/nemo_ckpt/*
+pkill -9 -u bbalakreshna python 2>/dev/null; sleep 3
+mkdir -p /home/bbalakreshna/nemo_ckpt
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 python -m nemo_automodel.cli.app /lustre/fsw/general_sa/bbalakreshna/finetune_nemotron.yaml
 ```
