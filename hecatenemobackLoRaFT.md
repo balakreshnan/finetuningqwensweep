@@ -120,6 +120,11 @@ du -sh ~/.cache/huggingface/hub/ 2>/dev/null
 pip install --no-build-isolation git+https://github.com/fanshiqing/grouped_gemm@v1.1.4
 ```
 
+- now create a sample data set
+- Code is available in 
+
+- Code is available in [pytchenemobacklightft.md](pytchenemobacklightft.md)
+
 - create the config to run
 
 ```
@@ -239,11 +244,6 @@ from nemo_automodel.cli.app import main
 main()
 PYEOF
 ```
-
-- now create a sample data set
-- Code is available in 
-
-- Code is available in [pytchenemobacklightft.md](pytchenemobacklightft.md)
 
 - run the training
 - clear previous runs
