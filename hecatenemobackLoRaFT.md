@@ -90,6 +90,10 @@ du -sh /lustre/fsw/xxxx/bbalakreshna/
 pip install nemo-automodel
 ```
 
+```
+pip install huggingface_hub wandb
+```
+
 - for model weights
 
 ```
