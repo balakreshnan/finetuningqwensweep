@@ -636,7 +636,7 @@ accelerate launch --num_processes 4 grpo_5runs_sweep.py
 
 ![GRPO Training Run](images/hecateqwengrpo5runs-4.png)
 
-![GRPO Training Run](images/hecateqwengrpo5runs-5.png
+![GRPO Training Run](images/hecateqwengrpo5runs-5.png)
 
 - Run informationis saved in
 
