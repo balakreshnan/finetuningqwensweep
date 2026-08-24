@@ -632,6 +632,12 @@ accelerate launch --num_processes 4 grpo_5runs_sweep.py
 
 ![GRPO Training Run](images/hecateqwengrpo5runs-2.png)
 
+![GRPO Training Run](images/hecateqwengrpo5runs-3.png)
+
+![GRPO Training Run](images/hecateqwengrpo5runs-4.png)
+
+![GRPO Training Run](images/hecateqwengrpo5runs-5.png
+
 - Run informationis saved in
 
 ```
@@ -643,3 +649,14 @@ accelerate launch --num_processes 4 grpo_5runs_sweep.py
 ```
 cat /lustre/fsw/general_sa/bbalakreshna/grpo-results-sweep/sweep_analytics.json
 ```
+> Results
+
+## 🏆 GRPO 5-Run Sweep — Final Results
+
+| Run | Config | Accuracy | Loss | Time |
+|-----|--------|----------|------|------|
+| run1-baseline | LR 5e-6, 4 gen, LoRA r=16 | 72% | 0.0034 | 23 min |
+| run2-high-lr-more-gen | LR 2e-5, 8 gen, LoRA r=32 | 74% | 0.0087 | 48 min |
+| **run3-moderate-lr** ✅ | **LR 1e-5, 4 gen, LoRA r=32** | **76%** | **0.0052** | **21 min** |
+| run4-large-lora | LR 2e-6, 4 gen, LoRA r=64 | 74% | 0.0018 | 21 min |
+| run5-max-exploration | LR 8e-6, 16 gen, LoRA r=32 | 70% | 0.0099 | 39 min |
