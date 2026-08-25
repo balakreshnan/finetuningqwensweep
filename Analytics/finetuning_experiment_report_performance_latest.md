@@ -2,11 +2,11 @@
 
 **Repository:** [balakreshnan/finetuningqwensweep](https://github.com/balakreshnan/finetuningqwensweep)
 
-**Snapshot:** `a534517678d1b2112a7932571339a3f67176ce03` (2026-08-24)
+**Snapshot:** `e8ea2f9c1b83c8ed1bb2d9d5ed6683bc3f9fc52e` (2026-08-25)
 
-**Inventory records:** 34
+**Inventory records:** 39
 
-> Important: this inventory separates **machine-readable measured runs**, **measured sweep summaries**, **documented recipes, narrative observations, smoke tests, failed attempts, and target configurations**. The five new sweep rows have numeric results in `hecateqwengrpo5runs.md`, but the generated `sweep_analytics.json` is referenced only by its cluster path and is not committed. Missing GPU/metric metadata is left unspecified rather than inferred.
+> Important: this inventory separates **machine-readable measured runs**, **documented recipes, narrative observations, smoke tests, failed attempts, and target configurations**. Both Hecate sweep artifacts are committed: `sweep_analytics.json` contains the five 4-GPU runs and `sweep_analytics-16gpu.json` contains the five 16-GPU runs. Missing GPU/metric metadata is left unspecified rather than inferred.
 
 ## Executive findings
 
@@ -14,20 +14,21 @@
 - `run1_balanced`: train loss **1.3373**, eval loss **1.4324**, perplexity **4.19**, runtime **46.6 min**, throughput **6.485 samples/s**.
 - The other three historical sweep rows report `NaN` eval loss. Their lower train losses should not be interpreted as superior generalization.
 - There is configuration drift between the historical CSV suite and the current fixed W&B suite. In particular, the current `run3_low_lr` uses LoRA r16 rather than historical r8, and the current suite adds a higher-capacity r32 point.
-- The new Hecate/Rubin Qwen3-1.7B sweep reports five held-out GSM8K results: **72%, 74%, 76%, 74%, and 70%** on `test[:50]`. `run3-moderate-lr` is the winner at **76%**, with LR 1e-5, four generations, LoRA r32/alpha64, training loss 0.0052, and 21-minute training time.
-- Training loss is not a quality selector in the GRPO sweep: `run4-large-lora` has the lowest reported loss (**0.0018**) but only **74%** accuracy, below run3's **76%** at loss **0.0052**.
-- More generations did not win this sweep. Run2 used eight generations and took 48 minutes for 74%; run5 used 16 generations, half the training examples, and took 39 minutes for 70%. Because several variables change together, this is directional rather than a one-factor causal result.
-- The older GRPO smoke runtimes (about 15 min B200, 6 min Rubin, and 40 min in a generic cluster document) remain narrative and are a separate workload from the new 21–48 minute sweep runs. Do not merge them into one hardware ranking.
+- The Hecate/Rubin Qwen3-1.7B GRPO artifacts now provide **10 machine-readable runs**: the same five configurations at 4 GPUs and 16 GPUs, evaluated on `test[:50]`. Both regimes peak at **76%**, but the winner shifts from `run3-moderate-lr` at 4 GPUs to `run4-large-lora` at 16 GPUs.
+- The 16-GPU sweep completes in **56.4 minutes** versus **148.3 minutes** for the 4-GPU sweep, an aggregate **2.63× wall-clock speedup**. Estimated training consumption rises from **9.89 to 15.05 GPU-hours** (+52%), so the faster result is not the lower-compute result.
+- Scaling changes optimization as well as runtime: optimizer steps fall by about 4× (for example, run3 goes from 62 to 15), accuracy deltas range from **−6 to +4 percentage points**, and the winning configuration changes. This is a cross-regime comparison, not a pure strong-scaling benchmark.
+- On 16 GPUs, `run4-large-lora` is the observed accuracy/runtime frontier at **76% in 321.4 seconds (5.4 min)**. Its GRPO training loss is slightly negative (−0.000198), which is possible for the policy objective and is not a held-out quality metric.
+- The older GRPO smoke runtimes (about 15 min B200, 6 min Rubin, and 40 min in a generic cluster document) remain narrative and are a separate workload from the measured 4-/16-GPU sweeps. Do not merge them into one hardware ranking.
 - The report maps **40 commit-pinned experiment-evidence screenshots**: 15 GRPO, 18 Nemotron-3.5 Lightning, 4 Nemotron-3 Nano, 2 `nvidia-smi` captures, and 1 Cosmos capture. Two additional report-illustration PNGs in `images/` are excluded from the evidence catalog. Screenshots are strong run/audit evidence but weak substitutes for machine-readable metrics.
 - The image mapping surfaces two provenance issues: the `nemo3nano-ft-*` screenshots belong to the documented **8×H100** recipe (Pytche/Blackwell is explicitly described as the next step), and the GRPO document calls the run “multimodal” even though its configured model/dataset are Qwen3-1.7B + GSM8K text/math.
 - The August 21–23 Nemotron additions add Pytche Transformers QLoRA, a completed 25-step NeMo AutoModel full-SFT smoke run, a 100-step NeMo LoRA workflow, and a documented Hecate/Rubin compatibility failure at step 0.
 - The most useful GRPO next step is to repeat the top configurations across seeds and the full GSM8K test split. With 50 examples, each answer moves accuracy by **2 percentage points**.
-- Model-size coverage is skewed small: **26/34 records (76%) are ≤3B**, with one 7B VLM record and seven 30B-A3B Nemotron records.
+- Model-size coverage is skewed small: **31/39 records (79%) are ≤3B**, with one 7B VLM record and seven 30B-A3B Nemotron records.
 - The strongest GPU-performance hypothesis is the matched GRPO smoke pair: **4×Rubin ~6 min vs 4×B200 ~15 min (2.5× directional wall-clock ratio)**; H100/GH200 do not yet have matched runtime evidence in the repo.
 
 ## Experiment evolution timeline
 
-> **Timeline convention:** exact run dates are not consistently recorded for every experiment, so this is an **evolution/sequence timeline**, not a fabricated calendar chronology. Repository snapshot: 2026-08-24. More information: [GitHub repository](https://github.com/balakreshnan/finetuningqwensweep).
+> **Timeline convention:** exact run dates are not consistently recorded for every experiment, so this is an **evolution/sequence timeline**, not a fabricated calendar chronology. Repository snapshot: 2026-08-25. More information: [GitHub repository](https://github.com/balakreshnan/finetuningqwensweep).
 
 | Stage | Experiment evolution | Models / datasets | Hardware / cluster | Key lesson |
 |---|---|---|---|---|
@@ -35,10 +36,10 @@
 | **2 — Hardening** | Fixed Qwen rerun recipes and reproducibility safeguards | Qwen2.5-3B-Instruct · OpenAssistant/oasst1 | H100-oriented recipe | Safer evaluation and deterministic seeds improve comparability; recipe drift (for example r8 → r16/r32 changes) must be versioned. |
 | **3 — Scale-out** | LoRA/QLoRA distributed training across cluster families | Llama-3.2-1B · SQuAD | B200 / Pytche / Hecate / H100-oriented environments | GPU activity screenshots prove execution, not scaling efficiency; collect full-run per-rank utilization and throughput. |
 | **4 — Multimodal** | Vision-language fine-tuning | Qwen2.5-VL-7B · The Cauldron/AI2D; Qwen3-VL-2B · LLaVA instruct mix | B200 and GH200 recipes | Multimodal pipelines need task-level evaluation and visual-token correctness, not just successful training. |
-| **5 — RL reasoning** | GRPO + QLoRA smoke/scale experiments, then a five-run hyperparameter sweep | Qwen3-1.7B · GSM8K | Pytche/B200, Hecate/Rubin, Lyris generic cluster | Moderate LR 1e-5 + four generations + r32 won at 76%. More generations cost time without improving accuracy; the older cross-cluster runtimes remain directional. |
+| **5 — RL reasoning** | GRPO + QLoRA smoke experiments, then matched five-configuration sweeps at 4 and 16 GPUs | Qwen3-1.7B · GSM8K | Pytche/B200, Hecate/Rubin, Lyris generic cluster | Both Hecate regimes peak at 76%, but the winner shifts from run3 to run4. More GPUs cut total wall time 2.63× while increasing estimated GPU-hours 52%; preserve global batch/update budget before claiming pure scaling. |
 | **6 — Large / MoE** | PEFT and full SFT on Nemotron 30B-A3B families | Nemotron-3.5 Lightning; Nemotron-3 Nano · SQuAD/Dolly/custom data | Rubin, Pytche/Blackwell-oriented docs, and 8×H100 recipe | Pytche shows QLoRA, full-SFT and NeMo LoRA execution; Hecate records a compiler compatibility failure. Training evidence still needs held-out metrics and exact manifests. |
 | **7 — Video / world model** | Cosmos Predict2 / Predict2.5 LoRA workflows | Cosmos Predict2 2B / Predict2.5 · UCF101 subset / Cosmos assets | EOS 8×H100 + Hecate-oriented workflows | Video-model evaluation should include fixed-seed generated samples and task/temporal-quality metrics in addition to loss telemetry. |
-| **8 — Next phase** | Controlled benchmarking and quality experiments | Cross-model / cross-dataset | H100 vs B200 vs GH200 vs Rubin | Repeat the GRPO winner across seeds/full test data, run one-factor LR/rank sweeps, commit the generated JSON/W&B history, and benchmark the exact winning manifest across GPUs. |
+| **8 — Next phase** | Controlled benchmarking and quality experiments | Cross-model / cross-dataset | H100 vs B200 vs GH200 vs Rubin | Repeat both GRPO winners across seeds/full test data, preserve global batch and optimizer-update budget across GPU counts, export W&B history, and benchmark the exact manifest across GPUs. |
 
 ### Timeline takeaway
 
@@ -50,9 +51,9 @@ The repository evolves from **single-model hyperparameter exploration → distri
 
 ### Portfolio shape
 
-- **26 of 34 records (76%)** use models at or below 3B nominal parameters; **1** record uses a 7B model; **7** records use 30B-A3B Nemotron variants. The work therefore starts heavily in the small-model regime and later expands into MoE, multimodal, and video/world-model adaptation.
-- **12 records** have measured, summary-reported, or observed wall-clock runtime. One additional ~120-minute GRPO entry is a **target configuration**, not a completed measured result.
-- The repository has enough evidence to compare **B200 vs Rubin directionally for one GRPO smoke workload**, but not enough matched evidence to rank H100, GH200, B200 and Rubin globally.
+- **31 of 39 records (79%)** use models at or below 3B nominal parameters; **1** record uses a 7B model; **7** records use 30B-A3B Nemotron variants. The work therefore starts heavily in the small-model regime and later expands into MoE, multimodal, and video/world-model adaptation.
+- **17 records** have measured or observed wall-clock runtime. One additional ~120-minute GRPO entry is a **target configuration**, not a completed measured result.
+- The repository now has a matched **4-vs-16-GPU Hecate sweep**, but the GPU-count change also changes global batch/update count. It supports end-to-end regime selection, not isolated hardware scaling efficiency. B200 vs Rubin remains directional for the older smoke workload.
 
 ### Model, dataset, hardware, and runtime coverage
 
@@ -61,7 +62,7 @@ The repository evolves from **single-model hyperparameter exploration → distri
 | Qwen/Qwen2.5-3B-Instruct | 3B | Dense text | OpenAssistant/oasst1 | Historical GPU not recorded; H100 rerun recipe | 44.9–67.6 min measured historical | Only family with committed machine-readable timing/throughput; historical GPU is unknown. |
 | meta-llama/Llama-3.2-1B / Instruct | 1B | Dense text | SQuAD 1,000–5,000 | B200/Pytche/Rubin-oriented docs | — | Useful distributed-PEFT feasibility coverage; no portable runtime result. |
 | Qwen/Qwen2.5-VL-7B-Instruct | 7B | Vision-language | The Cauldron / AI2D, 500 | 4× B200/GB200-tagged | — | Largest dense VLM in the inventory; performance outcome not exported. |
-| Qwen/Qwen3-1.7B | 1.7B | Dense text / GRPO | GSM8K 500/1,000 sweep; 1,500 target; test[:50] sweep evaluation | 4× B200; 4× Rubin; generic 4-GPU cluster | 6/15/40 min older smoke narratives; 21–48 min Hecate sweep summaries | Best cross-cluster runtime hypothesis plus the portfolio's first reported GRPO accuracy sweep. Workloads must remain separate. |
+| Qwen/Qwen3-1.7B | 1.7B | Dense text / GRPO | GSM8K 500/1,000 sweep; 1,500 target; test[:50] sweep evaluation | 4× B200; 4× and 16× Rubin; generic 4-GPU cluster | 6/15/40 min older smoke narratives; 5.4–47.0 min measured Hecate sweep runs | Ten machine-readable Hecate sweep outcomes enable cross-regime analysis. The 4-/16-GPU comparison changes optimization semantics; older smoke workloads remain separate. |
 | Nemotron-3.5-Lightning-30B-A3B | 30B total / ~3B active | MoE / hybrid | SQuAD 5,000; custom 103-example JSONL | 4× Rubin; 4× Pytche Blackwell-class | — | Pytche QLoRA/full-SFT/LoRA evidence and Hecate step-0 compatibility failure; held-out metrics and runtime export are missing. |
 | Nemotron-3-Nano-30B-A3B | 30B total / ~3B active | MoE / hybrid | Dolly 500/50 on Pytche; H100 recipe dataset not pinned | 4× Blackwell-class Pytche; 8× H100 recipe | — | Do not treat total 30B like a dense 30B workload; active parameter count matters. |
 | Qwen/Qwen3-VL-2B-Instruct | 2B | Vision-language | LLaVA mix 100/20 smoke; 10,000/500 recommended | 1× GH200 | — | Small model on a very large accelerator can be utilization-limited; increase microbatch before accumulation. |
@@ -69,7 +70,7 @@ The repository evolves from **single-model hyperparameter exploration → distri
 | Cosmos Predict2 2B / Video2World | 2B | Video / world model | UCF101 subset (~407 videos in EOS example) | 8× H100 EOS; 8× Rubin template | — | Execution evidence exists, but no matched runtime/quality table for accelerator comparison. |
 | Cosmos Predict2.5 2B | 2B | Video / world model | Cosmos-NeMo-Assets | 8-GPU orchestration; exact cluster not pinned | — | Official-recipe orchestration; performance depends on external run telemetry. |
 
-### Closest GPU performance comparison — Qwen3-1.7B GRPO smoke
+### Older cross-GPU runtime context — Qwen3-1.7B GRPO smoke
 
 | Environment | GPU | GPUs | Model / dataset | Runtime | Relative speed (B200=1.0) | GPU-hours | Evidence quality |
 |---|---|---:|---|---:|---:|---:|---|
@@ -81,23 +82,46 @@ The repository evolves from **single-model hyperparameter exploration → distri
 - The generic Lyris/Pytche note reports ~40 min, but its GPU is selectable among GB200/B200/B300. It is therefore useful as an environment observation, not as a GPU-architecture result.
 - Do **not** convert these three numbers into a universal GPU ranking: container digest, software versions, data-loading/I/O conditions, warm/cold start, token counts, and per-rank utilization are not fully controlled.
 
-### Latest Hecate GRPO five-run sweep
+### Latest Hecate GRPO sweep — 4 GPUs vs 16 GPUs
 
-All five runs use Qwen3-1.7B, 4-bit NF4 QLoRA, four Rubin GPUs, one epoch, 512-token completions, and greedy exact-match evaluation on the first 50 GSM8K test examples. The step counts below are approximate values from the source's planning table; accuracy, loss, and runtime are from its final-results table.
+The two committed JSON artifacts contain the same five Qwen3-1.7B / 4-bit NF4 QLoRA configurations, each trained for one epoch with 512-token completions and evaluated by greedy exact match on the first 50 GSM8K test examples. Values below come directly from the JSON artifacts; GPU-hours are calculated as `train_time_seconds × GPU count / 3600`.
 
-| Run | Train examples | LR | Generations | Batch / grad acc | LoRA r/alpha | ~Steps | Accuracy | Train loss | Runtime | GPU-hours |
-|---|---:|---:|---:|---|---|---:|---:|---:|---:|---:|
-| run1-baseline | 1,000 | 5e-6 | 4 | 4 / 4 | 16/32 | 62 | 72% | 0.0034 | 23 min | 1.53 |
-| run2-high-lr-more-gen | 1,000 | 2e-5 | 8 | 8 / 2 | 32/64 | 31 | 74% | 0.0087 | 48 min | 3.20 |
-| **run3-moderate-lr** | **1,000** | **1e-5** | **4** | **4 / 4** | **32/64** | **62** | **76%** | **0.0052** | **21 min** | **1.40** |
-| run4-large-lora | 1,000 | 2e-6 | 4 | 4 / 4 | 64/128 | 62 | 74% | 0.0018 | 21 min | 1.40 |
-| run5-max-exploration | 500 | 8e-6 | 16 | 16 / 1 | 32/64 | 31 | 70% | 0.0099 | 39 min | 2.60 |
+| Run | 4-GPU acc. | 16-GPU acc. | Δ accuracy | 4-GPU time | 16-GPU time | Speedup | 4-GPU steps | 16-GPU steps |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| run1-baseline | 72% | 70% | −2 pp | 23.3 min | 8.6 min | 2.71× | 62 | 15 |
+| run2-high-lr-more-gen | 74% | 72% | −2 pp | 47.0 min | 21.0 min | 2.23× | 125 | 31 |
+| run3-moderate-lr | **76%** | 70% | −6 pp | 20.3 min | 5.4 min | 3.74× | 62 | 15 |
+| run4-large-lora | 74% | **76%** | +2 pp | 20.3 min | 5.4 min | 3.78× | 62 | 15 |
+| run5-max-exploration | 70% | 74% | +4 pp | 37.6 min | 16.1 min | 2.34× | 125 | 31 |
+| **Sweep total** | — | — | — | **148.3 min** | **56.4 min** | **2.63×** | — | — |
 
-- **Winner:** run3 has the highest reported accuracy and ties run4 for the shortest rounded sweep runtime.
-- **Loss/quality decoupling:** run4's lower training loss does not translate into higher held-out accuracy. Select on the task metric, not GRPO training loss alone.
-- **Exploration cost:** run2 adds four generations and takes more than twice run3's time for two points lower accuracy. Run5 changes generations, sample count, batch, and accumulation simultaneously, so its lower score cannot be attributed to “over-exploration” alone.
-- **Evaluation resolution:** 50 examples make accuracy move in 2-point increments. The 76% result should be validated on the full GSM8K test split and multiple seeds before declaring a stable optimum.
-- **Artifact limitation:** the source code writes `sweep_analytics.json`, W&B run IDs, and URLs, but the repository commits only the summarized result table and screenshots—not the generated JSON or raw W&B history.
+| Compute summary | 4 GPUs | 16 GPUs | Change |
+|---|---:|---:|---:|
+| Estimated training GPU-hours | 9.89 | 15.05 | +52% |
+| Best accuracy | 76% (run3) | 76% (run4) | winner changed |
+| Fastest run | 20.3 min | 5.4 min | 3.76–3.78× faster for matched run3/run4 |
+
+#### Exact measured results
+
+| GPU count | Run | Train examples | LR | Generations | Batch / grad acc | LoRA r/alpha | Steps | Accuracy | Train loss | Runtime | GPU-hours | W&B |
+|---:|---|---:|---:|---:|---|---|---:|---:|---:|---:|---:|---|
+| 4 | run1-baseline | 1,000 | 5e-6 | 4 | 4 / 4 | 16/32 | 62 | 72% | 0.004576 | 23.3 min | 1.55 | `r2lixd5h` |
+| 4 | run2-high-lr-more-gen | 1,000 | 2e-5 | 8 | 8 / 2 | 32/64 | 125 | 74% | 0.008725 | 47.0 min | 3.13 | `e3448z3f` |
+| **4** | **run3-moderate-lr** | **1,000** | **1e-5** | **4** | **4 / 4** | **32/64** | **62** | **76%** | **0.005215** | **20.3 min** | **1.35** | `wrabdmlr` |
+| 4 | run4-large-lora | 1,000 | 2e-6 | 4 | 4 / 4 | 64/128 | 62 | 74% | 0.001528 | 20.3 min | 1.35 | `b4ijksn2` |
+| 4 | run5-max-exploration | 500 | 8e-6 | 16 | 16 / 1 | 32/64 | 125 | 70% | 0.009948 | 37.6 min | 2.51 | `xe88vbrf` |
+| 16 | run1-baseline | 1,000 | 5e-6 | 4 | 4 / 4 | 16/32 | 15 | 70% | −0.000339 | 8.6 min | 2.29 | `31s6xcxf` |
+| 16 | run2-high-lr-more-gen | 1,000 | 2e-5 | 8 | 8 / 2 | 32/64 | 31 | 72% | 0.005204 | 21.0 min | 5.61 | `uv38sg72` |
+| 16 | run3-moderate-lr | 1,000 | 1e-5 | 4 | 4 / 4 | 32/64 | 15 | 70% | 0.003267 | 5.4 min | 1.44 | `vjqmzkvw` |
+| **16** | **run4-large-lora** | **1,000** | **2e-6** | **4** | **4 / 4** | **64/128** | **15** | **76%** | **−0.000198** | **5.4 min** | **1.43** | `da7ics60` |
+| 16 | run5-max-exploration | 500 | 8e-6 | 16 | 16 / 1 | 32/64 | 31 | 74% | 0.007580 | 16.1 min | 4.28 | `guvdw5zw` |
+
+- **Regime-specific winners:** run3 is the 4-GPU winner; run4 is the 16-GPU winner and the 16-GPU accuracy/runtime frontier.
+- **Wall time vs compute:** 16 GPUs reduce aggregate sweep wall time by 62%, but use about 52% more estimated GPU-hours. Choose the regime based on latency, capacity, and compute-cost constraints.
+- **Optimization changed:** steps fall by roughly 4× at 16 GPUs because the global batch grows with world size. Accuracy movement therefore combines parallelism, global-batch, and optimizer-update effects; it cannot be attributed to accelerator count alone.
+- **Loss is diagnostic only:** GRPO policy loss can be near zero or negative and is not comparable to SFT cross-entropy or held-out accuracy. The negative run1/run4 16-GPU values are retained exactly rather than treated as errors.
+- **Evaluation resolution:** 50 examples make accuracy move in 2-point increments. Both 76% results need full-test, multi-seed validation before either is treated as a stable optimum.
+- **Remaining artifact gap:** both summary JSON files and W&B run IDs/URLs are committed, but raw W&B histories, per-example predictions, seed variance, and per-rank hardware telemetry are not.
 
 ### Historical Qwen timing trend
 
@@ -140,11 +164,16 @@ All five runs use Qwen3-1.7B, 4-bit NF4 QLoRA, four Rubin GPUs, one epoch, 512-t
 | LYRIS-SFT-01 | Llama-3.2-1B QLoRA SQuAD | Documented run recipe | SFT + QLoRA | meta-llama/Llama-3.2-1B-Instruct | rajpurkar/squad train[:5000] | Lyris/Pytche cluster | GB200/B200/B300 selectable; exact run SKU not pinned | 4 | 20 ep | 0.0002 | 4 / 4 | r=16, a=32, d=0.05 | — | — | — | documented; metrics not committed | [lyrispytchecluster.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/lyrispytchecluster.md) |
 | GRPO-PYTCHE-01 | Qwen3-1.7B GSM8K GRPO smoke | Observed narrative | GRPO + QLoRA | Qwen/Qwen3-1.7B | openai/gsm8k train[:500] | Pytche | B200 | 4 | 1 ep | 5e-06 | 4 / 2 | r=16, a=32, d=0.05 | — | — | 15 | completed per document; W&B screenshots/URL | [pytchegrpo.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/pytchegrpo.md) |
 | GRPO-HECATE-01 | Qwen3-1.7B GSM8K GRPO smoke | Observed narrative | GRPO + QLoRA | Qwen/Qwen3-1.7B | openai/gsm8k train[:500] | Hecate | Rubin | 4 | 1 ep | 5e-06 | 4 / 2 | r=16, a=32, d=0.05 | — | — | 6 | completed per document; W&B screenshots/URL | [hecategrpo.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/hecategrpo.md) |
-| GRPO-HECATE-SWEEP-01 | run1-baseline | Measured sweep summary | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 4 | 1 ep, ~62 steps | 5e-06 | 4 / 4 | r=16, a=32, d=0.05 | 0.0034 | accuracy 72% | 23 | completed | [hecateqwengrpo5runs.md](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/hecateqwengrpo5runs.md) |
-| GRPO-HECATE-SWEEP-02 | run2-high-lr-more-gen | Measured sweep summary | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 4 | 1 ep, ~31 steps | 2e-05 | 8 / 2 | r=32, a=64, d=0.05 | 0.0087 | accuracy 74% | 48 | completed | [hecateqwengrpo5runs.md](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/hecateqwengrpo5runs.md) |
-| **GRPO-HECATE-SWEEP-03** | **run3-moderate-lr** | **Measured sweep summary** | **GRPO + QLoRA** | **Qwen/Qwen3-1.7B** | **GSM8K train[:1000] + test[:50]** | **Hecate** | **Rubin** | **4** | **1 ep, ~62 steps** | **1e-05** | **4 / 4** | **r=32, a=64, d=0.05** | **0.0052** | **accuracy 76%** | **21** | **completed; sweep winner** | [hecateqwengrpo5runs.md](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/hecateqwengrpo5runs.md) |
-| GRPO-HECATE-SWEEP-04 | run4-large-lora | Measured sweep summary | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 4 | 1 ep, ~62 steps | 2e-06 | 4 / 4 | r=64, a=128, d=0.05 | 0.0018 | accuracy 74% | 21 | completed | [hecateqwengrpo5runs.md](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/hecateqwengrpo5runs.md) |
-| GRPO-HECATE-SWEEP-05 | run5-max-exploration | Measured sweep summary | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:500] + test[:50] | Hecate | Rubin | 4 | 1 ep, ~31 steps | 8e-06 | 16 / 1 | r=32, a=64, d=0.05 | 0.0099 | accuracy 70% | 39 | completed | [hecateqwengrpo5runs.md](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/hecateqwengrpo5runs.md) |
+| GRPO-HECATE-SWEEP-01 | run1-baseline | Measured JSON (4 GPU) | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 4 | 1 ep, 62 steps | 5e-06 | 4 / 4 | r=16, a=32, d=0.05 | 0.004576 | accuracy 72% | 23.3 | completed; W&B `r2lixd5h` | [sweep_analytics.json](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/Analytics/sweep_analytics.json) |
+| GRPO-HECATE-SWEEP-02 | run2-high-lr-more-gen | Measured JSON (4 GPU) | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 4 | 1 ep, 125 steps | 2e-05 | 8 / 2 | r=32, a=64, d=0.05 | 0.008725 | accuracy 74% | 47.0 | completed; W&B `e3448z3f` | [sweep_analytics.json](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/Analytics/sweep_analytics.json) |
+| **GRPO-HECATE-SWEEP-03** | **run3-moderate-lr** | **Measured JSON (4 GPU)** | **GRPO + QLoRA** | **Qwen/Qwen3-1.7B** | **GSM8K train[:1000] + test[:50]** | **Hecate** | **Rubin** | **4** | **1 ep, 62 steps** | **1e-05** | **4 / 4** | **r=32, a=64, d=0.05** | **0.005215** | **accuracy 76%** | **20.3** | **completed; 4-GPU winner; W&B `wrabdmlr`** | [sweep_analytics.json](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/Analytics/sweep_analytics.json) |
+| GRPO-HECATE-SWEEP-04 | run4-large-lora | Measured JSON (4 GPU) | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 4 | 1 ep, 62 steps | 2e-06 | 4 / 4 | r=64, a=128, d=0.05 | 0.001528 | accuracy 74% | 20.3 | completed; W&B `b4ijksn2` | [sweep_analytics.json](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/Analytics/sweep_analytics.json) |
+| GRPO-HECATE-SWEEP-05 | run5-max-exploration | Measured JSON (4 GPU) | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:500] + test[:50] | Hecate | Rubin | 4 | 1 ep, 125 steps | 8e-06 | 16 / 1 | r=32, a=64, d=0.05 | 0.009948 | accuracy 70% | 37.6 | completed; W&B `xe88vbrf` | [sweep_analytics.json](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/Analytics/sweep_analytics.json) |
+| GRPO-HECATE-16GPU-01 | run1-baseline | Measured JSON (16 GPU) | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 16 | 1 ep, 15 steps | 5e-06 | 4 / 4 | r=16, a=32, d=0.05 | −0.000339 | accuracy 70% | 8.6 | completed; W&B `31s6xcxf` | [sweep_analytics-16gpu.json](https://github.com/balakreshnan/finetuningqwensweep/blob/c76ac8c1261f6d36f6a647d8c7d0a330c69d68f1/Analytics/sweep_analytics-16gpu.json) |
+| GRPO-HECATE-16GPU-02 | run2-high-lr-more-gen | Measured JSON (16 GPU) | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 16 | 1 ep, 31 steps | 2e-05 | 8 / 2 | r=32, a=64, d=0.05 | 0.005204 | accuracy 72% | 21.0 | completed; W&B `uv38sg72` | [sweep_analytics-16gpu.json](https://github.com/balakreshnan/finetuningqwensweep/blob/c76ac8c1261f6d36f6a647d8c7d0a330c69d68f1/Analytics/sweep_analytics-16gpu.json) |
+| GRPO-HECATE-16GPU-03 | run3-moderate-lr | Measured JSON (16 GPU) | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:1000] + test[:50] | Hecate | Rubin | 16 | 1 ep, 15 steps | 1e-05 | 4 / 4 | r=32, a=64, d=0.05 | 0.003267 | accuracy 70% | 5.4 | completed; W&B `vjqmzkvw` | [sweep_analytics-16gpu.json](https://github.com/balakreshnan/finetuningqwensweep/blob/c76ac8c1261f6d36f6a647d8c7d0a330c69d68f1/Analytics/sweep_analytics-16gpu.json) |
+| **GRPO-HECATE-16GPU-04** | **run4-large-lora** | **Measured JSON (16 GPU)** | **GRPO + QLoRA** | **Qwen/Qwen3-1.7B** | **GSM8K train[:1000] + test[:50]** | **Hecate** | **Rubin** | **16** | **1 ep, 15 steps** | **2e-06** | **4 / 4** | **r=64, a=128, d=0.05** | **−0.000198** | **accuracy 76%** | **5.4** | **completed; 16-GPU winner; W&B `da7ics60`** | [sweep_analytics-16gpu.json](https://github.com/balakreshnan/finetuningqwensweep/blob/c76ac8c1261f6d36f6a647d8c7d0a330c69d68f1/Analytics/sweep_analytics-16gpu.json) |
+| GRPO-HECATE-16GPU-05 | run5-max-exploration | Measured JSON (16 GPU) | GRPO + QLoRA | Qwen/Qwen3-1.7B | GSM8K train[:500] + test[:50] | Hecate | Rubin | 16 | 1 ep, 31 steps | 8e-06 | 16 / 1 | r=32, a=64, d=0.05 | 0.007580 | accuracy 74% | 16.1 | completed; W&B `guvdw5zw` | [sweep_analytics-16gpu.json](https://github.com/balakreshnan/finetuningqwensweep/blob/c76ac8c1261f6d36f6a647d8c7d0a330c69d68f1/Analytics/sweep_analytics-16gpu.json) |
 | GRPO-LYRIS-01 | Qwen3-1.7B GSM8K GRPO smoke | Observed narrative | GRPO + QLoRA | Qwen/Qwen3-1.7B | openai/gsm8k train[:500] | Lyris/Pytche generic doc | GB200/B200/B300 selectable | 4 | 1 ep | 5e-06 | 4 / 2 | r=16, a=32, d=0.05 | — | — | 40 | documented as executed | [lyrispytchecluster.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/lyrispytchecluster.md) |
 | GRPO-LYRIS-02 | Qwen3-1.7B GSM8K GRPO scaled ~2h | Target recipe | GRPO + QLoRA | Qwen/Qwen3-1.7B | openai/gsm8k train[:1500] | Lyris/Pytche generic doc | GB200/B200/B300 selectable | 4 | 2 ep | 5e-06 | 2 / 4 | r=16, a=32, d=0.05 | — | — | 120 | target/configuration; measured result not committed | [lyrispytchecluster.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/lyrispytchecluster.md) |
 | NEMO-HECATE-01 | Nemotron-3.5 Lightning QLoRA SFT | Documented run + screenshots | SFT + QLoRA | nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 | rajpurkar/squad first 5000 | Hecate | Rubin | 4 | 1 ep | 0.0002 | 1 / 4 | r=16, a=32, d=0.05 | — | — | — | documented; numeric final eval absent | [hecatenemolight.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/hecatenemolight.md) |
@@ -173,7 +202,7 @@ All five runs use Qwen3-1.7B, 4-bit NF4 QLoRA, four Rubin GPUs, one epoch, 512-t
 
 ## Cluster / hardware interpretation
 
-- **Hecate / Rubin:** the older GRPO smoke test is documented at about 6 minutes on 4 GPUs; the newer five-run sweep reports 21–48 minute training times for larger/different run configurations. These are separate workloads. Hecate also hosts Nemotron QLoRA execution and a documented NeMo compiler failure at step 0.
+- **Hecate / Rubin:** the older 4-GPU GRPO smoke test is documented at about 6 minutes. The measured sweep artifacts contain 4-GPU runs of 20.3–47.0 minutes and 16-GPU runs of 5.4–21.0 minutes. The matched sweep configurations show 2.23–3.78× wall-clock speedups, but steps/global batch change with GPU count, so this is end-to-end regime scaling rather than isolated device scaling. Hecate also hosts Nemotron QLoRA execution and a documented NeMo compiler failure at step 0.
 - **Pytche / B200:** the same GRPO smoke recipe is documented at about 15 minutes on 4 B200 GPUs. The repository does not lock software/container revisions or token-level throughput, so the cross-cluster ratio is not a defensible hardware speedup claim.
 - **GH200:** Qwen3-VL-2B recommended configuration uses one GPU, 10k/500 train/eval examples, batch 4 and accumulation 4. The documentation explicitly notes that a 2B QLoRA workload can underutilize GH200.
 - **EOS / H100:** an 8-GPU Cosmos Predict2 2B Video2World LoRA recipe is documented. The separate H100 bare-metal note invokes the fixed Qwen sweep, but the historical CSV itself does not record its GPU.
@@ -187,8 +216,9 @@ All five runs use Qwen3-1.7B, 4-bit NF4 QLoRA, four Rubin GPUs, one epoch, 512-t
 
 ### GRPO + QLoRA
 - The common smoke recipe uses Qwen3-1.7B, GSM8K 500 examples, LR 5e-6, 2 generations, batch 4, accumulation 2, one epoch, completion length 256, LoRA r16/alpha32/dropout0.05.
-- The new sweep disables Qwen thinking mode, increases completion length to 512, and uses four reward functions: exact/near-correct boxed answer, boxed format, reasoning-shape heuristic, and a length penalty.
-- `run3-moderate-lr` is the observed winner at 76%. Run4 demonstrates that lower GRPO training loss is not the same as better held-out exact match.
+- The matched sweeps disable Qwen thinking mode, increase completion length to 512, and use four reward functions: exact/near-correct boxed answer, boxed format, reasoning-shape heuristic, and a length penalty.
+- Both GPU regimes peak at 76%, but `run3-moderate-lr` wins at 4 GPUs and `run4-large-lora` wins at 16 GPUs. The 16-GPU run4 result is the observed accuracy/runtime frontier for that regime.
+- Four-to-16-GPU scaling cuts total wall time from 148.3 to 56.4 minutes (2.63×) while increasing estimated training consumption from 9.89 to 15.05 GPU-hours. Because optimizer steps fall by about 4×, quality deltas cannot be attributed to hardware alone.
 - The sweep is multi-factor. Run5 changes generations, training examples, batch, and accumulation; run4 changes LR and rank. Use these results to choose candidates, not to estimate isolated causal effects.
 - The source evaluates only 50 test examples, giving 2-point accuracy resolution. Commit per-example outputs, run multiple seeds, and evaluate the full test set next.
 - The scaled recipe increases to 1,500 examples, 4 generations, 2 epochs, completion length 384, and uses batch 2 / accumulation 4; the roughly two-hour duration is a target, not a committed measured result.
@@ -202,12 +232,12 @@ All five runs use Qwen3-1.7B, 4-bit NF4 QLoRA, four Rubin GPUs, one epoch, 512-t
 
 The repository snapshot contains **42 PNG files**: **40 experiment-evidence screenshots** mapped here plus two report illustrations (`fine-tuning-timeline-whiteboard.png` and `fine-tuning-end-to-end-whiteboard-photorealistic.png`) excluded from run evidence. Every cataloged image is tied to its surrounding commit-pinned document, cluster, model, dataset, and caption context. This section deliberately distinguishes **what the repository text/caption proves** from what would require reading exact pixels or exporting the underlying telemetry.
 
-> **Image-analysis rule:** exact values are not OCR-derived from screenshots. Numeric statements below come from committed CSV/Markdown result tables or explicit surrounding text. The interactive report displays commit-pinned screenshots for visual audit.
+> **Image-analysis rule:** exact values are not OCR-derived from screenshots. Numeric statements below come from committed CSV/JSON artifacts, Markdown result tables, or explicit surrounding text. The interactive report displays commit-pinned screenshots for visual audit.
 
 ### Cross-image findings
 
-- **Execution evidence is much stronger than evaluation evidence.** The 40 cataloged experiment screenshots demonstrate that many pipelines ran, reached W&B, produced artifacts, or engaged multiple GPUs. The historical Qwen CSV is the only standalone committed machine-readable outcome artifact; the new GRPO values are summarized in Markdown while its generated JSON remains external. Screenshots should be secondary audit artifacts.
-- **The new GRPO sweep adds real quality evidence.** Its source table reports five held-out accuracies, training losses and runtimes. The accompanying five uncaptioned images support the sweep's audit trail, but exact values come from the table—not pixel inference.
+- **Execution evidence is much stronger than evaluation evidence for most families.** The 40 cataloged experiment screenshots demonstrate that many pipelines ran, reached W&B, produced artifacts, or engaged multiple GPUs. The historical Qwen CSV and both GRPO JSON files are the committed machine-readable outcome artifacts; screenshots should remain secondary audit evidence.
+- **The GRPO artifacts add real quality and scaling evidence.** The two JSON files report 10 held-out accuracies, training losses, step counts, runtimes and W&B identifiers. The five uncaptioned images support the 4-GPU sweep's audit trail, but exact values come from JSON—not pixel inference.
 - **Hecate/Rubin is directionally faster in the GRPO smoke narratives.** The same nominal Qwen3-1.7B / GSM8K-500 / 1-epoch / 4-GPU recipe is described as about **15 min on Pytche/B200** and **6 min on Hecate/Rubin** — a **2.5× narrative runtime ratio**. Treat this as a hypothesis for a controlled benchmark, not as an accelerator performance claim.
 - **GRPO needs reward-component exports.** The code optimizes correctness, boxed-answer format, and reasoning-length rewards. W&B screenshots alone can hide whether gains come from formatting rather than math correctness. Export each reward component, total reward, completion length, KL-like statistics if available, and held-out GSM8K exact match.
 - **Nemotron-3.5 Lightning screenshots do not prove generalization.** The shown Hecate recipe passes a training dataset but no held-out `eval_dataset`; its W&B panels can demonstrate training health, not validation quality. Add a deterministic SQuAD validation split plus eval loss/EM/F1.
@@ -287,10 +317,10 @@ The repository snapshot contains **42 PNG files**: **40 experiment-evidence scre
 
 ## Recommended next experiments
 
-1. **Validate the GRPO winner:** repeat run3-moderate-lr and run4-large-lora with at least three seeds and the full GSM8K test split; commit per-example predictions and `sweep_analytics.json`.
-2. **One-factor GRPO LR sweep:** hold four generations, r32/alpha64, 1,000 examples, batch/accumulation, seed and rewards fixed; test values around 1e-5.
-3. **One-factor GRPO rank sweep:** with LR fixed at 1e-5, compare r16/r32/r64 to determine whether run4's lower loss came from capacity or its much lower LR.
-4. **Controlled GRPO cluster benchmark:** run the exact winning manifest on B200 vs Rubin with the same commit, container, data fingerprint and seed; log tokens/s, utilization, peak VRAM, reward components, GPU-hours and held-out accuracy.
+1. **Validate both regime winners:** repeat 4-GPU run3 and 16-GPU run4 with at least three seeds and the full GSM8K test split; commit per-example predictions and raw W&B histories.
+2. **Controlled 4→16 GPU scaling:** preserve global prompt batch, optimizer-update count, seed, data order, LR and all model/reward settings by adjusting per-device batch or accumulation. Then measure step time, tokens/s, scaling efficiency and quality.
+3. **One-factor LR × rank grid:** test LR around 1e-5 and 2e-6 across r32/r64 while holding generations, sample count, global batch, update budget and seeds fixed. This separates the interaction behind the two regime winners.
+4. **Controlled B200 vs Rubin benchmark:** run the exact validated manifest with the same commit, container, data fingerprint and seed; log tokens/s, utilization, peak VRAM, reward components, GPU-hours and held-out accuracy.
 5. **Historical validation recovery:** rerun the four Qwen2.5 CSV configs through the current finite-eval path and export a run summary for every row.
 6. **SFT → GRPO comparison:** evaluate base, SFT/QLoRA, and SFT+GRPO checkpoints on the same held-out math set to quantify whether RL adds accuracy rather than only reward optimization.
 
@@ -298,9 +328,10 @@ The repository snapshot contains **42 PNG files**: **40 experiment-evidence scre
 
 - Screenshot analysis is context- and provenance-based; exact values were not extracted from plot pixels. Treat screenshot-derived conclusions as qualitative unless backed by committed CSV/JSON or explicit surrounding text.
 
-- Four rows have standalone committed CSV outcomes. Five additional GRPO rows have numeric Markdown summaries, but their generated JSON/raw W&B histories are not committed.
+- Four rows have standalone committed CSV outcomes, and 10 GRPO rows have standalone committed JSON outcomes. Raw W&B histories and per-example predictions are not committed.
 - The new GRPO accuracy uses only 50 test examples; one answer moves the score by 2 percentage points, and no multi-seed variance is reported.
 - The GRPO sweep changes multiple variables between several runs, so it identifies candidates but does not isolate causal hyperparameter effects.
+- The 4-/16-GPU comparison does not preserve global batch or optimizer-update count; its speed and accuracy deltas describe two execution regimes rather than pure strong-scaling efficiency.
 - Several documents contain screenshots or W&B links without exported numeric history in the repository.
 - Cluster timing statements are not normalized for software versions, token counts, launch overhead, or utilization.
 - Some source files are recipes/templates rather than proof of completed runs; the `Evidence` column makes that distinction explicit.
@@ -318,7 +349,9 @@ The repository snapshot contains **42 PNG files**: **40 experiment-evidence scre
 - [h1008GPUeos.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/h1008GPUeos.md)
 - [hecatecosmos3nano.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/hecatecosmos3nano.md)
 - [hecategrpo.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/hecategrpo.md)
-- [hecateqwengrpo5runs.md](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/hecateqwengrpo5runs.md)
+- [hecateqwengrpo5runs.md](https://github.com/balakreshnan/finetuningqwensweep/blob/fe047de8176a886d72d5426ed39411594c47e9fd/hecateqwengrpo5runs.md)
+- [sweep_analytics.json — 4 GPU](https://github.com/balakreshnan/finetuningqwensweep/blob/5ae95b80b73251be32d321fa0db0e223f1ad3a85/Analytics/sweep_analytics.json)
+- [sweep_analytics-16gpu.json](https://github.com/balakreshnan/finetuningqwensweep/blob/c76ac8c1261f6d36f6a647d8c7d0a330c69d68f1/Analytics/sweep_analytics-16gpu.json)
 - [hecatenemobackLoRaFT.md](https://github.com/balakreshnan/finetuningqwensweep/blob/04ae1ad9631dc4468c4653df12c88dadddccfffc/hecatenemobackLoRaFT.md)
 - [hecatenemolight.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/hecatenemolight.md)
 - [lyrispytchecluster.md](https://github.com/balakreshnan/finetuningqwensweep/blob/d04f1ef5cb0222f51452ac7b75364420ca40d076/lyrispytchecluster.md)
