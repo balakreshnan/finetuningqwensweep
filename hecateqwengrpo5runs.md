@@ -660,3 +660,63 @@ cat /lustre/fsw/general_sa/bbalakreshna/grpo-results-sweep/sweep_analytics.json
 | **run3-moderate-lr** ✅ | **LR 1e-5, 4 gen, LoRA r=32** | **76%** | **0.0052** | **21 min** |
 | run4-large-lora | LR 2e-6, 4 gen, LoRA r=64 | 74% | 0.0018 | 21 min |
 | run5-max-exploration | LR 8e-6, 16 gen, LoRA r=32 | 70% | 0.0099 | 39 min |
+
+- To run in 4 nodes with each 4 GPU
+- after mount is set for storage create a script
+- first create the gpro run script
+- then to run in parallel
+
+```
+cat > /lustre/fsw/general_sa/bbalakreshna/launch_sweep.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "$(hostname): Installing dependencies..."
+pip install --quiet transformers datasets accelerate peft bitsandbytes trl huggingface_hub wandb
+
+# Login to Hugging Face (use your token)
+export HF_TOKEN="xxxx"
+hf auth login --token "xxxx"
+
+# Login to W&B (use your API key)
+export WANDB_API_KEY="xxxx"
+
+echo "$(hostname): Launching training..."
+torchrun \
+  --nnodes=$SLURM_JOB_NUM_NODES \
+  --nproc_per_node=4 \
+  --rdzv_backend=c10d \
+  --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
+  /lustre/fsw/general_sa/bbalakreshna/grpo_5runs_sweep.py
+EOF
+
+chmod +x /lustre/fsw/general_sa/bbalakreshna/launch_sweep.sh
+```
+
+- then launch the training
+- let's first cancel anything running
+
+```
+# 1. Cancel everything
+scancel -u bbalakreshna
+
+# 2. Confirm nothing is left
+squeue -u bbalakreshna
+```
+
+```
+srun --account=general_sa \
+     --partition=batch-xdr \
+     --nodes=4 \
+     --ntasks-per-node=1 \
+     --time=5:00:00 \
+     --job-name=general_sa-finetune.grposweep \
+     --container-image=gitlab-master.nvidia.com/dl/dgx/pytorch:main-py3-devel \
+     --container-mount-home \
+     --container-mounts=/lustre:/lustre \
+     --no-container-remap-root \
+     --mpi=pmix \
+     --export=ALL \
+     /lustre/fsw/general_sa/bbalakreshna/launch_sweep.sh
+```
+
