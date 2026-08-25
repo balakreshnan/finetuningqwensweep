@@ -2,7 +2,7 @@
 
 **Repository:** [balakreshnan/finetuningqwensweep](https://github.com/balakreshnan/finetuningqwensweep)
 
-**Snapshot:** `e8ea2f9c1b83c8ed1bb2d9d5ed6683bc3f9fc52e` (2026-08-25)
+**Snapshot:** `5aba9e0ccfa1eabc04cc086dab5bae5fe291ef09` (2026-08-25)
 
 **Inventory records:** 39
 
@@ -99,7 +99,7 @@ The two committed JSON artifacts contain the same five Qwen3-1.7B / 4-bit NF4 QL
 |---|---:|---:|---:|
 | Estimated training GPU-hours | 9.89 | 15.05 | +52% |
 | Best accuracy | 76% (run3) | 76% (run4) | winner changed |
-| Fastest run | 20.3 min | 5.4 min | 3.76–3.78× faster for matched run3/run4 |
+| Fastest run | 20.3 min | 5.4 min | 3.78× faster for matched run4 (raw seconds) |
 
 #### Exact measured results
 
