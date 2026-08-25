@@ -720,7 +720,7 @@ srun --account=general_sa \
      /lustre/fsw/general_sa/bbalakreshna/launch_sweep.sh
 ```
 
-> GRPO Sweep Results — Qwen/Qwen3-1.7B
+# GRPO Sweep Results — Qwen/Qwen3-1.7B
 
 ## Overview
 
@@ -734,7 +734,7 @@ srun --account=general_sa \
 | Total Training Time | ~56.5 minutes |
 | W&B Project | [qwen3-grpo-math](https://wandb.ai/balabala76/qwen3-grpo-math) |
 
-> GRPO Sweep Comparison — 4 GPU vs Multi-Node (4 Nodes × 4 GPUs)
+# GRPO Sweep Comparison — 4 GPU vs Multi-Node (4 Nodes × 4 GPUs)
 
 ## Overview
 
