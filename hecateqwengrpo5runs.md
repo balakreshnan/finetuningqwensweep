@@ -720,3 +720,16 @@ srun --account=general_sa \
      /lustre/fsw/general_sa/bbalakreshna/launch_sweep.sh
 ```
 
+> GRPO Sweep Results — Qwen/Qwen3-1.7B
+
+## Overview
+
+| Metric | Value |
+|--------|-------|
+| Model | Qwen/Qwen3-1.7B |
+| Dataset | GSM8K (math reasoning) |
+| Method | GRPO + LoRA |
+| Total Runs | 5/5 completed ✅ |
+| Best Accuracy | **76% (run4-large-lora)** |
+| Total Training Time | ~56.5 minutes |
+| W&B Project | [qwen3-grpo-math](https://wandb.ai/balabala76/qwen3-grpo-math) |
