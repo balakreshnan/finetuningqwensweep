@@ -3,377 +3,828 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Analytics dashboard for the 16-GPU Qwen3-1.7B GRPO GSM8K sweep.">
-<title>16-GPU GRPO Sweep Analytics — Qwen3-1.7B GSM8K</title>
+<meta name="description" content="Professional analytics dashboard for the 16-GPU Qwen3-1.7B GRPO GSM8K sweep.">
+<title>16-GPU GRPO Sweep Analytics — Qwen3-1.7B</title>
 <style>
 :root {
+  color-scheme: dark;
+  --bg: #090c10;
+  --surface: #11161d;
+  --surface-raised: #171d26;
+  --surface-soft: #0e1319;
+  --border: #27313d;
+  --border-strong: #384656;
+  --text: #f4f7fa;
+  --muted: #9ca9b8;
+  --muted-2: #6f7c8a;
   --green: #76b900;
-  --green-soft: rgba(118,185,0,.12);
-  --bg: #0f0f1a;
-  --panel: #1e1e32;
-  --panel-2: #171729;
-  --border: #30304b;
-  --text: #eeeeF5;
-  --muted: #aaaac0;
-  --blue: #4fc3f7;
-  --orange: #ffb347;
-  --red: #ef6a67;
-  --purple: #ba68c8;
+  --green-bright: #91d400;
+  --green-soft: rgba(118, 185, 0, .12);
+  --blue: #52b7ff;
+  --blue-soft: rgba(82, 183, 255, .12);
+  --orange: #ffb14a;
+  --orange-soft: rgba(255, 177, 74, .12);
+  --red: #ff6f6a;
+  --red-soft: rgba(255, 111, 106, .12);
+  --purple: #bc83ff;
+  --shadow: 0 18px 55px rgba(0, 0, 0, .28);
 }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
-  background: var(--bg);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% -5%, rgba(118, 185, 0, .11), transparent 27rem),
+    radial-gradient(circle at 92% 0, rgba(82, 183, 255, .08), transparent 24rem),
+    var(--bg);
   color: var(--text);
-  font-family: "Segoe UI", Inter, system-ui, sans-serif;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   line-height: 1.6;
 }
+button, a { font: inherit; }
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
-.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
-.header {
-  background: radial-gradient(circle at 15% 0, rgba(118,185,0,.18), transparent 38%), linear-gradient(135deg, #1a1a2e, #172217);
-  border: 1px solid var(--green);
-  border-radius: 18px;
-  padding: 3.25rem 2rem;
-  text-align: center;
+code, .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+.app-shell { width: min(1500px, calc(100% - 2rem)); margin: 0 auto; padding: 1rem 0 2rem; }
+.hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 270px;
+  padding: 2.4rem;
+  background: linear-gradient(130deg, rgba(23, 29, 38, .98), rgba(14, 23, 16, .98));
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
 }
-.header h1 { color: var(--green); font-size: clamp(2rem, 4vw, 3rem); line-height: 1.15; }
-.subtitle { color: var(--muted); margin-top: .75rem; font-size: 1.05rem; }
-.badge {
-  display: inline-block;
-  background: var(--green);
-  color: #0c1400;
+.hero::after {
+  position: absolute;
+  inset: auto -6rem -11rem auto;
+  width: 28rem;
+  height: 28rem;
+  content: "";
+  border: 1px solid rgba(118, 185, 0, .18);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3rem rgba(118, 185, 0, .03), 0 0 0 7rem rgba(118, 185, 0, .02);
+}
+.hero-top, .hero-main, .hero-actions { position: relative; z-index: 1; }
+.hero-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.breadcrumb { color: var(--muted); font-size: .75rem; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .34rem .7rem;
+  color: var(--green-bright);
+  background: var(--green-soft);
+  border: 1px solid rgba(118, 185, 0, .32);
   border-radius: 999px;
-  margin-top: 1.15rem;
-  padding: .35rem 1rem;
-  font-size: .78rem;
+  font-size: .72rem;
   font-weight: 800;
-  letter-spacing: .06em;
+  letter-spacing: .05em;
+  text-transform: uppercase;
 }
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
-  gap: 1rem;
-  margin: 1.5rem 0 2.5rem;
+.status::before { width: .45rem; height: .45rem; content: ""; background: var(--green-bright); border-radius: 50%; box-shadow: 0 0 12px var(--green); }
+.hero-main { max-width: 930px; margin-top: 2.5rem; }
+.hero h1 { max-width: 850px; font-size: clamp(2.1rem, 4vw, 3.5rem); letter-spacing: -.045em; line-height: 1.05; }
+.hero h1 span { color: var(--green-bright); }
+.hero-copy { max-width: 790px; margin-top: 1rem; color: var(--muted); font-size: 1rem; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.4rem; }
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 38px;
+  padding: .52rem .9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(255,255,255,.025);
+  font-size: .8rem;
+  font-weight: 700;
 }
-.stat, .card, details, .chart, .table-wrap, .callout {
-  background: var(--panel);
+.button.primary { color: #101600; background: var(--green); border-color: var(--green); }
+.button:hover { text-decoration: none; border-color: var(--green); transform: translateY(-1px); }
+
+.tab-shell {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  margin: 1rem 0;
+  padding: .45rem;
+  background: rgba(14, 19, 25, .9);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  box-shadow: 0 12px 35px rgba(0,0,0,.22);
+  backdrop-filter: blur(18px);
+}
+.tab-list { display: flex; gap: .35rem; overflow-x: auto; scrollbar-width: thin; }
+.tab-button {
+  flex: 1 0 auto;
+  min-width: 125px;
+  padding: .72rem .85rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: .79rem;
+  font-weight: 750;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  transition: background .18s, color .18s, border-color .18s;
+}
+.tab-button .tab-index { margin-right: .42rem; color: var(--muted-2); font-family: "SFMono-Regular", Consolas, monospace; font-size: .68rem; }
+.tab-button:hover { color: var(--text); background: rgba(255,255,255,.035); }
+.tab-button[aria-selected="true"] { color: var(--green-bright); background: var(--green-soft); border-color: rgba(118, 185, 0, .34); }
+.tab-button[aria-selected="true"] .tab-index { color: var(--green); }
+.tab-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.tab-panel { min-height: 620px; animation: reveal .28s ease; }
+.tab-panel[hidden] { display: none; }
+@keyframes reveal { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.panel-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.5rem 0 .85rem;
+}
+.panel-kicker { color: var(--green); font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.panel-title { margin-top: .2rem; font-size: clamp(1.55rem, 2.5vw, 2.2rem); letter-spacing: -.025em; line-height: 1.2; }
+.panel-description { max-width: 860px; margin-top: .55rem; color: var(--muted); font-size: .93rem; }
+.source-chip { flex: 0 0 auto; padding: .35rem .65rem; color: var(--blue); background: var(--blue-soft); border: 1px solid rgba(82,183,255,.24); border-radius: 999px; font-size: .7rem; font-weight: 700; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0; }
+.kpi-card {
+  min-height: 116px;
+  padding: 1rem;
+  background: linear-gradient(145deg, var(--surface-raised), var(--surface));
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-.stat { padding: 1.35rem 1rem; text-align: center; }
-.stat-value { color: var(--green); font-size: 1.85rem; font-weight: 800; }
-.stat-label { color: var(--muted); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
-h2 {
-  color: var(--green);
-  border-bottom: 2px solid var(--border);
-  font-size: 1.45rem;
-  margin: 2.75rem 0 1rem;
-  padding-bottom: .55rem;
+.kpi-label { color: var(--muted); font-size: .65rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.kpi-value { margin-top: .35rem; color: var(--text); font-size: 1.65rem; font-weight: 800; letter-spacing: -.03em; }
+.kpi-value.accent { color: var(--green-bright); }
+.kpi-note { margin-top: .15rem; color: var(--muted-2); font-size: .7rem; }
+
+.content-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; margin-top: 1rem; }
+.span-12 { grid-column: span 12; }
+.span-8 { grid-column: span 8; }
+.span-7 { grid-column: span 7; }
+.span-6 { grid-column: span 6; }
+.span-5 { grid-column: span 5; }
+.span-4 { grid-column: span 4; }
+.span-3 { grid-column: span 3; }
+.card {
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
 }
-.section-intro { color: var(--muted); max-width: 950px; margin-bottom: 1rem; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
-.card { padding: 1.35rem; }
-.card h3 { color: var(--text); font-size: 1.02rem; margin-bottom: .55rem; }
-.card p, .card li { color: var(--muted); font-size: .88rem; }
-.card ul { list-style: none; }
-.card li { border-bottom: 1px solid var(--border); padding: .45rem 0; }
-.card li:last-child { border-bottom: 0; }
-.eyebrow { color: var(--green); font-size: .7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; margin-bottom: .35rem; }
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 920px; }
-th { background: var(--panel-2); color: var(--green); font-size: .73rem; letter-spacing: .07em; text-align: left; text-transform: uppercase; }
-th, td { padding: .85rem .9rem; }
-td { border-top: 1px solid var(--border); font-size: .86rem; }
-tbody tr:hover td { background: rgba(118,185,0,.045); }
-tr.winner td { background: var(--green-soft); }
-.winner-badge { background: var(--green); color: #081000; border-radius: 999px; font-size: .66rem; font-weight: 800; margin-left: .45rem; padding: .17rem .45rem; }
-.positive { color: var(--green); font-weight: 700; }
-.negative { color: var(--red); font-weight: 700; }
-.neutral { color: var(--orange); font-weight: 700; }
-.mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .82rem; }
-.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1rem; }
-.chart { padding: 1.25rem; }
-.chart h3 { font-size: .95rem; margin-bottom: 1rem; }
-.bar-row { display: grid; grid-template-columns: 165px 1fr; align-items: center; gap: .75rem; margin: .7rem 0; }
-.bar-label { color: var(--muted); font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bar-track { background: var(--panel-2); border-radius: 6px; height: 30px; overflow: hidden; }
-.bar-fill { align-items: center; border-radius: 6px; color: #08080c; display: flex; font-size: .76rem; font-weight: 800; height: 100%; min-width: 52px; padding-left: .6rem; }
-.run1 { background: var(--blue); }
-.run2 { background: var(--orange); }
-.run3 { background: var(--purple); }
-.run4 { background: var(--green); }
-.run5 { background: var(--red); }
-.callout { border-color: rgba(118,185,0,.45); margin: 1rem 0; padding: 1rem 1.25rem; }
-.callout strong { color: var(--green); }
-.callout p { color: var(--muted); font-size: .88rem; }
-details { margin-bottom: .8rem; overflow: hidden; }
-details[open] { border-color: var(--green); }
-summary { cursor: pointer; font-weight: 700; list-style: none; padding: 1rem 1.25rem; }
+.card.highlight { background: linear-gradient(145deg, rgba(118,185,0,.1), var(--surface)); border-color: rgba(118,185,0,.34); }
+.card.warning { background: linear-gradient(145deg, rgba(255,177,74,.07), var(--surface)); border-color: rgba(255,177,74,.28); }
+.card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.card-title { font-size: 1rem; letter-spacing: -.01em; }
+.card-subtitle { margin-top: .2rem; color: var(--muted); font-size: .76rem; }
+.eyebrow { color: var(--green); font-size: .65rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+.badge {
+  display: inline-block;
+  padding: .2rem .52rem;
+  border-radius: 999px;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.badge.green { color: var(--green-bright); background: var(--green-soft); }
+.badge.blue { color: var(--blue); background: var(--blue-soft); }
+.badge.orange { color: var(--orange); background: var(--orange-soft); }
+.badge.red { color: var(--red); background: var(--red-soft); }
+.body-copy { color: var(--muted); font-size: .86rem; }
+.body-copy + .body-copy { margin-top: .7rem; }
+.divider { height: 1px; margin: 1rem 0; background: var(--border); }
+.list { list-style: none; }
+.list li { display: flex; justify-content: space-between; gap: 1rem; padding: .54rem 0; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .8rem; }
+.list li:last-child { border-bottom: 0; }
+.list strong { color: var(--text); font-weight: 650; }
+.list .value { color: var(--muted); text-align: right; }
+.callout { padding: .9rem 1rem; color: var(--muted); background: var(--green-soft); border: 1px solid rgba(118,185,0,.27); border-radius: 9px; font-size: .8rem; }
+.callout strong { color: var(--green-bright); }
+.callout.info { background: var(--blue-soft); border-color: rgba(82,183,255,.24); }
+.callout.info strong { color: var(--blue); }
+.callout.warning { background: var(--orange-soft); border-color: rgba(255,177,74,.26); }
+.callout.warning strong { color: var(--orange); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+table { width: 100%; min-width: 900px; border-collapse: collapse; background: var(--surface-soft); }
+th { color: var(--muted); background: #121820; font-size: .66rem; letter-spacing: .07em; text-align: left; text-transform: uppercase; }
+th, td { padding: .76rem .8rem; }
+td { border-top: 1px solid var(--border); font-size: .77rem; }
+tbody tr:hover td { background: rgba(255,255,255,.025); }
+tr.winner td { background: rgba(118,185,0,.085); }
+.winner-label { margin-left: .35rem; padding: .14rem .4rem; color: #0b1200; background: var(--green); border-radius: 999px; font-size: .58rem; font-weight: 850; }
+.positive { color: var(--green-bright); font-weight: 750; }
+.negative { color: var(--red); font-weight: 750; }
+.neutral { color: var(--orange); font-weight: 750; }
+
+.chart { display: grid; gap: .64rem; }
+.bar-row { display: grid; grid-template-columns: 145px 1fr 48px; align-items: center; gap: .7rem; }
+.bar-label { overflow: hidden; color: var(--muted); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { height: 11px; overflow: hidden; background: #0b1015; border-radius: 999px; }
+.bar-fill { height: 100%; border-radius: inherit; }
+.bar-fill.green { background: linear-gradient(90deg, var(--green), var(--green-bright)); }
+.bar-fill.blue { background: linear-gradient(90deg, #2679b6, var(--blue)); }
+.bar-fill.orange { background: linear-gradient(90deg, #bd6c00, var(--orange)); }
+.bar-fill.purple { background: linear-gradient(90deg, #7342aa, var(--purple)); }
+.bar-fill.red { background: linear-gradient(90deg, #a83d3a, var(--red)); }
+.bar-value { color: var(--text); font-size: .69rem; font-weight: 750; text-align: right; }
+
+details { overflow: hidden; margin-top: .65rem; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 9px; }
+details[open] { border-color: rgba(118,185,0,.37); }
+summary { padding: .86rem 1rem; cursor: pointer; font-size: .8rem; font-weight: 750; list-style: none; }
 summary::-webkit-details-marker { display: none; }
-summary::before { color: var(--green); content: "▶"; display: inline-block; font-size: .65rem; margin-right: .7rem; transition: transform .2s; }
+summary::before { display: inline-block; margin-right: .6rem; color: var(--green); content: "›"; font-size: 1rem; transition: transform .18s; }
 details[open] summary::before { transform: rotate(90deg); }
-.detail-body { padding: 0 1.25rem 1.25rem; }
-.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .7rem; }
-.detail-metric { background: var(--panel-2); border-radius: 8px; padding: .8rem; }
-.detail-metric span { color: var(--muted); display: block; font-size: .66rem; letter-spacing: .06em; text-transform: uppercase; }
-.detail-metric strong { display: block; margin-top: .2rem; }
-.analysis { color: var(--muted); font-size: .87rem; margin-top: 1rem; }
-.recommendations { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
-.recommendation { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.35rem; position: relative; }
-.priority { border-radius: 999px; display: inline-block; font-size: .64rem; font-weight: 800; letter-spacing: .07em; margin-bottom: .75rem; padding: .2rem .55rem; text-transform: uppercase; }
-.priority.high { background: var(--green); color: #081000; }
-.priority.medium { background: var(--orange); color: #161000; }
-.priority.low { background: var(--blue); color: #00151d; }
-.recommendation h3 { font-size: 1rem; margin-bottom: .4rem; }
-.recommendation p { color: var(--muted); font-size: .85rem; }
-.outcome { color: var(--green); font-size: .76rem; font-weight: 700; margin-top: .7rem; }
-.source-list { list-style: none; }
-.source-list li { border-bottom: 1px solid var(--border); color: var(--muted); font-size: .85rem; padding: .5rem 0; overflow-wrap: anywhere; }
-.source-list li:last-child { border-bottom: 0; }
-.footer { border-top: 1px solid var(--border); color: var(--muted); font-size: .8rem; margin-top: 3rem; padding: 2rem 0; text-align: center; }
-@media (max-width: 720px) {
-  .container { padding: 1rem; }
-  .header { padding: 2.4rem 1rem; }
-  .chart-grid { grid-template-columns: 1fr; }
-  .bar-row { grid-template-columns: 115px 1fr; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
+.detail-body { padding: 0 1rem 1rem; }
+.detail-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .55rem; }
+.detail-metric { padding: .68rem; background: var(--surface-raised); border-radius: 7px; }
+.detail-metric span { display: block; color: var(--muted-2); font-size: .58rem; letter-spacing: .06em; text-transform: uppercase; }
+.detail-metric strong { display: block; margin-top: .16rem; font-size: .78rem; }
+.detail-analysis { margin-top: .75rem; color: var(--muted); font-size: .77rem; }
+
+.decision { display: grid; grid-template-columns: 1.25fr .75fr; gap: 1rem; }
+.decision-main { padding: 1.4rem; background: linear-gradient(145deg, rgba(118,185,0,.11), rgba(23,29,38,.95)); border: 1px solid rgba(118,185,0,.36); border-radius: 13px; }
+.decision-main h3 { margin-top: .3rem; font-size: 1.45rem; letter-spacing: -.03em; }
+.decision-main p { max-width: 680px; margin-top: .55rem; color: var(--muted); font-size: .85rem; }
+.signature { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: 1rem; }
+.signature span { padding: .32rem .55rem; color: var(--text); background: rgba(0,0,0,.2); border: 1px solid var(--border); border-radius: 6px; font-family: Consolas, monospace; font-size: .68rem; }
+.decision-side { display: grid; gap: .6rem; }
+.signal { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.signal span { color: var(--muted); font-size: .72rem; }
+.signal strong { font-size: .8rem; text-align: right; }
+
+.architecture-flow { display: grid; grid-template-columns: 1fr auto 1.5fr auto 1fr auto 1fr; align-items: stretch; gap: .55rem; }
+.flow-node { display: flex; min-height: 105px; flex-direction: column; justify-content: center; padding: .9rem; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 9px; text-align: center; }
+.flow-node.core { background: var(--green-soft); border-color: rgba(118,185,0,.35); }
+.flow-node strong { font-size: .82rem; }
+.flow-node span { margin-top: .24rem; color: var(--muted); font-size: .65rem; }
+.flow-arrow { display: grid; place-items: center; color: var(--green); font-size: 1.1rem; }
+.block-stack { display: grid; grid-template-columns: repeat(6, 1fr); gap: .55rem; margin-top: .75rem; }
+.block-step { min-height: 86px; padding: .7rem; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; text-align: center; }
+.block-step .step-number { color: var(--green); font-family: Consolas, monospace; font-size: .58rem; }
+.block-step strong { display: block; margin-top: .2rem; font-size: .72rem; }
+.block-step span { display: block; margin-top: .2rem; color: var(--muted); font-size: .6rem; }
+.target-cloud { display: flex; flex-wrap: wrap; gap: .45rem; }
+.target-cloud span { padding: .42rem .6rem; color: var(--blue); background: var(--blue-soft); border: 1px solid rgba(82,183,255,.2); border-radius: 7px; font-family: Consolas, monospace; font-size: .7rem; }
+
+.topology { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem; }
+.node { padding: .8rem; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 9px; }
+.node-title { color: var(--muted); font-size: .64rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+.gpu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .35rem; margin-top: .55rem; }
+.gpu { padding: .38rem; color: var(--green-bright); background: var(--green-soft); border: 1px solid rgba(118,185,0,.23); border-radius: 5px; font-family: Consolas, monospace; font-size: .63rem; text-align: center; }
+.interconnect { margin-top: .8rem; padding: .62rem; color: var(--muted); background: var(--surface-raised); border-radius: 7px; font-size: .72rem; text-align: center; }
+
+.evidence-table { display: grid; gap: .65rem; }
+.evidence-row { display: grid; grid-template-columns: 1.05fr 1.35fr 1.2fr; gap: .7rem; padding: .78rem; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 8px; }
+.evidence-row > div { color: var(--muted); font-size: .72rem; }
+.evidence-row strong { display: block; margin-bottom: .18rem; color: var(--text); font-size: .67rem; letter-spacing: .05em; text-transform: uppercase; }
+.confidence { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted); font-size: .65rem; }
+.confidence i { width: .4rem; height: .4rem; background: var(--orange); border-radius: 50%; }
+.confidence.high i { background: var(--green); }
+.confidence.low i { background: var(--red); }
+
+.roadmap { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem; }
+.roadmap-step { position: relative; padding: 1rem; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 9px; }
+.roadmap-step::after { position: absolute; top: 50%; right: -.56rem; z-index: 2; color: var(--green); content: "→"; }
+.roadmap-step:last-child::after { display: none; }
+.roadmap-step .number { color: var(--green); font-family: Consolas, monospace; font-size: .68rem; }
+.roadmap-step h3 { margin-top: .2rem; font-size: .82rem; }
+.roadmap-step p { margin-top: .35rem; color: var(--muted); font-size: .68rem; }
+.recommendation-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+.recommendation { padding: 1rem; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 9px; }
+.recommendation h3 { margin-top: .45rem; font-size: .84rem; }
+.recommendation p { margin-top: .38rem; color: var(--muted); font-size: .72rem; }
+.outcome { margin-top: .55rem; color: var(--green-bright); font-size: .66rem; font-weight: 700; }
+
+.footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; padding: 1.1rem .25rem; color: var(--muted-2); font-size: .68rem; }
+
+@media (max-width: 1120px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .span-8, .span-7 { grid-column: span 12; }
+  .span-5, .span-4 { grid-column: span 6; }
+  .span-3 { grid-column: span 6; }
+  .detail-grid { grid-template-columns: repeat(3, 1fr); }
+  .recommendation-grid { grid-template-columns: repeat(2, 1fr); }
+  .architecture-flow { grid-template-columns: 1fr auto 1fr; }
+  .architecture-flow .flow-arrow:nth-of-type(4), .architecture-flow .flow-arrow:nth-of-type(6) { display: none; }
+}
+@media (max-width: 760px) {
+  .app-shell { width: min(100% - 1rem, 1500px); padding-top: .5rem; }
+  .hero { padding: 1.4rem; border-radius: 15px; }
+  .hero-top { align-items: flex-start; flex-direction: column; }
+  .hero-main { margin-top: 1.8rem; }
+  .tab-shell { top: .25rem; }
+  .tab-button { min-width: 115px; }
+  .panel-hero { flex-direction: column; gap: .7rem; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .content-grid { display: block; }
+  .content-grid > * { margin-top: .75rem; }
+  .decision { grid-template-columns: 1fr; }
+  .bar-row { grid-template-columns: 105px 1fr 42px; }
+  .detail-grid { grid-template-columns: repeat(2, 1fr); }
+  .architecture-flow { grid-template-columns: 1fr; }
+  .flow-arrow { transform: rotate(90deg); }
+  .architecture-flow .flow-arrow:nth-of-type(4), .architecture-flow .flow-arrow:nth-of-type(6) { display: grid; }
+  .block-stack { grid-template-columns: repeat(2, 1fr); }
+  .topology, .roadmap, .recommendation-grid { grid-template-columns: 1fr; }
+  .roadmap-step::after { display: none; }
+  .evidence-row { grid-template-columns: 1fr; }
+  .footer { align-items: flex-start; flex-direction: column; }
 }
 </style>
+<noscript><style>.tab-panel[hidden]{display:block!important}.tab-shell{display:none}</style></noscript>
 </head>
 <body>
-<main class="container">
-  <header class="header">
-    <h1>16-GPU GRPO Math Sweep</h1>
-    <p class="subtitle">Qwen3-1.7B · QLoRA · GSM8K · 5 configurations · multi-node training</p>
-    <span class="badge">ANALYTICS REFRESH · 08/25/2026</span>
+<div class="app-shell">
+  <header class="hero">
+    <div class="hero-top">
+      <div class="breadcrumb">Hecate / GRPO / Sweep Analytics</div>
+      <div class="status">Sweep complete · 5 of 5</div>
+    </div>
+    <div class="hero-main">
+      <h1>16-GPU GRPO <span>decision dashboard</span></h1>
+      <p class="hero-copy">A structured review of Qwen3-1.7B math reasoning experiments: measured outcomes, model design, compute efficiency, architecture context, evidence strength, and the next experiments worth funding.</p>
+      <div class="hero-actions">
+        <a class="button primary" href="sweep_analytics-16gpu.json">Open source analytics</a>
+        <a class="button" href="https://wandb.ai/balabala76/qwen3-grpo-math" target="_blank" rel="noopener noreferrer">View W&amp;B project ↗</a>
+        <a class="button" href="../hecateqwengrpo5runs.md">Experiment documentation</a>
+      </div>
+    </div>
   </header>
 
-  <section class="stats" aria-label="Sweep summary">
-    <div class="stat"><div class="stat-value">76%</div><div class="stat-label">Best accuracy</div></div>
-    <div class="stat"><div class="stat-value">5 / 5</div><div class="stat-label">Runs completed</div></div>
-    <div class="stat"><div class="stat-value">56.5m</div><div class="stat-label">Recorded train time</div></div>
-    <div class="stat"><div class="stat-value">run4</div><div class="stat-label">Observed winner</div></div>
-    <div class="stat"><div class="stat-value">5.4m</div><div class="stat-label">Winner train time</div></div>
-    <div class="stat"><div class="stat-value">15.05</div><div class="stat-label">Estimated GPU-hours</div></div>
-  </section>
+  <nav class="tab-shell" aria-label="Dashboard sections">
+    <div class="tab-list" role="tablist" aria-orientation="horizontal">
+      <button class="tab-button" id="tab-overview" role="tab" aria-selected="true" aria-controls="panel-overview" tabindex="0" data-tab="overview"><span class="tab-index">01</span>Overview</button>
+      <button class="tab-button" id="tab-results" role="tab" aria-selected="false" aria-controls="panel-results" tabindex="-1" data-tab="results"><span class="tab-index">02</span>Results</button>
+      <button class="tab-button" id="tab-model" role="tab" aria-selected="false" aria-controls="panel-model" tabindex="-1" data-tab="model"><span class="tab-index">03</span>Model Details</button>
+      <button class="tab-button" id="tab-architecture" role="tab" aria-selected="false" aria-controls="panel-architecture" tabindex="-1" data-tab="architecture"><span class="tab-index">04</span>Architecture</button>
+      <button class="tab-button" id="tab-compute" role="tab" aria-selected="false" aria-controls="panel-compute" tabindex="-1" data-tab="compute"><span class="tab-index">05</span>Compute</button>
+      <button class="tab-button" id="tab-insights" role="tab" aria-selected="false" aria-controls="panel-insights" tabindex="-1" data-tab="insights"><span class="tab-index">06</span>Insights</button>
+      <button class="tab-button" id="tab-recommendations" role="tab" aria-selected="false" aria-controls="panel-recommendations" tabindex="-1" data-tab="recommendations"><span class="tab-index">07</span>Recommendations</button>
+    </div>
+  </nav>
 
-  <h2>What changed in the 16-GPU results</h2>
-  <div class="grid">
-    <article class="card">
-      <div class="eyebrow">New winner</div>
-      <h3>run4-large-lora leads at 76%</h3>
-      <p>The low-learning-rate, rank-64 configuration is now the top result. It also has the shortest raw runtime at 321.4 seconds, narrowly ahead of run3 at 325.0 seconds.</p>
-    </article>
-    <article class="card">
-      <div class="eyebrow">Winner shifted</div>
-      <h3>Hardware scale changed the ranking</h3>
-      <p>The prior 4-GPU dashboard favored run3 at 76%. In the new artifact, run3 falls to 70% while run4 rises to 76%, so the training recipe should be treated as hardware- and batch-regime-specific.</p>
-    </article>
-    <article class="card">
-      <div class="eyebrow">Promising follow-up</div>
-      <h3>run5 reaches 74% with 500 samples</h3>
-      <p>The 16-generation run is second on accuracy despite using half the training samples, but it takes 16.1 minutes—about 3× run4—and changes several variables at once.</p>
-    </article>
-    <article class="card">
-      <div class="eyebrow">Interpretation guardrail</div>
-      <h3>Objective loss is not the model selector</h3>
-      <p>run1 has the smallest numerical loss (-0.000339) but only 70% accuracy. GRPO objective values can cross zero and should not be interpreted like held-out supervised loss.</p>
-    </article>
-  </div>
+  <main>
+    <section class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-panel="overview">
+      <div class="panel-hero">
+        <div><div class="panel-kicker">Executive summary</div><h2 class="panel-title">The 16-GPU winner changed—and that matters</h2><p class="panel-description">run4-large-lora now leads at 76% accuracy and 5.4 minutes. The best score matches the prior 4-GPU peak, but the winning configuration moves from run3 to run4, making scale-aware validation the central decision.</p></div>
+        <div class="source-chip">Measured · 16-GPU JSON</div>
+      </div>
 
-  <h2>16-GPU results comparison</h2>
-  <p class="section-intro">All values below come from <a href="sweep_analytics-16gpu.json"><span class="mono">sweep_analytics-16gpu.json</span></a>. The winner highlight reflects measured accuracy first, with runtime used only as a secondary efficiency signal.</p>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>Run</th><th>Learning rate</th><th>Generations</th><th>LoRA r / α</th><th>Samples</th><th>Batch / accum.</th><th>Steps</th><th>GRPO loss</th><th>Accuracy</th><th>Train time</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><strong>run1-baseline</strong></td><td>5e-6</td><td>4</td><td>16 / 32</td><td>1,000</td><td>4 / 4</td><td>15</td><td>-0.000339</td><td>70%</td><td>8.6 min</td></tr>
-        <tr><td><strong>run2-high-lr-more-gen</strong></td><td>2e-5</td><td>8</td><td>32 / 64</td><td>1,000</td><td>8 / 2</td><td>31</td><td>0.005204</td><td>72%</td><td>21.0 min</td></tr>
-        <tr><td><strong>run3-moderate-lr</strong></td><td>1e-5</td><td>4</td><td>32 / 64</td><td>1,000</td><td>4 / 4</td><td>15</td><td>0.003267</td><td>70%</td><td>5.4 min</td></tr>
-        <tr class="winner"><td><strong>run4-large-lora</strong><span class="winner-badge">BEST</span></td><td>2e-6</td><td>4</td><td>64 / 128</td><td>1,000</td><td>4 / 4</td><td>15</td><td>-0.000198</td><td><strong>76%</strong></td><td><strong>5.4 min</strong></td></tr>
-        <tr><td><strong>run5-max-exploration</strong></td><td>8e-6</td><td>16</td><td>32 / 64</td><td>500</td><td>16 / 1</td><td>31</td><td>0.007580</td><td>74%</td><td>16.1 min</td></tr>
-      </tbody>
-    </table>
-  </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Best accuracy</div><div class="kpi-value accent">76%</div><div class="kpi-note">run4-large-lora</div></div>
+        <div class="kpi-card"><div class="kpi-label">Winner runtime</div><div class="kpi-value">5.4m</div><div class="kpi-note">321.4 raw seconds</div></div>
+        <div class="kpi-card"><div class="kpi-label">Sweep time</div><div class="kpi-value">56.4m</div><div class="kpi-note">sum of raw train seconds</div></div>
+        <div class="kpi-card"><div class="kpi-label">Recorded speedup</div><div class="kpi-value">2.63×</div><div class="kpi-note">vs prior 4-GPU snapshot</div></div>
+        <div class="kpi-card"><div class="kpi-label">Estimated cost</div><div class="kpi-value">15.05</div><div class="kpi-note">GPU-hours · training only</div></div>
+        <div class="kpi-card"><div class="kpi-label">Accuracy spread</div><div class="kpi-value">6 pp</div><div class="kpi-note">70% to 76%</div></div>
+      </div>
 
-  <div class="chart-grid" style="margin-top:1rem">
-    <section class="chart" aria-label="Accuracy comparison chart">
-      <h3>Accuracy</h3>
-      <div class="bar-row"><div class="bar-label">run1-baseline</div><div class="bar-track"><div class="bar-fill run1" style="width:70%">70%</div></div></div>
-      <div class="bar-row"><div class="bar-label">run2-high-lr</div><div class="bar-track"><div class="bar-fill run2" style="width:72%">72%</div></div></div>
-      <div class="bar-row"><div class="bar-label">run3-moderate-lr</div><div class="bar-track"><div class="bar-fill run3" style="width:70%">70%</div></div></div>
-      <div class="bar-row"><div class="bar-label">run4-large-lora ★</div><div class="bar-track"><div class="bar-fill run4" style="width:76%">76%</div></div></div>
-      <div class="bar-row"><div class="bar-label">run5-max-explore</div><div class="bar-track"><div class="bar-fill run5" style="width:74%">74%</div></div></div>
+      <div class="decision">
+        <article class="decision-main">
+          <div class="eyebrow">Current 16-GPU candidate</div>
+          <h3>Promote run4 for validation—not production declaration</h3>
+          <p>run4 is the observed accuracy/runtime frontier: every other measured configuration is slower and less accurate. Because evaluation used 50 examples and no seed variance is stored in the JSON, repeatability remains the promotion gate.</p>
+          <div class="signature"><span>lr=2e-6</span><span>gen=4</span><span>samples=1000</span><span>batch=4</span><span>accum=4</span><span>lora_r=64</span><span>alpha=128</span><span>epochs=1</span></div>
+        </article>
+        <aside class="decision-side">
+          <div class="signal"><span>Measured winner</span><strong class="positive">run4 · 76%</strong></div>
+          <div class="signal"><span>Runner-up</span><strong>run5 · 74%</strong></div>
+          <div class="signal"><span>Fastest raw time</span><strong>run4 · 321.4s</strong></div>
+          <div class="signal"><span>Primary uncertainty</span><strong class="neutral">seed + eval size</strong></div>
+        </aside>
+      </div>
+
+      <div class="content-grid">
+        <article class="card span-3"><div class="eyebrow">01 · Ranking</div><h3 class="card-title">run4 takes the lead</h3><p class="body-copy">Low LR plus rank-64 LoRA is the strongest observed combination at 16 GPUs.</p></article>
+        <article class="card span-3"><div class="eyebrow">02 · Scaling</div><h3 class="card-title">Winner is scale-dependent</h3><p class="body-copy">run3 falls six points while run4 gains two versus the prior dashboard snapshot.</p></article>
+        <article class="card span-3"><div class="eyebrow">03 · Exploration</div><h3 class="card-title">run5 remains interesting</h3><p class="body-copy">It reaches 74% with 500 samples, but costs roughly 3× run4's training time.</p></article>
+        <article class="card span-3"><div class="eyebrow">04 · Measurement</div><h3 class="card-title">Loss is not the selector</h3><p class="body-copy">The smallest numerical GRPO loss belongs to run1, which only reaches 70%.</p></article>
+        <div class="callout warning span-12"><strong>Decision guardrail:</strong> the documented 50-example evaluation changes in two-point increments. At 76%, a rough binomial 95% margin is about ±12 percentage points, so the apparent 2–6 point ordering needs a larger evaluation set and repeated seeds.</div>
+      </div>
     </section>
-    <section class="chart" aria-label="Training time comparison chart">
-      <h3>Training time (normalized to the 21-minute maximum)</h3>
-      <div class="bar-row"><div class="bar-label">run1-baseline</div><div class="bar-track"><div class="bar-fill run1" style="width:41%">8.6m</div></div></div>
-      <div class="bar-row"><div class="bar-label">run2-high-lr</div><div class="bar-track"><div class="bar-fill run2" style="width:100%">21.0m</div></div></div>
-      <div class="bar-row"><div class="bar-label">run3-moderate-lr</div><div class="bar-track"><div class="bar-fill run3" style="width:26%">5.4m</div></div></div>
-      <div class="bar-row"><div class="bar-label">run4-large-lora ★</div><div class="bar-track"><div class="bar-fill run4" style="width:26%">5.4m</div></div></div>
-      <div class="bar-row"><div class="bar-label">run5-max-explore</div><div class="bar-track"><div class="bar-fill run5" style="width:77%">16.1m</div></div></div>
+
+    <section class="tab-panel" id="panel-results" role="tabpanel" aria-labelledby="tab-results" data-panel="results" hidden>
+      <div class="panel-hero">
+        <div><div class="panel-kicker">Measured outcomes</div><h2 class="panel-title">Run results and scaling comparison</h2><p class="panel-description">The result table is sourced directly from the 16-GPU analytics JSON. Expand any run for its configuration and interpretation, then compare the previous 4-GPU snapshot below.</p></div>
+        <div class="source-chip">5 completed runs</div>
+      </div>
+
+      <article class="card">
+        <div class="card-header"><div><h3 class="card-title">16-GPU sweep matrix</h3><p class="card-subtitle">Accuracy is the selection metric; GRPO loss is shown as a training diagnostic.</p></div><span class="badge green">run4 best</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Run</th><th>LR</th><th>Gen</th><th>LoRA r / α</th><th>Samples</th><th>Batch / accum</th><th>Steps</th><th>GRPO loss</th><th>Accuracy</th><th>Time</th></tr></thead>
+            <tbody>
+              <tr><td><strong>run1-baseline</strong></td><td>5e-6</td><td>4</td><td>16 / 32</td><td>1,000</td><td>4 / 4</td><td>15</td><td>-0.000339</td><td>70%</td><td>8.6m</td></tr>
+              <tr><td><strong>run2-high-lr-more-gen</strong></td><td>2e-5</td><td>8</td><td>32 / 64</td><td>1,000</td><td>8 / 2</td><td>31</td><td>0.005204</td><td>72%</td><td>21.0m</td></tr>
+              <tr><td><strong>run3-moderate-lr</strong></td><td>1e-5</td><td>4</td><td>32 / 64</td><td>1,000</td><td>4 / 4</td><td>15</td><td>0.003267</td><td>70%</td><td>5.4m</td></tr>
+              <tr class="winner"><td><strong>run4-large-lora</strong><span class="winner-label">BEST</span></td><td>2e-6</td><td>4</td><td>64 / 128</td><td>1,000</td><td>4 / 4</td><td>15</td><td>-0.000198</td><td class="positive">76%</td><td class="positive">5.4m</td></tr>
+              <tr><td><strong>run5-max-exploration</strong></td><td>8e-6</td><td>16</td><td>32 / 64</td><td>500</td><td>16 / 1</td><td>31</td><td>0.007580</td><td>74%</td><td>16.1m</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <div class="content-grid">
+        <article class="card span-6">
+          <div class="card-header"><div><h3 class="card-title">Accuracy by run</h3><p class="card-subtitle">Absolute accuracy scale</p></div><span class="badge green">higher is better</span></div>
+          <div class="chart">
+            <div class="bar-row"><div class="bar-label">run1-baseline</div><div class="bar-track"><div class="bar-fill blue" style="width:70%"></div></div><div class="bar-value">70%</div></div>
+            <div class="bar-row"><div class="bar-label">run2-high-lr</div><div class="bar-track"><div class="bar-fill orange" style="width:72%"></div></div><div class="bar-value">72%</div></div>
+            <div class="bar-row"><div class="bar-label">run3-moderate</div><div class="bar-track"><div class="bar-fill purple" style="width:70%"></div></div><div class="bar-value">70%</div></div>
+            <div class="bar-row"><div class="bar-label">run4-large-lora</div><div class="bar-track"><div class="bar-fill green" style="width:76%"></div></div><div class="bar-value positive">76%</div></div>
+            <div class="bar-row"><div class="bar-label">run5-exploration</div><div class="bar-track"><div class="bar-fill red" style="width:74%"></div></div><div class="bar-value">74%</div></div>
+          </div>
+        </article>
+        <article class="card span-6">
+          <div class="card-header"><div><h3 class="card-title">Training time</h3><p class="card-subtitle">Normalized to the 21-minute maximum</p></div><span class="badge blue">lower is better</span></div>
+          <div class="chart">
+            <div class="bar-row"><div class="bar-label">run1-baseline</div><div class="bar-track"><div class="bar-fill blue" style="width:41%"></div></div><div class="bar-value">8.6m</div></div>
+            <div class="bar-row"><div class="bar-label">run2-high-lr</div><div class="bar-track"><div class="bar-fill orange" style="width:100%"></div></div><div class="bar-value">21.0m</div></div>
+            <div class="bar-row"><div class="bar-label">run3-moderate</div><div class="bar-track"><div class="bar-fill purple" style="width:26%"></div></div><div class="bar-value">5.4m</div></div>
+            <div class="bar-row"><div class="bar-label">run4-large-lora</div><div class="bar-track"><div class="bar-fill green" style="width:26%"></div></div><div class="bar-value positive">5.4m</div></div>
+            <div class="bar-row"><div class="bar-label">run5-exploration</div><div class="bar-track"><div class="bar-fill red" style="width:77%"></div></div><div class="bar-value">16.1m</div></div>
+          </div>
+        </article>
+      </div>
+
+      <article class="card" style="margin-top:1rem">
+        <div class="card-header"><div><h3 class="card-title">Per-run evidence</h3><p class="card-subtitle">Configuration, raw timing, W&amp;B record, and bounded interpretation</p></div></div>
+        <details><summary>Run 1 · Baseline · 70%</summary><div class="detail-body"><div class="detail-grid"><div class="detail-metric"><span>Learning rate</span><strong>5e-6</strong></div><div class="detail-metric"><span>Generations</span><strong>4</strong></div><div class="detail-metric"><span>LoRA</span><strong>r16 / α32</strong></div><div class="detail-metric"><span>Samples</span><strong>1,000</strong></div><div class="detail-metric"><span>Raw runtime</span><strong>514.7s</strong></div><div class="detail-metric"><span>W&amp;B</span><strong><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/31s6xcxf" target="_blank" rel="noopener noreferrer">31s6xcxf ↗</a></strong></div></div><p class="detail-analysis"><strong>Interpretation:</strong> ties run3 on accuracy despite run3's larger adapter and higher LR; this argues for one-factor experiments rather than a single-variable optimum claim.</p></div></details>
+        <details><summary>Run 2 · High LR + 8 generations · 72%</summary><div class="detail-body"><div class="detail-grid"><div class="detail-metric"><span>Learning rate</span><strong>2e-5</strong></div><div class="detail-metric"><span>Generations</span><strong>8</strong></div><div class="detail-metric"><span>LoRA</span><strong>r32 / α64</strong></div><div class="detail-metric"><span>Samples</span><strong>1,000</strong></div><div class="detail-metric"><span>Raw runtime</span><strong>1,262.0s</strong></div><div class="detail-metric"><span>W&amp;B</span><strong><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/uv38sg72" target="_blank" rel="noopener noreferrer">uv38sg72 ↗</a></strong></div></div><p class="detail-analysis"><strong>Interpretation:</strong> the slowest run and four points behind run4. LR, generations, batch, accumulation, and rank all differ, so the cause is not isolated.</p></div></details>
+        <details><summary>Run 3 · Moderate LR · 70%</summary><div class="detail-body"><div class="detail-grid"><div class="detail-metric"><span>Learning rate</span><strong>1e-5</strong></div><div class="detail-metric"><span>Generations</span><strong>4</strong></div><div class="detail-metric"><span>LoRA</span><strong>r32 / α64</strong></div><div class="detail-metric"><span>Samples</span><strong>1,000</strong></div><div class="detail-metric"><span>Raw runtime</span><strong>325.0s</strong></div><div class="detail-metric"><span>W&amp;B</span><strong><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/vjqmzkvw" target="_blank" rel="noopener noreferrer">vjqmzkvw ↗</a></strong></div></div><p class="detail-analysis"><strong>Interpretation:</strong> remains fast but drops six points relative to the earlier 4-GPU result, making it the clearest example of scale-sensitive optimization.</p></div></details>
+        <details open><summary>Run 4 · Large LoRA · 76% · observed winner</summary><div class="detail-body"><div class="detail-grid"><div class="detail-metric"><span>Learning rate</span><strong class="positive">2e-6</strong></div><div class="detail-metric"><span>Generations</span><strong>4</strong></div><div class="detail-metric"><span>LoRA</span><strong class="positive">r64 / α128</strong></div><div class="detail-metric"><span>Samples</span><strong>1,000</strong></div><div class="detail-metric"><span>Raw runtime</span><strong class="positive">321.4s</strong></div><div class="detail-metric"><span>W&amp;B</span><strong><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/da7ics60" target="_blank" rel="noopener noreferrer">da7ics60 ↗</a></strong></div></div><p class="detail-analysis"><strong>Interpretation:</strong> the observed frontier—highest accuracy and lowest raw time. Treat the low-LR/high-rank pair as a candidate interaction until controlled and repeated.</p></div></details>
+        <details><summary>Run 5 · Max exploration · 74%</summary><div class="detail-body"><div class="detail-grid"><div class="detail-metric"><span>Learning rate</span><strong>8e-6</strong></div><div class="detail-metric"><span>Generations</span><strong>16</strong></div><div class="detail-metric"><span>LoRA</span><strong>r32 / α64</strong></div><div class="detail-metric"><span>Samples</span><strong>500</strong></div><div class="detail-metric"><span>Raw runtime</span><strong>963.1s</strong></div><div class="detail-metric"><span>W&amp;B</span><strong><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/guvdw5zw" target="_blank" rel="noopener noreferrer">guvdw5zw ↗</a></strong></div></div><p class="detail-analysis"><strong>Interpretation:</strong> the strongest low-data candidate, but about 3× slower than run4 and too confounded to attribute its result to generation count alone.</p></div></details>
+      </article>
+
+      <article class="card" style="margin-top:1rem">
+        <div class="card-header"><div><h3 class="card-title">Prior 4-GPU snapshot vs 16-GPU artifact</h3><p class="card-subtitle">Descriptive scaling context; accuracy shifts may include global-batch and optimization effects.</p></div><span class="badge orange">cross-regime</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Run</th><th>4-GPU acc.</th><th>16-GPU acc.</th><th>Delta</th><th>4-GPU time</th><th>16-GPU time</th><th>Speedup</th></tr></thead>
+            <tbody>
+              <tr><td>run1-baseline</td><td>72%</td><td>70%</td><td class="negative">-2 pp</td><td>23.3m</td><td>8.6m</td><td>2.71×</td></tr>
+              <tr><td>run2-high-lr-more-gen</td><td>74%</td><td>72%</td><td class="negative">-2 pp</td><td>47.0m</td><td>21.0m</td><td>2.24×</td></tr>
+              <tr><td>run3-moderate-lr</td><td>76%</td><td>70%</td><td class="negative">-6 pp</td><td>20.3m</td><td>5.4m</td><td>3.76×</td></tr>
+              <tr class="winner"><td>run4-large-lora</td><td>74%</td><td>76%</td><td class="positive">+2 pp</td><td>20.3m</td><td>5.4m</td><td>3.76×</td></tr>
+              <tr><td>run5-max-exploration</td><td>70%</td><td>74%</td><td class="positive">+4 pp</td><td>37.6m</td><td>16.1m</td><td>2.34×</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
     </section>
-  </div>
 
-  <h2>Scaling context: prior 4 GPU vs new 16 GPU</h2>
-  <p class="section-intro">This comparison combines the previous dashboard snapshot with the new JSON. It is descriptive: a GPU-count change can also change global batch behavior and optimization dynamics, so accuracy deltas should not be attributed to hardware alone.</p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Run</th><th>4-GPU accuracy</th><th>16-GPU accuracy</th><th>Accuracy delta</th><th>4-GPU time</th><th>16-GPU time</th><th>Recorded speedup</th></tr></thead>
-      <tbody>
-        <tr><td>run1-baseline</td><td>72%</td><td>70%</td><td class="negative">-2 pp</td><td>23.3 min</td><td>8.6 min</td><td>2.71×</td></tr>
-        <tr><td>run2-high-lr-more-gen</td><td>74%</td><td>72%</td><td class="negative">-2 pp</td><td>47.0 min</td><td>21.0 min</td><td>2.24×</td></tr>
-        <tr><td>run3-moderate-lr</td><td>76%</td><td>70%</td><td class="negative">-6 pp</td><td>20.3 min</td><td>5.4 min</td><td>3.76×</td></tr>
-        <tr class="winner"><td>run4-large-lora</td><td>74%</td><td>76%</td><td class="positive">+2 pp</td><td>20.3 min</td><td>5.4 min</td><td>3.76×</td></tr>
-        <tr><td>run5-max-exploration</td><td>70%</td><td>74%</td><td class="positive">+4 pp</td><td>37.6 min</td><td>16.1 min</td><td>2.34×</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="callout">
-    <p><strong>Aggregate finding:</strong> recorded training time drops from 148.5 minutes in the prior dashboard to 56.4 minutes from the new JSON's raw seconds, a 2.63× aggregate speedup. Peak accuracy remains 76%, but the winning configuration changes from run3 to run4.</p>
-  </div>
-
-  <h2>Per-run evidence</h2>
-  <details>
-    <summary>Run 1 · Baseline · 70%</summary>
-    <div class="detail-body">
-      <div class="detail-grid">
-        <div class="detail-metric"><span>Learning rate</span><strong>5e-6</strong></div><div class="detail-metric"><span>Generations</span><strong>4</strong></div><div class="detail-metric"><span>LoRA</span><strong>r16 / α32</strong></div><div class="detail-metric"><span>Samples</span><strong>1,000</strong></div><div class="detail-metric"><span>Recorded steps</span><strong>15</strong></div><div class="detail-metric"><span>Raw runtime</span><strong>514.7 sec</strong></div>
+    <section class="tab-panel" id="panel-model" role="tabpanel" aria-labelledby="tab-model" data-panel="model" hidden>
+      <div class="panel-hero">
+        <div><div class="panel-kicker">Training system</div><h2 class="panel-title">Model, data, reward, and evaluation details</h2><p class="panel-description">This tab combines JSON-backed run settings with the local experiment documentation. Context that is not serialized in the analytics JSON is labeled as documented recipe metadata.</p></div>
+        <div class="source-chip">JSON + experiment documentation</div>
       </div>
-      <p class="analysis"><strong>Finding:</strong> The baseline ties run3 on accuracy despite run3's larger adapter and higher learning rate. That makes a controlled one-factor comparison more valuable than declaring either variable optimal.</p>
-    </div>
-  </details>
-  <details>
-    <summary>Run 2 · High LR + 8 generations · 72%</summary>
-    <div class="detail-body">
-      <div class="detail-grid">
-        <div class="detail-metric"><span>Learning rate</span><strong>2e-5</strong></div><div class="detail-metric"><span>Generations</span><strong>8</strong></div><div class="detail-metric"><span>LoRA</span><strong>r32 / α64</strong></div><div class="detail-metric"><span>Samples</span><strong>1,000</strong></div><div class="detail-metric"><span>Recorded steps</span><strong>31</strong></div><div class="detail-metric"><span>Raw runtime</span><strong>1,262.0 sec</strong></div>
-      </div>
-      <p class="analysis"><strong>Finding:</strong> This is the slowest run and lands four points behind run4. Because learning rate, generation count, batch size, accumulation, and adapter rank differ from baseline, the result does not isolate why.</p>
-    </div>
-  </details>
-  <details>
-    <summary>Run 3 · Moderate LR · 70%</summary>
-    <div class="detail-body">
-      <div class="detail-grid">
-        <div class="detail-metric"><span>Learning rate</span><strong>1e-5</strong></div><div class="detail-metric"><span>Generations</span><strong>4</strong></div><div class="detail-metric"><span>LoRA</span><strong>r32 / α64</strong></div><div class="detail-metric"><span>Samples</span><strong>1,000</strong></div><div class="detail-metric"><span>Recorded steps</span><strong>15</strong></div><div class="detail-metric"><span>Raw runtime</span><strong>325.0 sec</strong></div>
-      </div>
-      <p class="analysis"><strong>Finding:</strong> run3 remains fast but is no longer the accuracy winner. Its six-point decline relative to the earlier 4-GPU snapshot is the strongest reason to revalidate configurations when global training scale changes.</p>
-    </div>
-  </details>
-  <details open>
-    <summary>Run 4 · Large LoRA · 76% · observed winner</summary>
-    <div class="detail-body">
-      <div class="detail-grid">
-        <div class="detail-metric"><span>Learning rate</span><strong class="positive">2e-6</strong></div><div class="detail-metric"><span>Generations</span><strong>4</strong></div><div class="detail-metric"><span>LoRA</span><strong class="positive">r64 / α128</strong></div><div class="detail-metric"><span>Samples</span><strong>1,000</strong></div><div class="detail-metric"><span>Recorded steps</span><strong>15</strong></div><div class="detail-metric"><span>Raw runtime</span><strong class="positive">321.4 sec</strong></div>
-      </div>
-      <p class="analysis"><strong>Finding:</strong> run4 is the observed accuracy/runtime frontier: every other measured run is both slower and less accurate. Promote this configuration as the 16-GPU candidate, then confirm it across seeds before treating it as the population winner.</p>
-    </div>
-  </details>
-  <details>
-    <summary>Run 5 · Max exploration · 74%</summary>
-    <div class="detail-body">
-      <div class="detail-grid">
-        <div class="detail-metric"><span>Learning rate</span><strong>8e-6</strong></div><div class="detail-metric"><span>Generations</span><strong>16</strong></div><div class="detail-metric"><span>LoRA</span><strong>r32 / α64</strong></div><div class="detail-metric"><span>Samples</span><strong>500</strong></div><div class="detail-metric"><span>Recorded steps</span><strong>31</strong></div><div class="detail-metric"><span>Raw runtime</span><strong>963.1 sec</strong></div>
-      </div>
-      <p class="analysis"><strong>Finding:</strong> run5 is the best low-data candidate in this sweep, reaching 74% with 500 samples. It is not compute-efficient versus run4, and its design does not isolate whether generations, learning rate, or batch behavior produced the result.</p>
-    </div>
-  </details>
 
-  <h2>Evidence-based findings</h2>
-  <div class="grid">
-    <article class="card"><div class="eyebrow">Finding 1</div><h3>run4 dominates the observed frontier</h3><p>It combines the highest accuracy (76%) with the lowest raw runtime (321.4 seconds). Its estimated cost is 1.43 GPU-hours if all 16 GPUs were active for the recorded duration.</p></article>
-    <article class="card"><div class="eyebrow">Finding 2</div><h3>The best recipe is scale-dependent</h3><p>The best measured accuracy stays at 76%, but the winner moves from run3 on the prior 4-GPU snapshot to run4 in the 16-GPU artifact. Re-sweeping after a world-size or global-batch change is justified.</p></article>
-    <article class="card"><div class="eyebrow">Finding 3</div><h3>Low LR + high rank is a candidate interaction</h3><p>The winning pair is LR 2e-6 with LoRA r64. Since both variables change together versus run3, this is an interaction hypothesis—not proof that 2e-6 or r64 is independently optimal.</p></article>
-    <article class="card"><div class="eyebrow">Finding 4</div><h3>More rollouts remain worth testing</h3><p>run5's 74% with only 500 samples is encouraging, but it takes 16.1 minutes and uses a different LR, batch, accumulation, and step count. A controlled 4/8/16-generation experiment is needed.</p></article>
-    <article class="card"><div class="eyebrow">Finding 5</div><h3>Loss and accuracy rank differently</h3><p>run1 reports the smallest numerical objective while run4 reports the best accuracy. Select checkpoints with held-out task metrics and use GRPO loss, KL, clipping, reward, and entropy as training diagnostics.</p></article>
-    <article class="card"><div class="eyebrow">Finding 6</div><h3>Small accuracy gaps need uncertainty</h3><p>The JSON does not record evaluation cardinality, seed, confidence intervals, or per-example outcomes. Until those are attached, two- and four-point gaps should be treated as provisional.</p></article>
-  </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Base model</div><div class="kpi-value" style="font-size:1.2rem">Qwen3-1.7B</div><div class="kpi-note">causal language model</div></div>
+        <div class="kpi-card"><div class="kpi-label">Method</div><div class="kpi-value">GRPO</div><div class="kpi-note">online group-relative RL</div></div>
+        <div class="kpi-card"><div class="kpi-label">Adaptation</div><div class="kpi-value">QLoRA</div><div class="kpi-note">4-bit NF4 base</div></div>
+        <div class="kpi-card"><div class="kpi-label">Dataset</div><div class="kpi-value">GSM8K</div><div class="kpi-note">grade-school math</div></div>
+        <div class="kpi-card"><div class="kpi-label">Completion cap</div><div class="kpi-value">512</div><div class="kpi-note">tokens</div></div>
+        <div class="kpi-card"><div class="kpi-label">Evaluation</div><div class="kpi-value">50</div><div class="kpi-note">documented test examples</div></div>
+      </div>
 
-  <h2>Recommended next experiments</h2>
-  <div class="recommendations">
-    <article class="recommendation"><span class="priority high">High priority</span><h3>Reproduce run4 before promotion</h3><p>Repeat the exact run4 configuration across at least three seeds and evaluate each checkpoint on the full GSM8K test split. Save per-example predictions, not only aggregate accuracy.</p><div class="outcome">Outcome: a confidence-backed 16-GPU champion</div></article>
-    <article class="recommendation"><span class="priority high">High priority</span><h3>Separate LR from LoRA capacity</h3><p>Run a small 3×2 grid: LR {2e-6, 5e-6, 1e-5} × LoRA rank {32, 64}, holding 4 generations, 1,000 samples, batch 4, accumulation 4, one epoch, and evaluation fixed.</p><div class="outcome">Outcome: clean attribution of the run4 gain</div></article>
-    <article class="recommendation"><span class="priority high">High priority</span><h3>Record evaluation and hardware metadata</h3><p>Add seed, eval split and size, world size, node/GPU type, global batch, git commit, package versions, tokens/sec, peak memory, and per-example results to the analytics artifact.</p><div class="outcome">Outcome: auditable cross-scale comparisons</div></article>
-    <article class="recommendation"><span class="priority medium">Medium priority</span><h3>Isolate generation count</h3><p>Compare 4, 8, and 16 generations at the same LR, LoRA rank, sample count, global batch, optimizer-update budget, seed set, and evaluation protocol.</p><div class="outcome">Outcome: quantify the value and cost of exploration</div></article>
-    <article class="recommendation"><span class="priority medium">Medium priority</span><h3>Build a data scaling curve from run4</h3><p>Evaluate 500, 1,000, 2,000, and full-train configurations while keeping epochs or optimizer updates explicitly comparable. Report accuracy against both wall time and GPU-hours.</p><div class="outcome">Outcome: choose the best data/compute operating point</div></article>
-    <article class="recommendation"><span class="priority medium">Medium priority</span><h3>Control global batch when scaling</h3><p>When moving between 4 and 16 GPUs, first hold global batch constant through per-device batch or accumulation changes. Test LR scaling separately instead of assuming a linear rule.</p><div class="outcome">Outcome: distinguish parallel speedup from optimization drift</div></article>
-    <article class="recommendation"><span class="priority low">Follow-up</span><h3>Export GRPO stability traces</h3><p>Attach reward components, KL, clip ratio, entropy, gradient norm, completion length, and throughput histories for each run. Summary loss alone cannot diagnose why rankings changed.</p><div class="outcome">Outcome: explainable failures and safer early stopping</div></article>
-    <article class="recommendation"><span class="priority low">After validation</span><h3>Test additional epochs carefully</h3><p>Once run4 is reproduced, compare one versus two or three epochs with the same evaluation gate and stability metrics. Avoid projecting an accuracy gain before the controlled result exists.</p><div class="outcome">Outcome: determine whether the one-epoch run is under-trained</div></article>
-  </div>
+      <div class="content-grid">
+        <article class="card span-4">
+          <div class="card-header"><div><div class="eyebrow">Identity</div><h3 class="card-title">Model role</h3></div><span class="badge green">1.7B</span></div>
+          <ul class="list">
+            <li><strong>Checkpoint</strong><span class="value">Qwen/Qwen3-1.7B</span></li>
+            <li><strong>Task</strong><span class="value">math reasoning</span></li>
+            <li><strong>Output contract</strong><span class="value">step-by-step + boxed answer</span></li>
+            <li><strong>Thinking mode</strong><span class="value">disabled for this 512-token setup</span></li>
+            <li><strong>Training epochs</strong><span class="value">1 per run</span></li>
+          </ul>
+        </article>
+        <article class="card span-4">
+          <div class="card-header"><div><div class="eyebrow">Quantization</div><h3 class="card-title">QLoRA recipe</h3></div><span class="badge blue">memory efficient</span></div>
+          <ul class="list">
+            <li><strong>Base weights</strong><span class="value">4-bit NF4</span></li>
+            <li><strong>Double quantization</strong><span class="value">enabled</span></li>
+            <li><strong>Compute dtype</strong><span class="value">bfloat16</span></li>
+            <li><strong>LoRA dropout</strong><span class="value">0.05</span></li>
+            <li><strong>Bias</strong><span class="value">none</span></li>
+          </ul>
+        </article>
+        <article class="card span-4">
+          <div class="card-header"><div><div class="eyebrow">Training behavior</div><h3 class="card-title">Shared controls</h3></div><span class="badge orange">documented</span></div>
+          <ul class="list">
+            <li><strong>Gradient checkpointing</strong><span class="value">enabled</span></li>
+            <li><strong>Checkpoint cadence</strong><span class="value">100 steps</span></li>
+            <li><strong>Checkpoint retention</strong><span class="value">2</span></li>
+            <li><strong>Logging</strong><span class="value">every 5 steps</span></li>
+            <li><strong>Tracker</strong><span class="value">Weights &amp; Biases</span></li>
+          </ul>
+        </article>
+      </div>
 
-  <h2>Compute and methodology notes</h2>
-  <div class="grid">
-    <article class="card">
-      <div class="eyebrow">Recorded cost</div>
-      <h3>Estimated GPU-hours by run</h3>
-      <ul>
-        <li><strong>run1:</strong> <span>2.29 GPU-hours</span></li>
-        <li><strong>run2:</strong> <span>5.61 GPU-hours</span></li>
-        <li><strong>run3:</strong> <span>1.44 GPU-hours</span></li>
-        <li><strong>run4:</strong> <span>1.43 GPU-hours</span></li>
-        <li><strong>run5:</strong> <span>4.28 GPU-hours</span></li>
-        <li><strong>Total:</strong> <span>15.05 GPU-hours</span></li>
-      </ul>
-      <p style="margin-top:.7rem">Estimate = raw training seconds × 16 GPUs. It excludes evaluation and orchestration overhead and assumes all 16 devices were active for every recorded interval.</p>
-    </article>
-    <article class="card">
-      <div class="eyebrow">Controlled constants in JSON</div>
-      <h3>Shared experiment settings</h3>
-      <ul>
-        <li><strong>Model:</strong> <span>Qwen/Qwen3-1.7B</span></li>
-        <li><strong>Project:</strong> <span>qwen3-grpo-math</span></li>
-        <li><strong>Epochs:</strong> <span>1</span></li>
-        <li><strong>Max completion:</strong> <span>512 tokens</span></li>
-        <li><strong>Completed:</strong> <span>5 of 5 runs</span></li>
-        <li><strong>Variables swept:</strong> <span>LR, generations, samples, batch/accumulation, LoRA rank/alpha</span></li>
-      </ul>
-    </article>
-    <article class="card">
-      <div class="eyebrow">Caveats</div>
-      <h3>What the summary cannot establish</h3>
-      <ul>
-        <li>No independent single-variable optimum</li>
-        <li>No seed variance or statistical significance</li>
-        <li>No evaluation sample count or split identity</li>
-        <li>No hardware/world-size fields inside the JSON</li>
-        <li>No reward, KL, clipping, entropy, memory, or throughput histories</li>
-      </ul>
-    </article>
-  </div>
+      <div class="content-grid">
+        <article class="card span-7">
+          <div class="card-header"><div><h3 class="card-title">Reward function architecture</h3><p class="card-subtitle">Four complementary signals shape answer quality and output form.</p></div><span class="badge green">multi-objective</span></div>
+          <div class="content-grid" style="margin-top:0">
+            <div class="card span-6" style="box-shadow:none"><div class="eyebrow">Correctness · dominant</div><p class="body-copy"><strong style="color:var(--text)">+3.0</strong> exact boxed match · <strong style="color:var(--text)">+1.0</strong> within 1% · <strong style="color:var(--text)">-0.5</strong> wrong value · <strong style="color:var(--text)">-1.0</strong> no boxed answer.</p></div>
+            <div class="card span-6" style="box-shadow:none"><div class="eyebrow">Format · structure</div><p class="body-copy"><strong style="color:var(--text)">+1.5</strong> valid boxed output · <strong style="color:var(--text)">+0.2</strong> partial format cue · <strong style="color:var(--text)">-0.5</strong> no attempt.</p></div>
+            <div class="card span-6" style="box-shadow:none"><div class="eyebrow">Reasoning · process proxy</div><p class="body-copy">Up to <strong style="color:var(--text)">+1.0</strong> for multi-line reasoning and math indicators; <strong style="color:var(--text)">-0.5</strong> for degenerate responses under 20 characters.</p></div>
+            <div class="card span-6" style="box-shadow:none"><div class="eyebrow">Length · regularization</div><p class="body-copy"><strong style="color:var(--text)">0</strong> within 50–2,000 characters · <strong style="color:var(--text)">-0.5</strong> too short · <strong style="color:var(--text)">-0.3</strong> too long.</p></div>
+          </div>
+        </article>
+        <article class="card span-5 warning">
+          <div class="card-header"><div><h3 class="card-title">Evaluation contract</h3><p class="card-subtitle">Documented implementation details</p></div><span class="badge orange">high uncertainty</span></div>
+          <ul class="list">
+            <li><strong>Split</strong><span class="value">GSM8K test[:50]</span></li>
+            <li><strong>Decoding</strong><span class="value">greedy</span></li>
+            <li><strong>Thinking</strong><span class="value">enable_thinking=False</span></li>
+            <li><strong>Match</strong><span class="value">boxed exact answer</span></li>
+            <li><strong>Resolution</strong><span class="value">2 percentage points</span></li>
+          </ul>
+          <div class="callout warning" style="margin-top:.8rem"><strong>Statistical caution:</strong> around a 76% estimate with n=50, a rough 95% binomial margin is approximately ±12 points. Use the full test split for selection.</div>
+        </article>
+      </div>
 
-  <h2>Reproducibility and run links</h2>
-  <div class="grid">
-    <article class="card">
-      <div class="eyebrow">Source artifact</div>
-      <h3>Analytics</h3>
-      <ul class="source-list">
-        <li><a href="sweep_analytics-16gpu.json">sweep_analytics-16gpu.json</a></li>
-        <li>Output root: <span class="mono">/lustre/fsw/general_sa/bbalakreshna/grpo-results-sweep/</span></li>
-        <li>W&amp;B project: <a href="https://wandb.ai/balabala76/qwen3-grpo-math" target="_blank" rel="noopener noreferrer">balabala76/qwen3-grpo-math</a></li>
-      </ul>
-    </article>
-    <article class="card">
-      <div class="eyebrow">Weights &amp; Biases</div>
-      <h3>Direct run links</h3>
-      <ul class="source-list">
-        <li><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/31s6xcxf" target="_blank" rel="noopener noreferrer">run1-baseline · 31s6xcxf</a></li>
-        <li><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/uv38sg72" target="_blank" rel="noopener noreferrer">run2-high-lr-more-gen · uv38sg72</a></li>
-        <li><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/vjqmzkvw" target="_blank" rel="noopener noreferrer">run3-moderate-lr · vjqmzkvw</a></li>
-        <li><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/da7ics60" target="_blank" rel="noopener noreferrer">run4-large-lora · da7ics60</a></li>
-        <li><a href="https://wandb.ai/balabala76/qwen3-grpo-math/runs/guvdw5zw" target="_blank" rel="noopener noreferrer">run5-max-exploration · guvdw5zw</a></li>
-      </ul>
-    </article>
-  </div>
+      <div class="content-grid">
+        <article class="card span-6"><div class="card-header"><div><h3 class="card-title">Prompt and answer contract</h3></div></div><p class="body-copy"><code>/no_think</code> is prepended to the system prompt, the model is asked to solve step by step, and the final numerical answer must appear inside <code>\boxed{}</code>. Residual <code>&lt;think&gt;</code> blocks are stripped before reward parsing.</p></article>
+        <article class="card span-6"><div class="card-header"><div><h3 class="card-title">Data usage</h3></div></div><p class="body-copy">Runs use the first 500 or 1,000 GSM8K training examples. The documented evaluation uses the first 50 test examples. This deterministic slicing supports reproducibility but should be expanded and randomized for model selection.</p></article>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-architecture" role="tabpanel" aria-labelledby="tab-architecture" data-panel="architecture" hidden>
+      <div class="panel-hero">
+        <div><div class="panel-kicker">Model architecture</div><h2 class="panel-title">Decoder backbone with parameter-efficient adaptation</h2><p class="panel-description">The architecture view shows where QLoRA changes the frozen Qwen3-1.7B backbone and why adapter rank affects capacity without requiring full-parameter training.</p></div>
+        <div class="source-chip">Reference architecture + run recipe</div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Parameters</div><div class="kpi-value">1.7B</div><div class="kpi-note">base checkpoint class</div></div>
+        <div class="kpi-card"><div class="kpi-label">Decoder blocks</div><div class="kpi-value">28</div><div class="kpi-note">transformer layers</div></div>
+        <div class="kpi-card"><div class="kpi-label">Hidden width</div><div class="kpi-value">2,048</div><div class="kpi-note">model dimension</div></div>
+        <div class="kpi-card"><div class="kpi-label">Attention</div><div class="kpi-value">GQA</div><div class="kpi-note">grouped-query attention</div></div>
+        <div class="kpi-card"><div class="kpi-label">Position</div><div class="kpi-value">RoPE</div><div class="kpi-note">rotary embeddings</div></div>
+        <div class="kpi-card"><div class="kpi-label">Winner adapter</div><div class="kpi-value accent">r64</div><div class="kpi-note">alpha 128</div></div>
+      </div>
+
+      <article class="card">
+        <div class="card-header"><div><h3 class="card-title">Inference and training path</h3><p class="card-subtitle">Frozen quantized backbone with trainable low-rank paths injected into attention and MLP projections.</p></div></div>
+        <div class="architecture-flow">
+          <div class="flow-node"><strong>Tokenized prompt</strong><span>system + GSM8K question</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node core"><strong>28 × decoder block</strong><span>RMSNorm · GQA + RoPE · SwiGLU MLP · residual paths</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node"><strong>Final normalization</strong><span>hidden-state conditioning</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node"><strong>LM head</strong><span>autoregressive token logits</span></div>
+        </div>
+      </article>
+
+      <div class="content-grid">
+        <article class="card span-8">
+          <div class="card-header"><div><h3 class="card-title">Inside each decoder block</h3><p class="card-subtitle">Conceptual sequence; residual connections wrap the attention and MLP sublayers.</p></div></div>
+          <div class="block-stack">
+            <div class="block-step"><div class="step-number">01</div><strong>RMSNorm</strong><span>pre-attention normalization</span></div>
+            <div class="block-step"><div class="step-number">02</div><strong>GQA + RoPE</strong><span>context mixing and position</span></div>
+            <div class="block-step"><div class="step-number">03</div><strong>Residual</strong><span>attention skip path</span></div>
+            <div class="block-step"><div class="step-number">04</div><strong>RMSNorm</strong><span>pre-MLP normalization</span></div>
+            <div class="block-step"><div class="step-number">05</div><strong>SwiGLU MLP</strong><span>gate, up, down projections</span></div>
+            <div class="block-step"><div class="step-number">06</div><strong>Residual</strong><span>block output</span></div>
+          </div>
+        </article>
+        <article class="card span-4 highlight">
+          <div class="card-header"><div><h3 class="card-title">Why QLoRA here</h3></div><span class="badge green">efficient</span></div>
+          <p class="body-copy">NF4 compresses frozen base weights, while LoRA learns compact rank-decomposition updates. This concentrates trainable capacity in projections that control token mixing and feature transformation.</p>
+          <div class="divider"></div>
+          <p class="body-copy"><strong style="color:var(--text)">Winner hypothesis:</strong> rank 64 may provide useful capacity under the lower 2e-6 learning rate at this global training scale. The sweep does not isolate rank from LR.</p>
+        </article>
+      </div>
+
+      <div class="content-grid">
+        <article class="card span-7">
+          <div class="card-header"><div><h3 class="card-title">LoRA injection targets</h3><p class="card-subtitle">Seven documented linear projections receive adapters.</p></div><span class="badge blue">all major projections</span></div>
+          <div class="target-cloud"><span>q_proj</span><span>k_proj</span><span>v_proj</span><span>o_proj</span><span>gate_proj</span><span>up_proj</span><span>down_proj</span></div>
+        </article>
+        <article class="card span-5">
+          <div class="card-header"><div><h3 class="card-title">Capacity sweep</h3></div></div>
+          <ul class="list">
+            <li><strong>r16 / α32</strong><span class="value">run1 · 70%</span></li>
+            <li><strong>r32 / α64</strong><span class="value">runs 2, 3, 5 · 70–74%</span></li>
+            <li><strong>r64 / α128</strong><span class="value positive">run4 · 76%</span></li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout info" style="margin-top:1rem"><strong>Architecture guardrail:</strong> exact tensor shapes, attention grouping, and context configuration should be read from the pinned model revision's <code>config.json</code> in the training environment. The analytics artifact currently does not store that revision.</div>
+    </section>
+
+    <section class="tab-panel" id="panel-compute" role="tabpanel" aria-labelledby="tab-compute" data-panel="compute" hidden>
+      <div class="panel-hero">
+        <div><div class="panel-kicker">Compute profile</div><h2 class="panel-title">Multi-node efficiency and scaling behavior</h2><p class="panel-description">Training used a documented 4-node × 4-GPU topology on Hecate. GPU-hour estimates assume all 16 devices were active during each JSON-recorded training interval.</p></div>
+        <div class="source-chip">16 GPUs · training time only</div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Topology</div><div class="kpi-value">4 × 4</div><div class="kpi-note">nodes × GPUs</div></div>
+        <div class="kpi-card"><div class="kpi-label">Parallel devices</div><div class="kpi-value accent">16</div><div class="kpi-note">documented world size</div></div>
+        <div class="kpi-card"><div class="kpi-label">Sweep wall time</div><div class="kpi-value">56.4m</div><div class="kpi-note">raw train seconds</div></div>
+        <div class="kpi-card"><div class="kpi-label">GPU-hours</div><div class="kpi-value">15.05</div><div class="kpi-note">estimated training cost</div></div>
+        <div class="kpi-card"><div class="kpi-label">Winner cost</div><div class="kpi-value">1.43</div><div class="kpi-note">run4 GPU-hours</div></div>
+        <div class="kpi-card"><div class="kpi-label">Aggregate speedup</div><div class="kpi-value">2.63×</div><div class="kpi-note">vs recorded 4-GPU times</div></div>
+      </div>
+
+      <div class="content-grid">
+        <article class="card span-7">
+          <div class="card-header"><div><h3 class="card-title">Documented topology</h3><p class="card-subtitle">Conceptual layout; accelerator SKU and fabric telemetry are absent from the JSON.</p></div><span class="badge green">DDP</span></div>
+          <div class="topology">
+            <div class="node"><div class="node-title">Node 01</div><div class="gpu-grid"><div class="gpu">GPU 0</div><div class="gpu">GPU 1</div><div class="gpu">GPU 2</div><div class="gpu">GPU 3</div></div></div>
+            <div class="node"><div class="node-title">Node 02</div><div class="gpu-grid"><div class="gpu">GPU 4</div><div class="gpu">GPU 5</div><div class="gpu">GPU 6</div><div class="gpu">GPU 7</div></div></div>
+            <div class="node"><div class="node-title">Node 03</div><div class="gpu-grid"><div class="gpu">GPU 8</div><div class="gpu">GPU 9</div><div class="gpu">GPU 10</div><div class="gpu">GPU 11</div></div></div>
+            <div class="node"><div class="node-title">Node 04</div><div class="gpu-grid"><div class="gpu">GPU 12</div><div class="gpu">GPU 13</div><div class="gpu">GPU 14</div><div class="gpu">GPU 15</div></div></div>
+          </div>
+          <div class="interconnect">Distributed data parallel · synchronized adapter gradients · rollout generation distributed across ranks</div>
+        </article>
+        <article class="card span-5">
+          <div class="card-header"><div><h3 class="card-title">Estimated GPU-hours</h3><p class="card-subtitle">raw seconds × 16 / 3,600</p></div></div>
+          <div class="chart">
+            <div class="bar-row"><div class="bar-label">run1</div><div class="bar-track"><div class="bar-fill blue" style="width:41%"></div></div><div class="bar-value">2.29</div></div>
+            <div class="bar-row"><div class="bar-label">run2</div><div class="bar-track"><div class="bar-fill orange" style="width:100%"></div></div><div class="bar-value">5.61</div></div>
+            <div class="bar-row"><div class="bar-label">run3</div><div class="bar-track"><div class="bar-fill purple" style="width:26%"></div></div><div class="bar-value">1.44</div></div>
+            <div class="bar-row"><div class="bar-label">run4</div><div class="bar-track"><div class="bar-fill green" style="width:25%"></div></div><div class="bar-value positive">1.43</div></div>
+            <div class="bar-row"><div class="bar-label">run5</div><div class="bar-track"><div class="bar-fill red" style="width:76%"></div></div><div class="bar-value">4.28</div></div>
+          </div>
+          <div class="callout" style="margin-top:1rem"><strong>Frontier:</strong> run4 delivers both the top measured accuracy and the lowest estimated GPU-hour cost in this sweep.</div>
+        </article>
+      </div>
+
+      <article class="card" style="margin-top:1rem">
+        <div class="card-header"><div><h3 class="card-title">Scaling comparison</h3><p class="card-subtitle">Runtime improves across all runs, but optimization outcomes change non-uniformly.</p></div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Run</th><th>4-GPU time</th><th>16-GPU time</th><th>Speedup</th><th>Accuracy shift</th><th>Scaling read</th></tr></thead>
+            <tbody>
+              <tr><td>run1</td><td>23.3m</td><td>8.6m</td><td>2.71×</td><td class="negative">-2 pp</td><td>good runtime, lower point estimate</td></tr>
+              <tr><td>run2</td><td>47.0m</td><td>21.0m</td><td>2.24×</td><td class="negative">-2 pp</td><td>weakest recorded speedup</td></tr>
+              <tr><td>run3</td><td>20.3m</td><td>5.4m</td><td class="positive">3.76×</td><td class="negative">-6 pp</td><td>fast, optimization-sensitive</td></tr>
+              <tr class="winner"><td>run4</td><td>20.3m</td><td>5.4m</td><td class="positive">3.76×</td><td class="positive">+2 pp</td><td>best observed scale fit</td></tr>
+              <tr><td>run5</td><td>37.6m</td><td>16.1m</td><td>2.34×</td><td class="positive">+4 pp</td><td>improved point estimate, high cost</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <div class="content-grid">
+        <div class="callout warning span-6"><strong>Do not apply blind linear LR scaling:</strong> GRPO generation groups, global batch, optimizer updates, and rollout diversity interact. First hold global batch constant when changing world size, then test LR separately.</div>
+        <div class="callout info span-6"><strong>Telemetry gap:</strong> add node/GPU SKU, fabric, tokens/sec, rollout latency, all-reduce time, GPU utilization, peak memory, and evaluation overhead to distinguish compute scaling from optimizer behavior.</div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-insights" role="tabpanel" aria-labelledby="tab-insights" data-panel="insights" hidden>
+      <div class="panel-hero">
+        <div><div class="panel-kicker">Analytical synthesis</div><h2 class="panel-title">What is observed, what is inferred, and what remains unknown</h2><p class="panel-description">The five configurations move multiple variables simultaneously. The most useful insight is therefore not a universal hyperparameter optimum, but a set of testable interactions and confidence levels.</p></div>
+        <div class="source-chip">Evidence-weighted interpretation</div>
+      </div>
+
+      <div class="content-grid">
+        <article class="card span-4 highlight"><div class="card-header"><div><div class="eyebrow">High-confidence observation</div><h3 class="card-title">run4 owns the measured frontier</h3></div><span class="badge green">observed</span></div><p class="body-copy">76% at 321.4 seconds. Every other recorded 16-GPU run is both slower and less accurate.</p></article>
+        <article class="card span-4"><div class="card-header"><div><div class="eyebrow">Medium-confidence interpretation</div><h3 class="card-title">Scale changes the useful recipe</h3></div><span class="badge orange">interaction</span></div><p class="body-copy">The winner shifts from run3 to run4 across recorded GPU regimes. Global-batch or distributed optimization effects are plausible but not isolated.</p></article>
+        <article class="card span-4"><div class="card-header"><div><div class="eyebrow">Open hypothesis</div><h3 class="card-title">Exploration may improve data efficiency</h3></div><span class="badge blue">test next</span></div><p class="body-copy">run5 reaches 74% with 500 samples, but generation count, LR, batch, accumulation, and steps all change together.</p></article>
+      </div>
+
+      <article class="card" style="margin-top:1rem">
+        <div class="card-header"><div><h3 class="card-title">Evidence map</h3><p class="card-subtitle">Separate measurement from interpretation and action.</p></div></div>
+        <div class="evidence-table">
+          <div class="evidence-row"><div><strong>Observed</strong>run4 = 76% and 321.4s</div><div><strong>Interpretation</strong>best measured accuracy/runtime trade-off</div><div><strong>Action</strong>repeat exact run4 across seeds and full test</div></div>
+          <div class="evidence-row"><div><strong>Observed</strong>run3 moves 76% → 70%</div><div><strong>Interpretation</strong>configuration is sensitive across scale regimes</div><div><strong>Action</strong>hold global batch constant during scale test</div></div>
+          <div class="evidence-row"><div><strong>Observed</strong>run5 = 74% on 500 samples</div><div><strong>Interpretation</strong>higher rollout count may trade time for data efficiency</div><div><strong>Action</strong>controlled 4/8/16-generation comparison</div></div>
+          <div class="evidence-row"><div><strong>Observed</strong>run1 has lowest numerical loss, 70%</div><div><strong>Interpretation</strong>GRPO objective is not a held-out quality metric</div><div><strong>Action</strong>select by evaluation; diagnose with reward/KL/clip traces</div></div>
+        </div>
+      </article>
+
+      <div class="content-grid">
+        <article class="card span-7">
+          <div class="card-header"><div><h3 class="card-title">Hyperparameter evidence strength</h3><p class="card-subtitle">Confidence reflects experimental isolation, not intuition.</p></div></div>
+          <ul class="list">
+            <li><strong>16-GPU run4 is the measured winner</strong><span class="confidence high"><i></i>high descriptive confidence</span></li>
+            <li><strong>Low LR × high rank is a useful interaction</strong><span class="confidence"><i></i>medium; pair not isolated</span></li>
+            <li><strong>More generations improve accuracy</strong><span class="confidence low"><i></i>low; heavily confounded</span></li>
+            <li><strong>r64 is independently optimal</strong><span class="confidence low"><i></i>low; only one r64 run</span></li>
+            <li><strong>2e-6 is independently optimal</strong><span class="confidence low"><i></i>low; only one 2e-6 run</span></li>
+          </ul>
+        </article>
+        <article class="card span-5 warning">
+          <div class="card-header"><div><h3 class="card-title">Measurement limitations</h3></div><span class="badge red">selection risk</span></div>
+          <ul class="list">
+            <li><strong>Seeds</strong><span class="value">not stored</span></li>
+            <li><strong>Eval size</strong><span class="value">50 in docs, absent from JSON</span></li>
+            <li><strong>Per-example outputs</strong><span class="value">not attached</span></li>
+            <li><strong>Confidence intervals</strong><span class="value">not reported</span></li>
+            <li><strong>World size / SKU</strong><span class="value">absent from JSON</span></li>
+            <li><strong>Stability histories</strong><span class="value">not in summary</span></li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout" style="margin-top:1rem"><strong>Bottom line:</strong> use run4 as the next 16-GPU starting point. Do not yet call 2e-6, r64, four generations, or any single setting universally optimal—the sweep establishes a winning combination, not independent causal effects.</div>
+    </section>
+
+    <section class="tab-panel" id="panel-recommendations" role="tabpanel" aria-labelledby="tab-recommendations" data-panel="recommendations" hidden>
+      <div class="panel-hero">
+        <div><div class="panel-kicker">Action plan</div><h2 class="panel-title">Validate, isolate, optimize, then scale</h2><p class="panel-description">The sequence below minimizes decision risk first, then spends compute on experiments that can explain the winner and improve the recipe.</p></div>
+        <div class="source-chip">Prioritized experiment roadmap</div>
+      </div>
+
+      <article class="card">
+        <div class="card-header"><div><h3 class="card-title">Recommended sequence</h3><p class="card-subtitle">Each stage has a clear promotion gate.</p></div></div>
+        <div class="roadmap">
+          <div class="roadmap-step"><div class="number">01</div><h3>Validate winner</h3><p>Repeat run4 across ≥3 seeds and full GSM8K test.</p></div>
+          <div class="roadmap-step"><div class="number">02</div><h3>Isolate interaction</h3><p>Run LR × LoRA grid with every other setting fixed.</p></div>
+          <div class="roadmap-step"><div class="number">03</div><h3>Optimize exploration</h3><p>Compare 4, 8, 16 generations under equal budgets.</p></div>
+          <div class="roadmap-step"><div class="number">04</div><h3>Scale data / epochs</h3><p>Only after the stable recipe and evaluation gate hold.</p></div>
+        </div>
+      </article>
+
+      <div class="recommendation-grid" style="margin-top:1rem">
+        <article class="recommendation"><span class="badge green">P0 · validation</span><h3>Reproduce run4</h3><p>Exact configuration, at least three seeds, full test split, and saved per-example predictions.</p><div class="outcome">Gate: stable mean and confidence interval</div></article>
+        <article class="recommendation"><span class="badge green">P0 · attribution</span><h3>Separate LR from rank</h3><p>LR {2e-6, 5e-6, 1e-5} × rank {32, 64}; fix generations, samples, batch, accumulation, epochs, and seeds.</p><div class="outcome">Goal: explain the run4 improvement</div></article>
+        <article class="recommendation"><span class="badge green">P0 · metadata</span><h3>Strengthen analytics schema</h3><p>Add seed, eval split/size, world size, GPU SKU, global batch, code revision, throughput, memory, and predictions.</p><div class="outcome">Goal: auditable cross-scale results</div></article>
+        <article class="recommendation"><span class="badge orange">P1 · exploration</span><h3>Control generation count</h3><p>Compare 4/8/16 generations with matched sample count, LR, rank, global batch, optimizer-update budget, and seed set.</p><div class="outcome">Goal: value of rollout diversity per GPU-hour</div></article>
+        <article class="recommendation"><span class="badge orange">P1 · data</span><h3>Build a scaling curve</h3><p>Evaluate 500, 1,000, 2,000, and full training data from the validated recipe; report accuracy, time, and GPU-hours.</p><div class="outcome">Goal: best data/compute operating point</div></article>
+        <article class="recommendation"><span class="badge orange">P1 · observability</span><h3>Export stability traces</h3><p>Reward components, KL, clip ratio, entropy, grad norm, completion length, tokens/sec, rollout and all-reduce time.</p><div class="outcome">Goal: explain ranking changes and failures</div></article>
+        <article class="recommendation"><span class="badge blue">P2 · epochs</span><h3>Test 1 vs 2–3 epochs</h3><p>Use the validated configuration, shared seeds, full evaluation, and early-stop guards. Do not pre-assign expected accuracy.</p><div class="outcome">Goal: determine whether one epoch under-trains</div></article>
+        <article class="recommendation"><span class="badge blue">P2 · scaling</span><h3>Control global batch</h3><p>When changing GPU count, preserve global batch first via per-device batch or accumulation; sweep LR as a separate factor.</p><div class="outcome">Goal: separate speedup from optimizer drift</div></article>
+        <article class="recommendation"><span class="badge blue">P2 · evaluation</span><h3>Add stronger math benchmarks</h3><p>After GSM8K selection stabilizes, add out-of-domain arithmetic and harder reasoning sets to test transfer rather than memorized style.</p><div class="outcome">Goal: verify generalization</div></article>
+      </div>
+
+      <article class="card highlight" style="margin-top:1rem">
+        <div class="card-header"><div><div class="eyebrow">Next job to launch</div><h3 class="card-title">run4-replication-seed-set</h3><p class="card-subtitle">The highest-value next spend is confidence, not a wider unconstrained sweep.</p></div><span class="badge green">recommended</span></div>
+        <div class="signature"><span>lr=2e-6</span><span>generations=4</span><span>samples=1000</span><span>batch=4</span><span>accum=4</span><span>lora_r=64</span><span>alpha=128</span><span>max_completion=512</span><span>epochs=1</span><span>seeds≥3</span><span>eval=full_test</span></div>
+      </article>
+    </section>
+  </main>
 
   <footer class="footer">
-    <p>GRPO Sweep Analytics Dashboard · refreshed from <span class="mono">sweep_analytics-16gpu.json</span> on 08/25/2026</p>
-    <p>Accuracy claims are measured point estimates; recommendations distinguish observed results from hypotheses.</p>
+    <div>GRPO Sweep Analytics · refreshed 08/25/2026 · source: <a href="sweep_analytics-16gpu.json">sweep_analytics-16gpu.json</a></div>
+    <div>Observed results are separated from hypotheses and recommendations.</div>
   </footer>
-</main>
+</div>
+
+<script>
+(() => {
+  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+  const validTabs = new Set(tabs.map(tab => tab.dataset.tab));
+
+  function activate(name, options = {}) {
+    if (!validTabs.has(name)) name = 'overview';
+    tabs.forEach(tab => {
+      const active = tab.dataset.tab === name;
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active && options.focus) {
+        tab.focus();
+        tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    });
+    panels.forEach(panel => {
+      panel.hidden = panel.dataset.panel !== name;
+    });
+    if (options.updateHash !== false) {
+      history.replaceState(null, '', '#' + name);
+    }
+  }
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activate(tab.dataset.tab));
+    tab.addEventListener('keydown', event => {
+      let nextIndex = null;
+      if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+      if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+      if (event.key === 'Home') nextIndex = 0;
+      if (event.key === 'End') nextIndex = tabs.length - 1;
+      if (nextIndex !== null) {
+        event.preventDefault();
+        activate(tabs[nextIndex].dataset.tab, { focus: true });
+      }
+    });
+  });
+
+  window.addEventListener('hashchange', () => activate(location.hash.slice(1), { updateHash: false }));
+  activate(location.hash.slice(1) || 'overview', { updateHash: false });
+})();
+</script>
 </body>
 </html>
