@@ -733,3 +733,96 @@ srun --account=general_sa \
 | Best Accuracy | **76% (run4-large-lora)** |
 | Total Training Time | ~56.5 minutes |
 | W&B Project | [qwen3-grpo-math](https://wandb.ai/balabala76/qwen3-grpo-math) |
+
+> GRPO Sweep Comparison — 4 GPU vs Multi-Node (4 Nodes × 4 GPUs)
+
+## Overview
+
+| Metric | 4 GPU (Single Node) | 4 Nodes × 4 GPUs (16 GPUs) |
+|--------|--------------------|-----------------------------|
+| Model | Qwen/Qwen3-1.7B | Qwen/Qwen3-1.7B |
+| Method | GRPO + LoRA | GRPO + LoRA |
+| Cluster | HECATE | HECATE |
+| Total GPUs | 4 | 16 |
+| Best Accuracy | **76% (run3-moderate-lr)** | **76% (run4-large-lora)** |
+| Total Sweep Time | ~152 min | ~56.5 min |
+| Speedup | 1× (baseline) | **~2.7× faster** |
+
+---
+
+## Side-by-Side Results
+
+| Run | Config | 4 GPU Accuracy | 16 GPU Accuracy | 4 GPU Time | 16 GPU Time | Speedup |
+|-----|--------|---------------|-----------------|------------|-------------|---------|
+| run1-baseline | LR 5e-6, 4 gen, LoRA r=16 | 72% | 70% | 23 min | 8.6 min | 2.7× |
+| run2-high-lr-more-gen | LR 2e-5, 8 gen, LoRA r=32 | 74% | 72% | 48 min | 21.0 min | 2.3× |
+| run3-moderate-lr | LR 1e-5, 4 gen, LoRA r=32 | **76%** ✅ | 70% | 21 min | 5.4 min | 3.9× |
+| run4-large-lora | LR 2e-6, 4 gen, LoRA r=64 | 74% | **76%** 🏆 | 21 min | 5.4 min | 3.9× |
+| run5-max-exploration | LR 8e-6, 16 gen, LoRA r=32 | 70% | 74% | 39 min | 16.1 min | 2.4× |
+
+---
+
+## Accuracy Comparison
+
+| Run | 4 GPU | 16 GPU | Delta |
+|-----|-------|--------|-------|
+| run1-baseline | 72% | 70% | -2% |
+| run2-high-lr-more-gen | 74% | 72% | -2% |
+| run3-moderate-lr | **76%** | 70% | -6% |
+| run4-large-lora | 74% | **76%** | +2% |
+| run5-max-exploration | 70% | 74% | +4% |
+
+---
+
+## Training Time Comparison
+
+| Run | 4 GPU | 16 GPU | Time Saved |
+|-----|-------|--------|------------|
+| run1-baseline | 23 min | 8.6 min | 14.4 min |
+| run2-high-lr-more-gen | 48 min | 21.0 min | 27.0 min |
+| run3-moderate-lr | 21 min | 5.4 min | 15.6 min |
+| run4-large-lora | 21 min | 5.4 min | 15.6 min |
+| run5-max-exploration | 39 min | 16.1 min | 22.9 min |
+| **Total** | **152 min** | **56.5 min** | **95.5 min saved** |
+
+---
+
+## Training Loss Comparison
+
+| Run | 4 GPU Loss | 16 GPU Loss |
+|-----|-----------|-------------|
+| run1-baseline | 0.0034 | -0.000339 |
+| run2-high-lr-more-gen | 0.0087 | 0.005204 |
+| run3-moderate-lr | 0.0052 | 0.003267 |
+| run4-large-lora | 0.0018 | -0.000198 |
+| run5-max-exploration | 0.0099 | 0.007580 |
+
+---
+
+## Key Findings
+
+### ⚡ Performance
+- **2.7× average speedup** going from 4 → 16 GPUs (range: 2.3×–3.9×)
+- Total sweep completed in **56.5 min vs 152 min** — saved ~1.5 hours
+
+### 🎯 Accuracy
+- **Best accuracy is 76% in both setups**, but from different runs:
+  - 4 GPU: **run3-moderate-lr** (LR 1e-5, LoRA r=32)
+  - 16 GPU: **run4-large-lora** (LR 2e-6, LoRA r=64)
+- Scaling to 16 GPUs shifted which config wins — larger effective batch size favors lower LR + larger LoRA capacity
+- Some configs dropped accuracy at scale (run3: 76% → 70%), while others improved (run5: 70% → 74%)
+
+### 📊 Scaling Insights
+- Higher parallelism increases effective batch size, which can require LR adjustment
+- **Low LR + large LoRA (run4)** scales better to multi-node than moderate LR configs
+- **High generation count (run5)** benefited from more GPUs (+4% accuracy improvement)
+- Configs sensitive to batch size (run3) may need LR warmup/scaling when going multi-node
+
+---
+
+## Recommendations
+
+1. **For multi-node (16 GPU):** Use run4 config (LR 2e-6, LoRA r=64) — it scales best
+2. **For single-node (4 GPU):** Use run3 config (LR 1e-5, LoRA r=32) — best in that regime
+3. **Apply linear LR scaling** when changing GPU count: `new_lr = base_lr × (new_gpus / base_gpus)`
+4. **Next experiment:** Try run4 config with 2000+ samples on 16 GPUs to push past 76%

@@ -1,0 +1,133 @@
+{
+  "sweep_project": "qwen3-grpo-math",
+  "model": "Qwen/Qwen3-1.7B",
+  "total_runs": 5,
+  "completed_runs": 5,
+  "runs": [
+    {
+      "run_name": "run1-baseline",
+      "description": "Baseline: 1000 samples, LR 5e-6, 4 generations, LoRA r=16",
+      "config": {
+        "max_completion_length": 512,
+        "num_samples": 1000,
+        "learning_rate": 5e-06,
+        "num_generations": 4,
+        "per_device_train_batch_size": 4,
+        "gradient_accumulation_steps": 4,
+        "num_train_epochs": 1,
+        "lora_r": 16,
+        "lora_alpha": 32
+      },
+      "results": {
+        "accuracy": 0.7,
+        "training_loss": -0.0003393040969967842,
+        "total_steps": 15,
+        "train_time_seconds": 514.7,
+        "train_time_minutes": 8.6
+      },
+      "output_dir": "/lustre/fsw/general_sa/bbalakreshna/grpo-results-sweep/run1-baseline",
+      "wandb_run_id": "31s6xcxf",
+      "wandb_run_url": "https://wandb.ai/balabala76/qwen3-grpo-math/runs/31s6xcxf"
+    },
+    {
+      "run_name": "run2-high-lr-more-gen",
+      "description": "Higher LR (2e-5) with 8 generations for better exploration",
+      "config": {
+        "max_completion_length": 512,
+        "num_samples": 1000,
+        "learning_rate": 2e-05,
+        "num_generations": 8,
+        "per_device_train_batch_size": 8,
+        "gradient_accumulation_steps": 2,
+        "num_train_epochs": 1,
+        "lora_r": 32,
+        "lora_alpha": 64
+      },
+      "results": {
+        "accuracy": 0.72,
+        "training_loss": 0.005203844288424138,
+        "total_steps": 31,
+        "train_time_seconds": 1262.0,
+        "train_time_minutes": 21.0
+      },
+      "output_dir": "/lustre/fsw/general_sa/bbalakreshna/grpo-results-sweep/run2-high-lr-more-gen",
+      "wandb_run_id": "uv38sg72",
+      "wandb_run_url": "https://wandb.ai/balabala76/qwen3-grpo-math/runs/uv38sg72"
+    },
+    {
+      "run_name": "run3-moderate-lr",
+      "description": "Moderate LR (1e-5), LoRA r=32, 1000 samples",
+      "config": {
+        "max_completion_length": 512,
+        "num_samples": 1000,
+        "learning_rate": 1e-05,
+        "num_generations": 4,
+        "per_device_train_batch_size": 4,
+        "gradient_accumulation_steps": 4,
+        "num_train_epochs": 1,
+        "lora_r": 32,
+        "lora_alpha": 64
+      },
+      "results": {
+        "accuracy": 0.7,
+        "training_loss": 0.003266553208231926,
+        "total_steps": 15,
+        "train_time_seconds": 325.0,
+        "train_time_minutes": 5.4
+      },
+      "output_dir": "/lustre/fsw/general_sa/bbalakreshna/grpo-results-sweep/run3-moderate-lr",
+      "wandb_run_id": "vjqmzkvw",
+      "wandb_run_url": "https://wandb.ai/balabala76/qwen3-grpo-math/runs/vjqmzkvw"
+    },
+    {
+      "run_name": "run4-large-lora",
+      "description": "Large LoRA rank (64) with low LR (2e-6) for stable training",
+      "config": {
+        "max_completion_length": 512,
+        "num_samples": 1000,
+        "learning_rate": 2e-06,
+        "num_generations": 4,
+        "per_device_train_batch_size": 4,
+        "gradient_accumulation_steps": 4,
+        "num_train_epochs": 1,
+        "lora_r": 64,
+        "lora_alpha": 128
+      },
+      "results": {
+        "accuracy": 0.76,
+        "training_loss": -0.0001981235419710477,
+        "total_steps": 15,
+        "train_time_seconds": 321.4,
+        "train_time_minutes": 5.4
+      },
+      "output_dir": "/lustre/fsw/general_sa/bbalakreshna/grpo-results-sweep/run4-large-lora",
+      "wandb_run_id": "da7ics60",
+      "wandb_run_url": "https://wandb.ai/balabala76/qwen3-grpo-math/runs/da7ics60"
+    },
+    {
+      "run_name": "run5-max-exploration",
+      "description": "Max exploration: 16 generations, LR 8e-6",
+      "config": {
+        "max_completion_length": 512,
+        "num_samples": 500,
+        "learning_rate": 8e-06,
+        "num_generations": 16,
+        "per_device_train_batch_size": 16,
+        "gradient_accumulation_steps": 1,
+        "num_train_epochs": 1,
+        "lora_r": 32,
+        "lora_alpha": 64
+      },
+      "results": {
+        "accuracy": 0.74,
+        "training_loss": 0.0075796498887000545,
+        "total_steps": 31,
+        "train_time_seconds": 963.1,
+        "train_time_minutes": 16.1
+      },
+      "output_dir": "/lustre/fsw/general_sa/bbalakreshna/grpo-results-sweep/run5-max-exploration",
+      "wandb_run_id": "guvdw5zw",
+      "wandb_run_url": "https://wandb.ai/balabala76/qwen3-grpo-math/runs/guvdw5zw"
+    }
+  ]
+}
