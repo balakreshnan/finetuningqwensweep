@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Olympics Reasoning Pipeline</title>
+<meta name="description" content="Interactive walkthrough: distilling a 270K-row Olympics reasoning dataset with NVIDIA Dynamo + SGLang, then full fine-tuning Nemotron-3.5-Lightning on 16 GB200 GPUs.">
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --panel2:#f0f2f5; --ink:#15181d; --muted:#5d6673; --line:#d9dde3;
+  --accent:#76b900; --accent2:#3b82f6; --warn:#e5862b; --bad:#d9434b; --good:#2e9d5b; --violet:#8b5cf6;
+  --chip:#eef1f4; --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1116; --panel:#161a21; --panel2:#1c222b; --ink:#e7eaee; --muted:#9aa4b2; --line:#2a313c;
+    --accent:#86cf12; --accent2:#60a5fa; --warn:#f59e4b; --bad:#f06a71; --good:#46c37b; --violet:#a78bfa;
+    --chip:#202733; --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1116; --panel:#161a21; --panel2:#1c222b; --ink:#e7eaee; --muted:#9aa4b2; --line:#2a313c;
+  --accent:#86cf12; --accent2:#60a5fa; --warn:#f59e4b; --bad:#f06a71; --good:#46c37b; --violet:#a78bfa;
+  --chip:#202733; --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+header{padding:28px 0 8px}
+h1{font-size:clamp(22px,3.2vw,34px);line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:22px;margin:28px 0 10px}
+h3{font-size:16px;margin:20px 0 8px}
+p{margin:6px 0 10px}
+.sub{color:var(--muted);max-width:860px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.themebtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:18px 0 6px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.kpi b{display:block;font-size:22px;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:12.5px}
+.kpi.g b{color:var(--accent)} .kpi.b b{color:var(--accent2)}
+nav{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);margin-top:14px}
+nav .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:8px;padding-bottom:8px}
+nav button{flex:0 0 auto;border:1px solid transparent;background:transparent;color:var(--muted);padding:7px 12px;border-radius:999px;cursor:pointer;font:inherit;font-size:14px}
+nav button.on{background:var(--panel);color:var(--ink);border-color:var(--line);box-shadow:var(--shadow)}
+section.tab{display:none;padding-bottom:40px}
+section.tab.on{display:block;animation:fade .35s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);margin:12px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid2>*,.grid3>*{min-width:0}
+@media (max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+canvas{width:100%;display:block;border-radius:10px;background:var(--panel2)}
+.ctrl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:10px 0 2px;font-size:13.5px;color:var(--muted)}
+.ctrl button{border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:8px;padding:6px 11px;cursor:pointer;font:inherit;font-size:13px}
+.ctrl button.pri{background:var(--accent);border-color:var(--accent);color:#0b1200;font-weight:600}
+.ctrl label{display:flex;align-items:center;gap:6px}
+.ctrl input[type=range]{width:140px;accent-color:var(--accent)}
+.ctrl input[type=checkbox]{accent-color:var(--accent)}
+.live{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.pill{background:var(--chip);border-radius:999px;padding:4px 10px;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pill b{color:var(--ink)}
+a.pill{text-decoration:none;color:var(--muted);border:1px solid var(--line);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+a.pill:hover{border-color:var(--accent);color:var(--ink)}
+.note{font-size:12.5px;color:var(--muted)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.tablewrap th,.tablewrap td,td.n,th.n{white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12.5px}
+td.n,th.n{text-align:right}
+tr.tot td{font-weight:700}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px}
+.step{flex:1 1 130px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;position:relative;cursor:pointer;transition:transform .15s,border-color .15s}
+.step:hover,.step.on{border-color:var(--accent);transform:translateY(-2px)}
+.step small{color:var(--muted);display:block;font-size:12px}
+.step .num{position:absolute;top:-9px;left:10px;background:var(--accent);color:#0b1200;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+.step.ft .num{background:var(--accent2);color:#fff}
+.detail{margin-top:10px;min-height:56px;padding:12px;border-radius:10px;background:var(--panel2);border-left:3px solid var(--accent)}
+.bar{height:10px;border-radius:6px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width 1.1s cubic-bezier(.2,.8,.2,1)}
+.passes{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.passes button{border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit;font-size:13px}
+.passes button.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--panel2))}
+.covnum{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.hbars .row{display:grid;grid-template-columns:150px 1fr 64px;gap:8px;align-items:center;margin:5px 0;font-size:13px}
+.hbars .row .t{height:14px;border-radius:4px;background:var(--panel2);position:relative;overflow:hidden}
+.hbars .row .t i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.pair .t{height:9px!important}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:6px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.callout{border-left:3px solid var(--accent2);background:var(--panel2);padding:10px 12px;border-radius:8px;margin:10px 0}
+.callout.warn{border-color:var(--warn)}
+.callout.good{border-color:var(--good)}
+ul.tight{margin:6px 0;padding-left:20px} ul.tight li{margin:3px 0}
+code{background:var(--chip);border-radius:5px;padding:1px 5px;font-size:12.5px}
+footer{color:var(--muted);font-size:12.5px;padding:24px 0 40px;border-top:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="top">
+    <div>
+      <h1>Olympics reasoning: distill with Dynamo, fine-tune on GB200</h1>
+      <p class="sub">A reasoning dataset was built from 120 years of Olympic entries, with one verified trace for each source row.
+      The traces were generated by <b>Nemotron-3.5-Lightning-30B-A3B</b> served with <b>NVIDIA Dynamo (SGLang backend)</b>,
+      and the same model was then full-fine-tuned with <b>Megatron-Bridge on 16 GB200 GPUs</b>. Every number on this page
+      comes from the actual run.</p>
+    </div>
+    <button class="themebtn" id="themeBtn" aria-label="Toggle colour theme">◐ Theme</button>
+  </div>
+  <div class="kpis">
+    <div class="kpi g"><b>269,723</b><span>dataset rows (99.997 % of 269,731 source rows)</span></div>
+    <div class="kpi"><b>1.41 M</b><span>Dynamo requests for the dataset</span></div>
+    <div class="kpi"><b>5.04 B</b><span>tokens generated for the dataset</span></div>
+    <div class="kpi b"><b>380 k tok/s</b><span>first pass, 12 nodes / 48 GPUs</span></div>
+    <div class="kpi"><b>789 steps</b><span>1 epoch, 408 M tokens, 16 GPUs</span></div>
+    <div class="kpi b"><b>52.5 min</b><span>fine-tuning wall time (14 GPU-h)</span></div>
+  </div>
+  <div class="live" style="margin-top:4px">
+    <a class="pill" href="https://huggingface.co/datasets/Balab2021/Olympics-Reasoning-Nemotron-3.5-Lightning" target="_blank" rel="noopener">🤗 Dataset (public): <b>Balab2021/Olympics-Reasoning-Nemotron-3.5-Lightning</b></a>
+    <a class="pill" href="https://huggingface.co/Balab2021/Nemotron-3.5-Lightning-30B-A3B-Olympics-Reasoning" target="_blank" rel="noopener">🤗 Model: <b>Balab2021/Nemotron-3.5-Lightning-30B-A3B-Olympics-Reasoning</b></a>
+    <a class="pill" href="https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16" target="_blank" rel="noopener">Base: <b>nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16</b></a>
+    <a class="pill" href="https://huggingface.co/datasets/pranjalvoid/olympics-dataset" target="_blank" rel="noopener">Source: <b>pranjalvoid/olympics-dataset</b></a>
+  </div>
+</header>
+</div>
+
+<nav><div class="wrap" role="tablist">
+  <button class="on" data-tab="overview">Overview</button>
+  <button data-tab="distill">Distillation</button>
+  <button data-tab="dynamo">Dynamo throughput</button>
+  <button data-tab="finetune">Fine-tuning</button>
+  <button data-tab="gpus">Across GPUs</button>
+  <button data-tab="results">Results</button>
+  <button data-tab="knowledge">Did it learn?</button>
+</div></nav>
+
+<div class="wrap">
+
+<!-- ================= OVERVIEW ================= -->
+<section class="tab on" id="overview">
+  <h2>End-to-end flow</h2>
+  <p class="sub">Click a stage for details. Stages 1–5 build the dataset; stages 6–10 fine-tune and evaluate the model.</p>
+  <div class="card">
+    <div class="flow" id="flow"></div>
+    <div class="detail" id="flowDetail">Select a stage.</div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>The idea</h3>
+      <ul class="tight">
+        <li><b>Verifiable questions:</b> each source row (one athlete's entry in one event) gets one question built over a table taken from the data, and its gold answer is computed exactly.</li>
+        <li><b>Rejection sampling:</b> the model answers each question several times, and only the <i>shortest correct</i> trace is kept.</li>
+        <li><b>Self-distillation:</b> the same model is the teacher, the student and the baseline.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Stack</h3>
+      <table>
+        <tr><td>Hardware</td><td>GB200 NVL72 racks, with 4 GB200 GPUs (189 GB) and 2 Grace CPUs per node</td></tr>
+        <tr><td>Serving</td><td>NVIDIA Dynamo 1.5.1 + SGLang 0.5.18</td></tr>
+        <tr><td>Training</td><td>NeMo 26.08.01 / Megatron-Bridge</td></tr>
+        <tr><td>Scheduler</td><td>Slurm + enroot/pyxis containers</td></tr>
+        <tr><td>Tracking</td><td>Weights &amp; Biases, Hugging Face Hub</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DISTILLATION ================= -->
+<section class="tab" id="distill">
+  <h2>Distillation: from a source row to a verified trace</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>1 · One question per source row</h3>
+      <p>Each row anchors one question that names the athlete. The context is either the event's <b>entry table</b> (up to 150 entrants) or the athlete's <b>career table</b> (up to 80 rows).</p>
+      <div class="tablewrap"><table>
+        <tr><th>Template</th><th>Asks</th><th class="n">Dataset rows</th><th class="n">pass@1</th></tr>
+        <tbody id="qtTable"></tbody>
+      </table></div>
+      <p class="note">Each event table keeps a fixed row order, so all questions about one event share the same prompt prefix, which the KV-aware router can reuse.</p>
+    </div>
+    <div class="card">
+      <h3>Example prompt (event context)</h3>
+<pre style="white-space:pre-wrap;font-size:12px;background:var(--panel2);padding:10px;border-radius:8px;margin:0;overflow:auto;max-height:260px">All entrants in Cross Country Skiing Men's 10 kilometres at the
+1992 Winter Olympics (Albertville). Medal '-' means no medal; ...
+
+| Name                  | NOC | Age | Height | Weight | Medal |
+|-----------------------|-----|-----|--------|--------|-------|
+| Ioannis Mitroulas     | GRE | 17  | n/a    | n/a    | -     |
+| Iskren Milkov Plankov | BUL | 22  | 180    | 78     | -     |
+| ... (up to 150 rows)                                         |
+
+How many entrants in this table represented the same NOC as
+&lt;athlete&gt;, counting &lt;athlete&gt;?</pre>
+      <p class="note">The model reasons inside <code>&lt;think&gt;…&lt;/think&gt;</code> and must end with <code>Final answer: &lt;n&gt;</code>. The answer is graded exactly against the gold value.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>2 · Live: Dynamo serving the teacher across the cluster</h3>
+    <p class="note">This is an illustrative simulation of the real topology. Each node is an independent Dynamo deployment: a frontend with a KV-aware router in front of 4 SGLang workers, one per GPU, each holding a full copy of the model (TP1). Dots are requests; dots of the same colour belong to the same event, so they share a prompt prefix.</p>
+    <canvas id="dynCanvas" height="430" aria-label="Animated simulation of Dynamo distillation"></canvas>
+    <div class="ctrl">
+      <button class="pri" id="dynPlay">⏸ Pause</button>
+      <label>Nodes <input type="range" id="dynNodes" min="1" max="12" value="12"> <b id="dynNodesV">12</b></label>
+      <label><input type="checkbox" id="dynKV" checked> KV-aware routing</label>
+      <label>Speed <input type="range" id="dynSpeed" min="1" max="5" value="2"></label>
+    </div>
+    <div class="live">
+      <span class="pill">GPUs <b id="dGpus">48</b></span>
+      <span class="pill">Expected throughput <b id="dTps">380k</b> tok/s</span>
+      <span class="pill">Simulated requests <b id="dReq">0</b></span>
+      <span class="pill">Kept (correct) <b id="dOk">0</b></span>
+      <span class="pill">Sent to retry <b id="dBad">0</b></span>
+      <span class="pill">Prefix-cache hits <b id="dHit">0 %</b></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>3 · Rejection-sampling loop until every row is covered</h3>
+    <p>For each row, the builder keeps the <b>shortest trace that is correct, finished and at most 28k tokens</b>. Rows without one go back with more samples, a longer budget or a different question template. Click through the passes:</p>
+    <div class="passes" id="passBtns"></div>
+    <div class="grid2" style="align-items:center">
+      <div>
+        <div class="covnum" id="covNum">0</div>
+        <div class="note" id="covLbl">rows with a verified trace</div>
+        <div class="bar" style="margin-top:8px"><i id="covBar"></i></div>
+        <div class="note" style="margin-top:6px">The target is 269,731 unique source rows (271,116 minus 1,385 exact duplicates).</div>
+      </div>
+      <div class="tablewrap"><table id="passDetail"></table></div>
+    </div>
+    <div class="callout warn"><b>One template was retired.</b> The first wording of the NOC-medal question ("medal rows … count every row") was read by the model as "rows of that NOC" and scored <b>30 %</b>. It was reworded (<b>96.7 %</b>) and all 124,732 samples of the old wording were discarded. Checking failures before resampling saved a lot of GPU time.</div>
+    <div class="callout">The last <b>8 rows</b> were counting questions over 100-plus-entrant team rosters that no sample got right across 3 templates and 60-plus samples per row. They were accepted as a known shortfall and are listed in the dataset card.</div>
+  </div>
+</section>
+
+<!-- ================= DYNAMO THROUGHPUT ================= -->
+<section class="tab" id="dynamo">
+  <h2>How Dynamo was parallelised</h2>
+  <div class="grid3">
+    <div class="card"><h3>Across nodes</h3><p>Every node runs its <b>own</b> Dynamo deployment with a file-based discovery store, so it needs no etcd or NATS. Questions are shuffled and sharded by <code>index % N</code>. Nodes never talk to each other, so throughput scales linearly.</p></div>
+    <div class="card"><h3>Inside a node</h3><p>There are 4 SGLang workers, one per GPU, each holding a <b>full copy of the 30B-A3B model</b> (about 60 GB of 189 GB). The frontend's <b>KV-aware router</b> sends requests that share a prompt prefix to the worker that already has it cached.</p></div>
+    <div class="card"><h3>Inside a GPU</h3><p>Continuous batching keeps about 256 requests in flight per GPU (1,024 per node). Each GPU has about 8.7 M tokens of KV/Mamba-state capacity, and the decode CUDA graph is sized to batch 256.</p></div>
+  </div>
+
+  <div class="card">
+    <h3>First pass, training split: per-node output throughput (12 nodes)</h3>
+    <div class="hbars" id="nodeBars"></div>
+    <div class="live">
+      <span class="pill">Mean <b>31,684 tok/s</b> per node (±1.3 %)</span>
+      <span class="pill">Sum <b>380,208 tok/s</b></span>
+      <span class="pill">≈ <b>7.9 k tok/s</b> per GPU</span>
+      <span class="pill">≈ <b>156 requests/s</b> cluster-wide</span>
+      <span class="pill">Finish spread <b>100.7–106.6 min</b></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Every generation run</h3>
+    <div class="tablewrap"><table>
+      <tr><th>Run</th><th class="n">Nodes</th><th class="n">In flight / node</th><th class="n">Requests</th><th class="n">Output tokens / request</th><th class="n">tok/s per node</th><th class="n">Total tok/s</th></tr>
+      <tbody id="runTable"></tbody>
+    </table></div>
+    <p class="note">Long runs with long traces sustain 32–34k tok/s per node. Short runs are dominated by start-up and by slow final requests. Raising the in-flight requests per node from 512 to 1,024 lifted the steady rate from about 27k to 31–34k tok/s. There were zero failed requests across all 64 client runs, out of <b>1,604,344 requests in total (≈ 5.40 B output tokens)</b>.</p>
+  </div>
+</section>
+
+<!-- ================= FINE-TUNING ================= -->
+<section class="tab" id="finetune">
+  <h2>Fine-tuning: one epoch on 16 GB200 GPUs</h2>
+  <div class="card">
+    <h3>Live: one training step across the 16 GPUs</h3>
+    <p class="note">This is an illustrative animation of the real layout: TP1 · <b>EP8</b> (128 experts over 8 GPUs, 16 per GPU) · expert-DP 2 · DP16 for the dense and Mamba layers · HybridEP all-to-all over NVLink. The step counter and loss curve replay the logged run, scaled in time.</p>
+    <canvas id="ftCanvas" height="400" aria-label="Animated fine-tuning step across 16 GPUs"></canvas>
+    <div class="ctrl">
+      <button class="pri" id="ftPlay">⏸ Pause</button>
+      <button id="ftReset">↺ Restart</button>
+      <label>Speed <input type="range" id="ftSpeed" min="1" max="6" value="3"></label>
+    </div>
+    <div class="live">
+      <span class="pill">Step <b id="fStep">0</b> / 789</span>
+      <span class="pill">Phase <b id="fPhase">–</b></span>
+      <span class="pill">LR <b id="fLr">–</b></span>
+      <span class="pill">Loss <b id="fLoss">–</b></span>
+      <span class="pill">Tokens seen <b id="fTok">0</b></span>
+      <span class="pill">Wall clock <b id="fWall">0.0</b> min</span>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Loss curves (logged)</h3>
+      <canvas id="lossCanvas" height="240"></canvas>
+      <div class="legend"><span><i style="background:var(--accent)"></i>train lm loss</span><span><i style="background:var(--accent2)"></i>validation loss</span><span><i style="background:var(--violet)"></i>MTP-1 loss ÷ 10</span></div>
+    </div>
+    <div class="card">
+      <h3>Packing: 227,051 rows → 50,446 sequences</h3>
+      <canvas id="packCanvas" height="240"></canvas>
+      <div class="live"><span class="pill">8,192-token sequences</span><span class="pill">4.5 rows per sequence</span><span class="pill">fill <b>98.8 %</b></span><span class="pill">408.2 M real tokens</span><span class="pill">242.5 M loss tokens (59.4 %)</span></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Configuration</h3>
+      <table>
+        <tr><td>GPUs</td><td><b>16 × GB200</b> (4 nodes × 4)</td></tr>
+        <tr><td>Parallelism</td><td>TP1 · PP1 · CP1 · EP8 · ETP1 · DP16, recipe-default optimizer</td></tr>
+        <tr><td>MoE dispatcher</td><td>flex / <b>HybridEP</b> (DeepEP rejects GB200)</td></tr>
+        <tr><td>Recompute</td><td>selective: moe, layernorm, core_attn, mlp</td></tr>
+        <tr><td>Epochs / steps</td><td><b>1 epoch = 789 steps</b></td></tr>
+        <tr><td>Global / micro batch</td><td>64 packed sequences / 1 (≈ 517 k real tokens per step)</td></tr>
+        <tr><td>Sequence length</td><td>8,192</td></tr>
+        <tr><td>Learning rate</td><td>5e-6, 30-step warm-up, cosine down to 5e-7</td></tr>
+        <tr><td>Validation / checkpoints</td><td>every 100 steps; 10 validation iterations; keep the last 2</td></tr>
+        <tr><td>Loss</td><td>assistant turn only (reasoning + answer)</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Where the 52.5 minutes went</h3>
+      <div id="timeBars" class="hbars"></div>
+      <h3>Throughput</h3>
+      <table>
+        <tr><td>Step time</td><td>mean <b>3,337 ms</b> · median 3,325 · p95 3,464</td></tr>
+        <tr><td>Model FLOP/s</td><td>mean <b>267.5 TFLOP/s per GPU</b> (range 235–283), ≈ 11 % of dense BF16 peak</td></tr>
+        <tr><td>Tokens/s</td><td><b>≈ 155 k</b> across 16 GPUs ≈ 9.7 k per GPU</td></tr>
+        <tr><td>Weak scaling 2 → 4 nodes</td><td>3.07 s → 3.34 s per step ≈ <b>92 %</b></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Choosing the layout (20-step benchmarks, 8k packed, gbs 32)</h3>
+    <div class="tablewrap"><table>
+      <tr><th>Config</th><th class="n">Step</th><th class="n">TFLOP/s per GPU</th><th class="n">Peak memory</th><th>Outcome</th></tr>
+      <tr><td>1 node · EP4 · selective recompute</td><td class="n">–</td><td class="n">–</td><td class="n">171 / 184 GB</td><td style="color:var(--bad)">out of memory</td></tr>
+      <tr><td>2 nodes · EP8 · alltoall</td><td class="n">3.40 s</td><td class="n">259</td><td class="n">122 GB</td><td>works</td></tr>
+      <tr><td>2 nodes · EP8 · <b>HybridEP</b></td><td class="n"><b>3.07 s</b></td><td class="n"><b>287</b></td><td class="n">122 GB</td><td style="color:var(--good)">chosen (+11 %)</td></tr>
+    </table></div>
+  </div>
+</section>
+
+<!-- ================= ACROSS GPUs ================= -->
+<section class="tab" id="gpus">
+  <h2>Across GPUs during fine-tuning</h2>
+  <p class="sub">Megatron logs averages across ranks. W&amp;B recorded per-GPU system metrics every ~7.5 s on one training node. Its four GPUs behaved almost identically, so the expert-parallel load was balanced.</p>
+  <div class="card">
+    <div class="legend"><span><i style="background:var(--accent)"></i>GPU0</span><span><i style="background:var(--accent2)"></i>GPU1</span><span><i style="background:var(--violet)"></i>GPU2</span><span><i style="background:var(--warn)"></i>GPU3</span></div>
+    <div id="gpuBars"></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Reading it</h3>
+      <ul class="tight">
+        <li>GPUs were <b>busy (81–84 %)</b> but only about <b>12 % tensor-pipe active</b>, at half the power limit. The run is bound by small expert GEMMs, Mamba scans, recompute and all-to-all traffic, which is typical for a model with about 3 B active parameters.</li>
+        <li>The MoE load-balance loss stayed near 1.0 (1.05 → 0.98), so tokens were spread evenly over experts. That matches the flat per-GPU power and NVLink traffic.</li>
+        <li>Megatron's rank-0 peak was 96.9 GB allocated, and NVML saw about 109 GB per GPU. That leaves <b>about 80 GB free</b>, enough for 16k sequences next time.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>GPU time (fine-tuning side)</h3>
+      <table>
+        <tr><th>Job</th><th class="n">GPUs × time</th><th class="n">GPU-h</th></tr>
+        <tr><td>Import HF → Megatron</td><td class="n">4 × 2.1 min</td><td class="n">0.1</td></tr>
+        <tr><td>Packing (CPU-bound, GPUs idle)</td><td class="n">8 × 85 min</td><td class="n">11.3</td></tr>
+        <tr class="tot"><td>SFT</td><td class="n">16 × 52.5 min</td><td class="n">14.0</td></tr>
+        <tr><td>Export Megatron → HF</td><td class="n">4 × 1.8 min</td><td class="n">0.1</td></tr>
+        <tr><td>Dynamo eval of the fine-tuned model</td><td class="n">16 × 35.7 min</td><td class="n">9.5</td></tr>
+      </table>
+      <p class="note">Lesson: run packing as a CPU job, since 11 GPU-hours sat idle.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RESULTS ================= -->
+<section class="tab" id="results">
+  <h2>Base vs fine-tuned (both served through Dynamo)</h2>
+  <p class="sub">Both models used identical sampling (T=1.0, top_p=0.95, reasoning on). pass@1 is averaged over the samples for each question.</p>
+  <div class="grid2">
+    <div class="card"><h3>Row benchmark: 23,861 questions, held-out athletes</h3>
+      <div class="live"><span class="pill">pass@1 <b>92.00 → 92.35 %</b></span><span class="pill">mean tokens <b>2,209 → 1,951 (−12 %)</b></span><span class="pill">truncated <b>3.02 → 2.23 %</b></span></div>
+      <div class="legend"><span><i style="background:var(--muted)"></i>base</span><span><i style="background:var(--accent)"></i>fine-tuned</span></div>
+      <div class="hbars" id="rowRes"></div>
+    </div>
+    <div class="card"><h3>Table benchmark: 550 questions of types <i>not</i> in the training data</h3>
+      <div class="live"><span class="pill">pass@1 <b>93.98 → 93.05 %</b></span><span class="pill">mean tokens <b>2,467 → 2,529</b></span><span class="pill">truncated <b>4.59 → 5.32 %</b></span></div>
+      <div class="legend"><span><i style="background:var(--muted)"></i>base</span><span><i style="background:var(--accent2)"></i>fine-tuned</span></div>
+      <div class="hbars" id="tabRes"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Reading the results</h3>
+    <ul class="tight">
+      <li><b>In-distribution:</b> slightly more accurate, with <b>12 % shorter reasoning</b> and fewer runaway traces. The largest gains were on the hard counting types (taller +1.6, older +1.2 points).</li>
+      <li><b>Out-of-distribution:</b> the two country-medal tally types dropped by 2.7–4.3 points, about 2 standard errors on 550 questions. Mixing those types into training should fix this.</li>
+      <li><b>Small headroom:</b> the base model was already at about 92 %, the hardest traces (longer than 8k tokens) were excluded from SFT, and the student learned only from itself.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= KNOWLEDGE ================= -->
+<section class="tab" id="knowledge">
+  <h2>Did fine-tuning add knowledge to the model?</h2>
+  <div class="callout good" style="font-size:16px"><b>Essentially no, and it wasn't designed to.</b> This run changed how the model reasons over the table it is given. It did not teach it new facts.</div>
+  <div class="grid3">
+    <div class="card"><h3>1 · The teacher is the student</h3><p>Every trace was written by the same base model. Rejection sampling kept only its own correct, short attempts. SFT <b>sharpens</b> the model towards reasoning paths it could already produce.</p></div>
+    <div class="card"><h3>2 · Every answer is in the prompt</h3><p>Each question includes the full table it needs, plus the instruction "use only the table you are given". The model is rewarded for careful reading and counting, not recall. No closed-book test was run.</p></div>
+    <div class="card"><h3>3 · The effects look like skill</h3><p>Reasoning got 12 % shorter, there were fewer truncations, accuracy rose slightly in-distribution, and it fell slightly on unseen question types. This is the signature of narrow behavioural fine-tuning.</p></div>
+  </div>
+  <div class="card">
+    <h3>To actually add knowledge</h3>
+    <ul class="tight">
+      <li>Train on <b>closed-book</b> pairs (for example "How many medals did X win in 1988?" with no table), using facts the model cannot already answer, and evaluate closed-book on held-out facts.</li>
+      <li>For lookups over a 270k-row table, <b>retrieval or a tool call</b> is usually better than putting the table into the weights.</li>
+      <li>For more reasoning skill: a <b>stronger teacher</b>, or <b>RL with the exact-answer verifier</b> (for example GRPO), plus 16k sequences so the hardest traces are kept.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Lessons from the run</h3>
+    <ul class="tight">
+      <li>Megatron-Bridge's offline-pack cache name ignores the data, so a second dataset silently reused an old pack. Fixed with a per-dataset tokenizer path.</li>
+      <li>DeepEP rejects GB200 by device name; HybridEP is the right dispatcher for NVL72.</li>
+      <li>The single-worker packer needs more than 1 h for 230k rows on Grace CPUs, so give it a long limit or run it as a CPU job.</li>
+      <li>Login nodes kill long CPU jobs and cannot import containers. Do that work on compute nodes.</li>
+      <li>Ambiguous wording looks like low accuracy. Read the failures before buying more samples.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>All figures come from the job logs, generation logs, packed-data metadata and W&amp;B system metrics of the actual run. The animations are illustrative simulations of the real topology, and the training replay is time-scaled.</footer>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => n.toLocaleString("en-US");
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- theme ---------- */
+let theme = null;
+try { theme = localStorage.getItem("olympics-theme"); } catch (e) {}
+if (theme) document.documentElement.setAttribute("data-theme", theme);
+$("#themeBtn").onclick = () => {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark" ||
+    (!document.documentElement.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
+  const next = dark ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  try { localStorage.setItem("olympics-theme", next); } catch (e) {}
+};
+
+/* ---------- tabs ---------- */
+const onTab = {};
+$$("nav button").forEach(b => b.onclick = () => {
+  $$("nav button").forEach(x => x.classList.toggle("on", x === b));
+  $$("section.tab").forEach(s => s.classList.toggle("on", s.id === b.dataset.tab));
+  (onTab[b.dataset.tab] || (() => {}))();
+  window.scrollTo({ top: Math.min(window.scrollY, $("nav").offsetTop), behavior: "smooth" });
+});
+
+/* ---------- canvas helper ---------- */
+function fitCanvas(c) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = +c.getAttribute("height");
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); c.style.height = h + "px";
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w, h };
+}
+function rr(g, x, y, w, h, r) { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); }
+
+/* ---------- overview flow ---------- */
+const STAGES = [
+  ["Source table", "271,116 rows → 269,731 unique", "athlete_events.csv (120 years of Olympic entries). Exact duplicate rows are dropped, leaving 269,731 unique rows to cover."],
+  ["Questions", "1 per row · 8 templates", "Each row gets a question that names its athlete, built over the event's entry table or the athlete's career table. The gold answer is computed exactly. The test split holds out 10 % of athletes."],
+  ["Dynamo teacher", "12 nodes · 48 GPUs", "Every node runs a Dynamo frontend (KV-aware router) and 4 SGLang workers (TP1). Sampling uses T=1.0, top_p=0.95 with reasoning on. The first pass made 1,078,924 requests, generated 2.63 B tokens and took 2 h 03 m."],
+  ["Grade & retry", "4 passes → 99.997 %", "Each answer is graded against the gold value. Unsolved rows get more samples (K up to 16), a 28k-token budget or a different template. The dataset needed 1.41 M requests and 5.04 B tokens in total."],
+  ["Dataset", "269,723 rows · public", "The shortest verified-correct trace is kept for each row. Train 242,727 / test 26,996, with athletes held out. Stats are logged to W&B and the dataset is published on the HF Hub."],
+  ["SFT files", "227,051 rows", "Each row becomes a chat: system, user, and an assistant turn with reasoning_content + answer. Rows with prompt + trace over 8k tokens are dropped, as is 1 % held out for validation. Training used a frozen snapshot."],
+  ["Packing", "50,446 × 8,192 tokens", "Offline packing at 4.5 rows per sequence with 98.8 % fill: 408.2 M real tokens, 242.5 M of them carrying loss. Uses a per-dataset cache path."],
+  ["Full SFT", "16 GB200 · 789 steps", "Megatron-Bridge: TP1, EP8, HybridEP, selective recompute, gbs 64, LR 5e-6 cosine. One epoch in 52.5 min at about 3.34 s per step and about 267 TFLOP/s per GPU."],
+  ["Export & eval", "Dynamo, base vs FT", "Megatron → HF export (65.8 GB, 14 shards), then the same Dynamo harness scores the base and fine-tuned models on 23,861 row questions and 550 table questions."],
+  ["Publish", "model + report", "The report goes to W&B and into the model card, and the weights are pushed to the HF Hub (private)."],
+];
+const flow = $("#flow");
+STAGES.forEach((s, i) => {
+  const d = document.createElement("div");
+  d.className = "step" + (i >= 5 ? " ft" : "");
+  d.innerHTML = `<span class="num">${i + 1}</span><b>${s[0]}</b><small>${s[1]}</small>`;
+  d.onclick = () => { $$(".step").forEach(x => x.classList.remove("on")); d.classList.add("on");
+    const det = $("#flowDetail"); det.style.borderLeftColor = i >= 5 ? "var(--accent2)" : "var(--accent)";
+    det.innerHTML = `<b>${i + 1}. ${s[0]}</b>: ${s[2]}`; };
+  flow.appendChild(d);
+});
+flow.children[2].click();
+
+/* ---------- question templates ---------- */
+const QT = [
+  ["ev_same_noc", "entrants from the athlete's NOC", 31626, 91.91],
+  ["ev_older", "entrants older than the athlete", 26607, 51.24],
+  ["ev_taller", "entrants taller than the athlete", 24250, 55.54],
+  ["ev_noc_medal_count", "medal rows won by the athlete's NOC", 34070, 96.71],
+  ["at_events_at", "events entered at that Games", 35831, 99.29],
+  ["at_medals_at", "medals won at that Games", 37371, 99.86],
+  ["at_events_before", "events entered in earlier years", 37406, 99.27],
+  ["at_other_events_at", "other events at that Games", 42562, 98.51],
+];
+$("#qtTable").innerHTML = QT.map(q => `<tr><td><code>${q[0]}</code></td><td>${q[1]}</td><td class="n">${fmt(q[2])}</td><td class="n" style="color:${q[3] < 70 ? "var(--warn)" : "inherit"}">${q[3]} %</td></tr>`).join("");
+
+/* ---------- coverage passes ---------- */
+const PASSES = [
+  { n: "Pass 1", q: 269731, k: 4, tok: "16,384", nodes: 12, t: "2 h 03 m", req: 1078924, out: "2.63 B", cov: 248559 },
+  { n: "Retry", q: 40752, k: 6, tok: "16,384", nodes: 8, t: "1 h 29 m", req: 244512, out: "1.29 B", cov: 263793 },
+  { n: "Fallback", q: 5938, k: 8, tok: "16,384", nodes: 4, t: "55 m", req: 47504, out: "0.41 B", cov: 268585 },
+  { n: "Retry 2", q: 2292, k: 16, tok: "28,000", nodes: 4, t: "1 h 34 m", req: 36672, out: "0.68 B", cov: 269543 },
+  { n: "Fallback 2", q: 188, k: 16, tok: "28,000", nodes: 4, t: "9 m", req: 3008, out: "0.03 B", cov: 269723 },
+];
+const TOTAL = 269731;
+let covShown = 0, covAnim = null;
+function showPass(i) {
+  $$("#passBtns button").forEach((b, j) => b.classList.toggle("on", j === i));
+  const p = PASSES[i];
+  $("#passDetail").innerHTML = `
+    <tr><td>Questions sampled</td><td class="n"><b>${fmt(p.q)}</b></td></tr>
+    <tr><td>Samples per question (K)</td><td class="n">${p.k}</td></tr>
+    <tr><td>Max tokens</td><td class="n">${p.tok}</td></tr>
+    <tr><td>Nodes × time</td><td class="n">${p.nodes} × ${p.t}</td></tr>
+    <tr><td>Requests</td><td class="n">${fmt(p.req)}</td></tr>
+    <tr><td>Output tokens</td><td class="n">${p.out}</td></tr>`;
+  const from = covShown, to = p.cov, t0 = performance.now(), dur = reduce ? 1 : 900;
+  cancelAnimationFrame(covAnim);
+  const tick = now => {
+    const f = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - f, 3);
+    covShown = Math.round(from + (to - from) * e);
+    $("#covNum").textContent = fmt(covShown) + " / " + fmt(TOTAL);
+    $("#covLbl").textContent = `rows with a verified trace: ${(100 * covShown / TOTAL).toFixed(covShown === TOTAL ? 0 : 3)} %`;
+    $("#covBar").style.width = (100 * covShown / TOTAL) + "%";
+    if (f < 1) covAnim = requestAnimationFrame(tick);
+  };
+  covAnim = requestAnimationFrame(tick);
+}
+PASSES.forEach((p, i) => { const b = document.createElement("button"); b.textContent = p.n; b.onclick = () => showPass(i); $("#passBtns").appendChild(b); });
+
+/* ---------- Dynamo simulation ---------- */
+const dyn = { canvas: $("#dynCanvas"), nodes: 12, kv: true, speed: 2, running: true, parts: [], t: 0,
+  req: 0, ok: 0, bad: 0, hits: 0, routed: 0, cache: {}, spawnAcc: 0 };
+const EVCOL = ["#76b900", "#3b82f6", "#e5862b", "#8b5cf6", "#e11d74", "#14b8a6", "#eab308", "#64748b"];
+function dynLayout(w, h) {
+  const narrow = w < 640, n = dyn.nodes;
+  const cols = narrow ? Math.min(n, 2) : n <= 4 ? n : n <= 8 ? 4 : 6, rows = Math.ceil(n / cols);
+  const left = narrow ? 58 : 92, right = w - (narrow ? 84 : 120), top = 22, bottom = h - 18;
+  const cw = (right - left) / cols, ch = (bottom - top) / rows;
+  const nodes = [];
+  for (let i = 0; i < n; i++) {
+    const c = i % cols, r = Math.floor(i / cols);
+    const x = left + c * cw + 5, y = top + r * ch + 5, bw = cw - 10, bh = ch - 10;
+    const fe = { x: x + (narrow ? 13 : 18), y: y + bh / 2 + (narrow ? 4 : 0) };
+    const gw = narrow ? Math.max(20, bw - 34) : 20, gtop = narrow ? 14 : 0;
+    const gpus = [0, 1, 2, 3].map(g => ({ x: x + bw - gw - 6, y: y + gtop + (bh - gtop) * (g + .5) / 4, w: gw, h: Math.max(6, (bh - gtop) / 4 - 6), load: 0 }));
+    nodes.push({ x, y, w: bw, h: bh, fe, gpus });
+  }
+  const sx = narrow ? 30 : 44, gx = w - (narrow ? 42 : 62);
+  return { nodes, narrow, src: { x: sx, y: h / 2 }, grader: { x: gx, y: h * .32 }, data: { x: gx, y: h * .72 } };
+}
+function dynSpawn(L) {
+  const ev = Math.floor(Math.random() * 40), node = Math.floor(Math.random() * dyn.nodes);
+  dyn.parts.push({ ev, node, stage: 0, x: L.src.x, y: L.src.y + (Math.random() - .5) * 60, t: 0, gpu: -1 });
+  dyn.req++;
+}
+function lerp(a, b, f) { return a + (b - a) * f; }
+function dynStep(dt) {
+  const c = dyn.canvas, { g, w, h } = dyn.ctx, L = dynLayout(w, h);
+  if (dyn.running) {
+    dyn.spawnAcc += dt * dyn.nodes * 1.6 * dyn.speed;
+    while (dyn.spawnAcc > 1) { dynSpawn(L); dyn.spawnAcc--; }
+  }
+  g.clearRect(0, 0, w, h);
+  const ink = css("--ink"), muted = css("--muted"), line = css("--line"), panel = css("--panel"), acc = css("--accent"), good = css("--good"), bad = css("--bad");
+  g.font = "11px system-ui,sans-serif";
+  // source
+  const sw = L.narrow ? 44 : 70, gw = L.narrow ? 76 : 92, gx0 = L.grader.x - gw / 2;
+  g.fillStyle = panel; g.strokeStyle = line; rr(g, 8, h / 2 - 70, sw, 140, 10); g.fill(); g.stroke();
+  g.fillStyle = ink; g.textAlign = "center"; g.fillText(L.narrow ? "Qs" : "Questions", 8 + sw / 2, h / 2 - 54); g.fillStyle = muted; g.fillText("shard", 8 + sw / 2, h / 2 + 58); g.fillText("i % N", 8 + sw / 2, h / 2 + 70);
+  for (let k = 0; k < 6; k++) { g.fillStyle = css("--chip"); g.fillRect(16, h / 2 - 40 + k * 14, sw - 16, 9); }
+  // nodes
+  L.nodes.forEach((n, i) => {
+    g.fillStyle = panel; g.strokeStyle = line; rr(g, n.x, n.y, n.w, n.h, 8); g.fill(); g.stroke();
+    g.fillStyle = muted; g.textAlign = "left"; g.fillText("node " + i, n.x + 6, n.y + 12);
+    g.beginPath(); g.arc(n.fe.x, n.fe.y, 9, 0, 7); g.fillStyle = css("--accent2"); g.fill();
+    g.fillStyle = "#fff"; g.textAlign = "center"; g.font = "bold 9px system-ui"; g.fillText("FE", n.fe.x, n.fe.y + 3); g.font = "11px system-ui,sans-serif";
+    n.gpus.forEach((gp, j) => {
+      const real = dyn.nodeState[i].gpus[j];
+      g.strokeStyle = line; g.fillStyle = css("--panel2"); rr(g, gp.x, gp.y - gp.h / 2, gp.w, gp.h, 3); g.fill(); g.stroke();
+      const lf = Math.min(1, real.load / 6); g.fillStyle = acc; g.globalAlpha = .35 + .65 * lf;
+      rr(g, gp.x, gp.y - gp.h / 2, gp.w * lf, gp.h, 3); g.fill(); g.globalAlpha = 1;
+      g.strokeStyle = line; g.beginPath(); g.moveTo(n.fe.x + 9, n.fe.y); g.lineTo(gp.x, gp.y); g.globalAlpha = .35; g.stroke(); g.globalAlpha = 1;
+    });
+  });
+  // grader + dataset
+  g.fillStyle = panel; g.strokeStyle = line; rr(g, gx0, h * .32 - 26, gw, 52, 10); g.fill(); g.stroke();
+  g.fillStyle = ink; g.textAlign = "center"; g.fillText(L.narrow ? "grade" : "grade vs gold", L.grader.x, h * .32 - 4); g.fillStyle = muted; g.fillText(L.narrow ? "vs gold" : "Final answer: n", L.grader.x, h * .32 + 12);
+  g.fillStyle = panel; rr(g, gx0, h * .72 - 30, gw, 60, 10); g.fill(); g.stroke();
+  g.fillStyle = good; g.fillText("dataset", L.grader.x, h * .72 - 8); g.fillStyle = muted; g.fillText("shortest", L.grader.x, h * .72 + 8); g.fillText("correct", L.grader.x, h * .72 + 21);
+  // particles
+  const sp = dt * dyn.speed;
+  dyn.parts = dyn.parts.filter(p => {
+    const n = L.nodes[p.node]; if (!n) return false;
+    const st = dyn.nodeState[p.node];
+    if (dyn.running) p.t += sp * (p.stage === 2 ? .35 : 1.6);
+    let x, y;
+    if (p.stage === 0) { x = lerp(p.x, n.fe.x, Math.min(p.t, 1)); y = lerp(p.y, n.fe.y, Math.min(p.t, 1));
+      if (p.t >= 1) { p.stage = 1; p.t = 0;
+        let gi; dyn.routed++;
+        const key = p.ev;
+        if (dyn.kv && st.cache[key] !== undefined) { gi = st.cache[key]; dyn.hits++; }
+        else { gi = dyn.kv ? st.gpus.reduce((b, gg, j) => gg.load < st.gpus[b].load ? j : b, 0) : Math.floor(Math.random() * 4);
+          if (!dyn.kv && st.cache2[gi] && st.cache2[gi].has(key)) dyn.hits++;
+          if (dyn.kv) st.cache[key] = gi; }
+        (st.cache2[gi] = st.cache2[gi] || new Set()).add(key);
+        p.gpu = gi; st.gpus[gi].load++; } }
+    else if (p.stage === 1) { const gp = n.gpus[p.gpu]; x = lerp(n.fe.x, gp.x, Math.min(p.t, 1)); y = lerp(n.fe.y, gp.y, Math.min(p.t, 1)); if (p.t >= 1) { p.stage = 2; p.t = 0; } }
+    else if (p.stage === 2) { const gp = n.gpus[p.gpu]; x = gp.x + gp.w / 2 + Math.sin(p.t * 20) * 2; y = gp.y; if (p.t >= 1) { p.stage = 3; p.t = 0; st.gpus[p.gpu].load--; p.ok = Math.random() < .863; } }
+    else if (p.stage === 3) { const gp = n.gpus[p.gpu]; const f = Math.min(p.t * .6, 1); x = lerp(gp.x + gp.w, L.grader.x, f); y = lerp(gp.y, L.grader.y, f) - Math.sin(f * Math.PI) * 20; if (f >= 1) { p.stage = 4; p.t = 0; } }
+    else if (p.stage === 4) { const f = Math.min(p.t, 1);
+      if (p.ok) { x = lerp(L.grader.x, L.data.x, f); y = lerp(L.grader.y, L.data.y, f); }
+      else { x = lerp(L.grader.x, L.src.x, f); y = lerp(L.grader.y, 14, f) + Math.sin(f * Math.PI) * -6; }
+      if (f >= 1) { p.ok ? dyn.ok++ : dyn.bad++; return false; } }
+    g.beginPath(); g.arc(x, y, p.stage === 4 ? 3.2 : 2.6, 0, 7);
+    g.fillStyle = p.stage === 4 ? (p.ok ? good : bad) : EVCOL[p.ev % EVCOL.length]; g.fill();
+    return true;
+  });
+  if (dyn.parts.length > 2600) dyn.parts.splice(0, dyn.parts.length - 2600);
+  $("#dReq").textContent = fmt(dyn.req); $("#dOk").textContent = fmt(dyn.ok); $("#dBad").textContent = fmt(dyn.bad);
+  $("#dHit").textContent = dyn.routed ? Math.round(100 * dyn.hits / dyn.routed) + " %" : "0 %";
+}
+function dynReset() {
+  dyn.parts = []; dyn.req = dyn.ok = dyn.bad = dyn.hits = dyn.routed = 0;
+  dyn.nodeState = Array.from({ length: 12 }, () => ({ gpus: [0, 1, 2, 3].map(() => ({ load: 0 })), cache: {}, cache2: {} }));
+  $("#dGpus").textContent = dyn.nodes * 4;
+  $("#dTps").textContent = Math.round(dyn.nodes * 31.684) + "k";
+}
+$("#dynNodes").oninput = e => { dyn.nodes = +e.target.value; $("#dynNodesV").textContent = dyn.nodes; dynReset(); };
+$("#dynKV").onchange = e => { dyn.kv = e.target.checked; dynReset(); };
+$("#dynSpeed").oninput = e => { dyn.speed = +e.target.value; };
+$("#dynPlay").onclick = () => { dyn.running = !dyn.running; $("#dynPlay").textContent = dyn.running ? "⏸ Pause" : "▶ Play"; };
+dynReset();
+
+/* ---------- node throughput bars ---------- */
+const NODES = [[80912, 201.3, 105.3, 31864], [80912, 198.0, 104.6, 31536], [80912, 201.0, 106.5, 31459], [80912, 195.9, 103.2, 31632],
+  [80912, 195.8, 103.4, 31544], [80912, 200.4, 106.6, 31334], [80912, 196.1, 103.7, 31519], [80912, 196.3, 101.9, 32118],
+  [80912, 192.9, 100.7, 31915], [80912, 197.5, 103.4, 31855], [80908, 194.1, 101.7, 31817], [80908, 198.1, 104.4, 31615]];
+$("#nodeBars").innerHTML = NODES.map((n, i) => `<div class="row" title="${fmt(n[0])} requests · ${n[1]} M tokens · ${n[2]} min"><span>node ${i} <span class="note">${n[2]} min</span></span><div class="t"><i data-w="${(n[3] - 28000) / (32500 - 28000) * 100}" style="background:var(--accent)"></i></div><b style="text-align:right">${fmt(n[3])}</b></div>`).join("")
+  + `<p class="note">The bar scale starts at 28k tok/s to make the ±1.3 % spread visible.</p>`;
+const RUNS = [
+  ["Rows pass 1, train split", 12, "1,024", 970936, 2438, 31684, "380k"],
+  ["Rows pass 1, test split", 12, "1,024", 107988, 2455, 29901, "359k"],
+  ["Retry (K=6)", 8, "1,024", 244512, 5287, 33574, "269k"],
+  ["Fallback (K=8)", 4, "1,024", 47504, 8631, 34049, "136k"],
+  ["Retry 2 (K=16, 28k)", 4, "1,024", 36672, 18604, 32735, "131k"],
+  ["Fallback 2 (K=16, 28k)", 4, "1,024", 3008, 8287, 22080, "88k"],
+  ["Table set, train split (K=8)", 4, "512", 74016, 1578, 27074, "108k"],
+  ["Table set, test split", 4, "512", 4400, 2467, 16110, "64k"],
+  ["Fine-tuned eval, row test", 4, "1,024", 107988, 2026, 30683, "123k"],
+  ["Fine-tuned eval, table test", 4, "1,024", 2200, 2529, 12048, "48k"],
+];
+$("#runTable").innerHTML = RUNS.map(r => `<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td class="n">${r[2]}</td><td class="n">${fmt(r[3])}</td><td class="n">${fmt(r[4])}</td><td class="n"><b>${fmt(r[5])}</b></td><td class="n">${r[6]}</td></tr>`).join("");
+function growBars(root) { setTimeout(() => root.querySelectorAll("i[data-w]").forEach(i => i.style.width = Math.max(1, +i.dataset.w) + "%"), 30); }
+onTab.dynamo = () => growBars($("#nodeBars"));
+
+/* ---------- fine-tuning animation ---------- */
+const LOSS = [[1, .1038], [10, .1060], [50, .0985], [100, .1007], [150, .0995], [200, .0997], [250, .0990], [300, .1005], [350, .0975], [400, .0961],
+  [450, .0980], [500, .0973], [550, .0960], [600, .0997], [650, .0950], [700, .0935], [750, .0952], [789, .0946]];
+const VAL = [[100, .1013], [200, .1045], [300, .1033], [400, .1016], [500, .1013], [600, .0995], [700, .0980], [789, .0973]];
+const MTP = [[1, 1.007], [10, 1.012], [50, .536], [100, .469], [200, .418], [300, .379], [400, .347], [500, .329], [600, .324], [700, .308], [789, .312]];
+function interp(arr, s) { for (let i = 1; i < arr.length; i++) if (s <= arr[i][0]) { const a = arr[i - 1], b = arr[i], f = (s - a[0]) / (b[0] - a[0]); return a[1] + (b[1] - a[1]) * f; } return arr[arr.length - 1][1]; }
+function lrAt(s) { return s <= 30 ? 5e-6 * s / 30 : 5e-7 + (5e-6 - 5e-7) * .5 * (1 + Math.cos(Math.PI * (s - 30) / (789 - 30))); }
+const ft = { running: true, speed: 3, step: 0, phaseT: 0, wall: 0, tokens: 0 };
+const PH = [["dispatch", "HybridEP all-to-all: tokens → expert GPUs"], ["experts", "expert MLPs + Mamba / attention"], ["combine", "all-to-all back"],
+  ["backward", "backward pass (selective recompute)"], ["all-reduce", "gradient sync: DP16 dense, expert-DP 2"], ["optimizer", "distributed Adam step"]];
+function ftLayout(w, h) {
+  // wide: 4 nodes in a row (groups side by side); narrow: 2x2 (one EP group per row)
+  const narrow = w < 640, cols = narrow ? 2 : 4, rows = narrow ? 2 : 1;
+  const nodes = [], nw = (w - 40 - (cols - 1) * 7) / cols, rowH = (h - 70) / rows;
+  for (let n = 0; n < 4; n++) {
+    const c = n % cols, r = Math.floor(n / cols);
+    const x = 20 + c * (nw + 7), y = 46 + r * rowH, bw = nw, bh = rowH - (narrow ? 40 : 50);
+    const gpus = [0, 1, 2, 3].map(g => ({ x: x + 10 + (g % 2) * (bw / 2 - 5), y: y + 26 + Math.floor(g / 2) * (bh / 2 - 12), w: bw / 2 - 15, h: bh / 2 - 22 }));
+    nodes.push({ x, y, w: bw, h: bh, gpus, grp: n < 2 ? 0 : 1 });
+  }
+  return nodes;
+}
+let ftParts = [];
+function ftDraw(dt) {
+  const { g, w, h } = ft.ctx, N = ftLayout(w, h);
+  const ink = css("--ink"), muted = css("--muted"), line = css("--line"), panel = css("--panel"), c1 = css("--accent"), c2 = css("--accent2"), vio = css("--violet");
+  const stepDur = 1.6 / ft.speed;
+  if (ft.running && ft.step < 789) {
+    ft.phaseT += dt / stepDur;
+    if (ft.phaseT >= 1) { ft.phaseT = 0; ft.step = Math.min(789, ft.step + Math.max(1, Math.round(ft.speed * ft.speed / 2))); }
+  }
+  const ph = Math.min(5, Math.floor(ft.phaseT * 6)), phF = ft.phaseT * 6 - ph;
+  g.clearRect(0, 0, w, h);
+  g.font = "12px system-ui,sans-serif"; g.textAlign = "left";
+  // EP group labels
+  const narrow = w < 640;
+  [[0, narrow ? "EP group A · experts 0–127" : "EP group A: experts 0–127 over 8 GPUs", c1],
+   [1, narrow ? "EP group B · replica (expert-DP 2)" : "EP group B: replica of A (expert-DP 2)", c2]].forEach(([k, t, col]) => {
+    const a = N[k * 2], b = N[k * 2 + 1];
+    const x0 = Math.min(a.x, b.x) - 6, y0 = a.y - 30, x1 = Math.max(a.x + a.w, b.x + b.w) + 6, y1 = Math.max(a.y + a.h, b.y + b.h) + 6;
+    g.strokeStyle = col; g.setLineDash([5, 4]); rr(g, x0, y0, x1 - x0, y1 - y0, 12); g.stroke(); g.setLineDash([]);
+    g.fillStyle = col; g.fillText(t, x0 + 8, y0 + 16);
+  });
+  N.forEach((n, ni) => {
+    g.fillStyle = panel; g.strokeStyle = line; rr(g, n.x, n.y, n.w, n.h, 10); g.fill(); g.stroke();
+    g.fillStyle = muted; g.fillText("node " + (ni + 1), n.x + 10, n.y + 18);
+    n.gpus.forEach((gp, gi) => {
+      const lvl = ni % 2 * 4 + gi, e0 = lvl * 16, col = n.grp ? c2 : c1;
+      let glow = 0;
+      if (ph === 1 || ph === 3) glow = .55 + .45 * Math.sin(phF * Math.PI);
+      g.fillStyle = css("--panel2"); g.strokeStyle = col; g.lineWidth = 1.4; rr(g, gp.x, gp.y, gp.w, gp.h, 8); g.fill(); g.stroke(); g.lineWidth = 1;
+      if (glow) { g.globalAlpha = glow * .35; g.fillStyle = col; rr(g, gp.x, gp.y, gp.w, gp.h, 8); g.fill(); g.globalAlpha = 1; }
+      const small = gp.w < 100;
+      g.fillStyle = ink; g.font = (small ? "bold 10.5px" : "bold 12px") + " system-ui"; g.fillText("GPU" + gi, gp.x + 6, gp.y + (small ? 14 : 18));
+      g.font = (small ? "10px" : "11px") + " system-ui"; g.fillStyle = muted;
+      g.fillText(small ? `e ${e0}–${e0 + 15}` : `experts ${e0}–${e0 + 15}`, gp.x + 6, gp.y + (small ? 27 : 34));
+      if (!small) g.fillText("dense+Mamba", gp.x + 6, gp.y + 48);
+      // expert cells
+      const cw = Math.max(3, (gp.w - 16) / 16);
+      for (let e = 0; e < 16; e++) { g.fillStyle = col; g.globalAlpha = .25 + .6 * ((ph === 1 ? Math.abs(Math.sin(e * 1.7 + ft.step)) : .2)); g.fillRect(gp.x + 8 + e * cw, gp.y + gp.h - 14, cw - 1.5, 7); }
+      g.globalAlpha = 1;
+    });
+  });
+  // all-to-all particles inside each EP group
+  if (ft.running && (ph === 0 || ph === 2) && Math.random() < .9) {
+    for (let k = 0; k < 6; k++) {
+      const grp = Math.random() < .5 ? 0 : 1, a = N[grp * 2 + (Math.random() < .5 ? 0 : 1)], b = N[grp * 2 + (Math.random() < .5 ? 0 : 1)];
+      const ga = a.gpus[Math.floor(Math.random() * 4)], gb = b.gpus[Math.floor(Math.random() * 4)];
+      ftParts.push({ x0: ga.x + ga.w / 2, y0: ga.y + ga.h / 2, x1: gb.x + gb.w / 2, y1: gb.y + gb.h / 2, t: 0, col: grp ? c2 : c1 });
+    }
+  }
+  if (ph === 4 && phF < .2 && ft.running) {
+    for (let k = 0; k < 8; k++) { const a = N[k % 2].gpus[k % 4], b = N[2 + k % 2].gpus[k % 4];
+      ftParts.push({ x0: a.x + a.w / 2, y0: a.y + a.h / 2, x1: b.x + b.w / 2, y1: b.y + b.h / 2, t: 0, col: vio, arc: 1 }); }
+  }
+  ftParts = ftParts.filter(p => { if (ft.running) p.t += dt * 1.8 * ft.speed / 2;
+    const f = Math.min(1, p.t), x = lerp(p.x0, p.x1, f), y = lerp(p.y0, p.y1, f) - (p.arc ? Math.sin(f * Math.PI) * 40 : Math.sin(f * Math.PI) * 14);
+    g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fillStyle = p.col; g.fill(); return f < 1; });
+  if (ftParts.length > 800) ftParts.splice(0, ftParts.length - 800);
+  // phase strip
+  const sy = h - 44, sw = (w - 40) / 6;
+  PH.forEach((p, i) => { g.fillStyle = i === ph ? (i === 4 ? vio : c1) : css("--panel2"); g.strokeStyle = line;
+    rr(g, 20 + i * sw, sy, sw - 6, 26, 6); g.fill(); g.stroke();
+    g.fillStyle = i === ph ? "#0b1200" : muted; g.font = (i === ph ? "bold " : "") + (narrow ? "10px" : "11.5px") + " system-ui"; g.textAlign = "center";
+    g.fillText(narrow ? ["a2a", "expert", "comb", "bwd", "sync", "optim"][i] : p[0], 20 + i * sw + (sw - 6) / 2, sy + 17); });
+  g.textAlign = "left";
+  // live stats
+  const s = Math.max(1, ft.step);
+  ft.tokens = Math.round(ft.step * 517400);
+  const wall = ft.step < 5 ? 2 + ft.step / 5 * 2.2 : 4.2 + (ft.step - 5) * 3.337 / 60 + Math.floor(ft.step / 100) * 0.56;
+  $("#fStep").textContent = ft.step; $("#fPhase").textContent = PH[ph][1];
+  $("#fLr").textContent = lrAt(s).toExponential(2); $("#fLoss").textContent = interp(LOSS, s).toFixed(4);
+  $("#fTok").textContent = (ft.tokens / 1e6).toFixed(1) + " M"; $("#fWall").textContent = (ft.step >= 789 ? 52.5 : Math.min(52.5, wall)).toFixed(1);
+  drawLoss(ft.step);
+}
+$("#ftPlay").onclick = () => { ft.running = !ft.running; $("#ftPlay").textContent = ft.running ? "⏸ Pause" : "▶ Play"; };
+$("#ftReset").onclick = () => { ft.step = 0; ft.phaseT = 0; ftParts = []; ft.running = true; $("#ftPlay").textContent = "⏸ Pause"; };
+$("#ftSpeed").oninput = e => ft.speed = +e.target.value;
+
+/* loss chart */
+const lossC = $("#lossCanvas"); let lossCtx = null;
+function drawLoss(upto) {
+  if (!lossCtx) return; const { g, w, h } = lossCtx;
+  const L = 42, R = w - 12, T = 12, B = h - 26, y0 = .090, y1 = .108;
+  const X = s => L + (R - L) * s / 789, Y = v => B - (B - T) * (v - y0) / (y1 - y0);
+  g.clearRect(0, 0, w, h); g.font = "11px system-ui"; g.fillStyle = css("--muted"); g.strokeStyle = css("--line");
+  for (let v = .090; v <= .1081; v += .004) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(R, Y(v)); g.stroke(); g.textAlign = "right"; g.fillText(v.toFixed(3), L - 6, Y(v) + 4); }
+  g.textAlign = "center"; [0, 200, 400, 600, 789].forEach(s => g.fillText(s, X(s), h - 8));
+  const series = (arr, col, scale = 1, dots = false) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); let first = true;
+    arr.forEach(([s, v]) => { if (s > upto) return; const yy = Y(v / scale); first ? g.moveTo(X(s), yy) : g.lineTo(X(s), yy); first = false; });
+    g.stroke(); g.lineWidth = 1;
+    if (dots) arr.forEach(([s, v]) => { if (s > upto) return; g.beginPath(); g.arc(X(s), Y(v / scale), 3.5, 0, 7); g.fillStyle = col; g.fill(); }); };
+  series(MTP.map(([s, v]) => [s, Math.min(v / 10, y1)]), css("--violet"));
+  series(LOSS, css("--accent")); series(VAL, css("--accent2"), 1, true);
+  g.fillStyle = css("--muted"); g.textAlign = "left"; g.fillText("step", R - 26, B - 4);
+}
+
+/* packing animation */
+const pack = { bins: [], cur: null, t: 0 };
+function packDraw(dt) {
+  if (!pack.ctx) return; const { g, w, h } = pack.ctx;
+  const nb = Math.max(6, Math.floor((w - 20) / 34)), bw = (w - 20) / nb - 6, top = 22, bh = h - 56;
+  if (!pack.bins.length || pack.bins.length !== nb) pack.bins = Array.from({ length: nb }, () => ({ items: [], fill: 0 }));
+  pack.t += dt;
+  if (pack.t > .09) { pack.t = 0;
+    const len = Math.max(250, Math.min(8000, Math.round(-Math.log(1 - Math.random() * .97) * 1800)));
+    let bi = pack.bins.findIndex(b => b.fill + len <= 8192);
+    if (bi < 0) { pack.bins.shift(); pack.bins.push({ items: [], fill: 0 }); bi = pack.bins.findIndex(b => b.fill + len <= 8192); }
+    pack.bins[bi].items.push({ len, hue: Math.floor(Math.random() * 360) }); pack.bins[bi].fill += len;
+  }
+  g.clearRect(0, 0, w, h); g.font = "11px system-ui"; g.fillStyle = css("--muted"); g.textAlign = "left";
+  g.fillText("each column = one 8,192-token packed sequence; blocks = training rows", 10, 14);
+  pack.bins.forEach((b, i) => {
+    const x = 10 + i * (bw + 6);
+    g.strokeStyle = css("--line"); g.fillStyle = css("--panel"); rr(g, x, top, bw, bh, 5); g.fill(); g.stroke();
+    let y = top + bh;
+    b.items.forEach(it => { const hh = bh * it.len / 8192; y -= hh;
+      g.fillStyle = `hsl(${it.hue} 55% 55%)`; g.fillRect(x + 2, y + 1, bw - 4, Math.max(1, hh - 2)); });
+    g.fillStyle = css("--muted"); g.textAlign = "center"; g.fillText(Math.round(100 * b.fill / 8192) + "%", x + bw / 2, h - 18);
+  });
+}
+
+/* ---------- time breakdown ---------- */
+const TIME = [["Setup + load ckpt", 2.0, "var(--muted)"], ["Warm-up (5 steps)", 2.2, "var(--warn)"], ["784 steady steps", 43.6, "var(--accent)"], ["8 val + 8 ckpt saves", 4.5, "var(--accent2)"]];
+$("#timeBars").innerHTML = TIME.map(t => `<div class="row"><span>${t[0]}</span><div class="t"><i data-w="${t[1] / 43.6 * 100}" style="background:${t[2]}"></i></div><b style="text-align:right">${t[1]} min</b></div>`).join("");
+
+/* ---------- per-GPU bars ---------- */
+const GPU = [
+  ["GPU utilisation", "%", [81, 81, 83, 84], 100],
+  ["SM active", "%", [31.7, 31.3, 31.9, 31.5], 100],
+  ["Tensor-pipe active", "%", [12.0, 11.9, 12.1, 12.0], 100],
+  ["HBM used", "GB", [108.8, 108.9, 108.9, 108.9], 189],
+  ["Power (limit 1,200 W)", "W", [601, 609, 596, 604], 1200],
+  ["NVLink TX (W&B rate)", "k", [36.3, 37.1, 37.0, 36.2], 50],
+  ["Temperature", "°C", [34, 33, 35, 34], 90],
+];
+const GCOL = ["var(--accent)", "var(--accent2)", "var(--violet)", "var(--warn)"];
+$("#gpuBars").innerHTML = GPU.map(m => `<h3 style="margin:14px 0 4px">${m[0]}</h3><div class="hbars pair">` +
+  m[2].map((v, i) => `<div class="row"><span class="note">GPU${i}</span><div class="t"><i data-w="${v / m[3] * 100}" style="background:${GCOL[i]}"></i></div><b style="text-align:right">${v}${m[1] === "k" ? "k" : " " + m[1]}</b></div>`).join("") + `</div>`).join("");
+onTab.gpus = () => growBars($("#gpuBars"));
+
+/* ---------- results ---------- */
+const ROWRES = [["at_medals_at", 99.82, 99.82], ["at_events_at", 99.26, 99.12], ["at_events_before", 99.18, 99.21], ["at_other_events_at", 98.68, 98.51],
+  ["ev_same_noc", 93.58, 94.22], ["ev_taller", 73.14, 74.72], ["ev_older", 68.08, 69.27]];
+const TABRES = [["athlete_games", 99.62, 99.75], ["athlete_medals", 99.38, 99.75], ["medalist_age", 99.38, 99.00], ["highest_bmi", 98.00, 98.00],
+  ["country_golds", 86.00, 81.67], ["sport_top_country", 74.67, 72.00]];
+function resBars(el, rows, col) {
+  el.innerHTML = rows.map(r => {
+    const d = (r[2] - r[1]).toFixed(2), dc = r[2] > r[1] ? "var(--good)" : r[2] < r[1] ? "var(--bad)" : "var(--muted)";
+    return `<div style="margin:9px 0"><div style="display:flex;justify-content:space-between;font-size:12.5px"><code>${r[0]}</code><span style="color:${dc}">${d > 0 ? "+" : ""}${d} pts</span></div>
+    <div class="row pair" style="grid-template-columns:1fr 64px;margin:3px 0"><div class="t"><i data-w="${(r[1] - 60) / 40 * 100}" style="background:var(--muted)"></i></div><span class="note" style="text-align:right">${r[1]}%</span></div>
+    <div class="row pair" style="grid-template-columns:1fr 64px;margin:3px 0"><div class="t"><i data-w="${(r[2] - 60) / 40 * 100}" style="background:${col}"></i></div><b style="text-align:right">${r[2]}%</b></div></div>`;
+  }).join("") + `<p class="note">The axis starts at 60 % to make the differences visible.</p>`;
+}
+resBars($("#rowRes"), ROWRES, "var(--accent)"); resBars($("#tabRes"), TABRES, "var(--accent2)");
+onTab.results = () => { growBars($("#rowRes")); growBars($("#tabRes")); };
+onTab.finetune = () => { growBars($("#timeBars")); resize(); };
+onTab.distill = () => { resize(); if (!covShown) showPass(0); };
+
+/* ---------- main loop ---------- */
+function resize() {
+  // narrow screens stack the nodes, so the animated canvases get taller
+  const narrow = dyn.canvas.clientWidth > 0 ? dyn.canvas.clientWidth < 640 : window.innerWidth < 680;
+  dyn.canvas.setAttribute("height", narrow ? 620 : 430);
+  if (dyn.canvas.offsetParent) dyn.ctx = fitCanvas(dyn.canvas);
+  const fc = $("#ftCanvas"); fc.setAttribute("height", window.innerWidth < 680 ? 600 : 400);
+  if (fc.offsetParent) ft.ctx = fitCanvas(fc);
+  if (lossC.offsetParent) { lossCtx = fitCanvas(lossC); drawLoss(ft.step); }
+  const pc = $("#packCanvas"); if (pc.offsetParent) pack.ctx = fitCanvas(pc);
+}
+window.addEventListener("resize", resize);
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!document.hidden) {
+    if ($("#distill").classList.contains("on") && dyn.ctx) dynStep(reduce ? 0 : dt);
+    if ($("#finetune").classList.contains("on") && ft.ctx) { ftDraw(reduce ? 0 : dt); packDraw(reduce ? 0 : dt); }
+  }
+  requestAnimationFrame(loop);
+}
+if (reduce) { ft.step = 789; dyn.running = false; }
+resize(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cricket Reasoning Distillation</title>
+<meta name="description" content="How 425,119 ball-by-ball T20I rows became a 500K-row verified reasoning dataset and a LoRA fine-tune of Qwen3.8-27B on 32 Vera Rubin GPUs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---------- Material Design 3 tokens (seed: cricket-field green) ---------- */
+:root{
+  color-scheme: light;
+  --md-primary:#2c6a46; --md-on-primary:#ffffff; --md-primary-container:#b0f1c3; --md-on-primary-container:#002110;
+  --md-secondary:#4f6354; --md-on-secondary:#fff; --md-secondary-container:#d2e8d5; --md-on-secondary-container:#0c1f13;
+  --md-tertiary:#3a646f; --md-on-tertiary:#fff; --md-tertiary-container:#bee9f6; --md-on-tertiary-container:#001f26;
+  --md-error:#ba1a1a; --md-error-container:#ffdad6; --md-on-error-container:#410002;
+  --md-surface:#f6fbf3; --md-on-surface:#181d19; --md-on-surface-variant:#414942;
+  --md-surface-c-lowest:#ffffff; --md-surface-c-low:#f0f5ed; --md-surface-c:#eaefe7; --md-surface-c-high:#e4eae2; --md-surface-c-highest:#dfe4dc;
+  --md-outline:#717971; --md-outline-variant:#c1c9c0; --md-inverse-surface:#2d322e; --md-inverse-on-surface:#eef2eb;
+  --good:#1a7f37; --bad:#c62828;
+  /* data series (validated categorical slots 1-3) */
+  --s-ft:#2a78d6; --s-base:#eb6834; --s-ref:#1baf7a;
+  --grid:#d8ddd6;
+  --shadow-1:0 1px 2px rgba(0,0,0,.18),0 1px 3px 1px rgba(0,0,0,.10);
+  --shadow-2:0 1px 2px rgba(0,0,0,.2),0 2px 6px 2px rgba(0,0,0,.12);
+  --r-xs:4px; --r-s:8px; --r-m:12px; --r-l:16px; --r-xl:28px;
+  --ease:cubic-bezier(.2,0,0,1); --ease-emph:cubic-bezier(.05,.7,.1,1);
+  --font:"Roboto Flex",Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Roboto Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --md-primary:#95d5a8; --md-on-primary:#00391e; --md-primary-container:#0f5130; --md-on-primary-container:#b0f1c3;
+    --md-secondary:#b6ccb9; --md-on-secondary:#213527; --md-secondary-container:#384b3d; --md-on-secondary-container:#d2e8d5;
+    --md-tertiary:#a2cdd9; --md-on-tertiary:#02363f; --md-tertiary-container:#214c57; --md-on-tertiary-container:#bee9f6;
+    --md-error:#ffb4ab; --md-error-container:#93000a; --md-on-error-container:#ffdad6;
+    --md-surface:#101511; --md-on-surface:#dfe4dc; --md-on-surface-variant:#c1c9c0;
+    --md-surface-c-lowest:#0b0f0c; --md-surface-c-low:#181d19; --md-surface-c:#1c211d; --md-surface-c-high:#262b27; --md-surface-c-highest:#313632;
+    --md-outline:#8b938a; --md-outline-variant:#414942; --md-inverse-surface:#dfe4dc; --md-inverse-on-surface:#2d322e;
+    --good:#6fdc8c; --bad:#ff8a80;
+    --s-ft:#3987e5; --s-base:#d95926; --s-ref:#199e70; --grid:#353b36;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --md-primary:#95d5a8; --md-on-primary:#00391e; --md-primary-container:#0f5130; --md-on-primary-container:#b0f1c3;
+  --md-secondary:#b6ccb9; --md-on-secondary:#213527; --md-secondary-container:#384b3d; --md-on-secondary-container:#d2e8d5;
+  --md-tertiary:#a2cdd9; --md-on-tertiary:#02363f; --md-tertiary-container:#214c57; --md-on-tertiary-container:#bee9f6;
+  --md-error:#ffb4ab; --md-error-container:#93000a; --md-on-error-container:#ffdad6;
+  --md-surface:#101511; --md-on-surface:#dfe4dc; --md-on-surface-variant:#c1c9c0;
+  --md-surface-c-lowest:#0b0f0c; --md-surface-c-low:#181d19; --md-surface-c:#1c211d; --md-surface-c-high:#262b27; --md-surface-c-highest:#313632;
+  --md-outline:#8b938a; --md-outline-variant:#414942; --md-inverse-surface:#dfe4dc; --md-inverse-on-surface:#2d322e;
+  --good:#6fdc8c; --bad:#ff8a80;
+  --s-ft:#3987e5; --s-base:#d95926; --s-ref:#199e70; --grid:#353b36;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--md-surface);color:var(--md-on-surface);font-family:var(--font);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--md-primary)}
+code,.mono{font-family:var(--mono);font-size:.88em}
+code{background:var(--md-surface-c-high);padding:1px 6px;border-radius:6px}
+h1,h2,h3,h4{margin:0;font-weight:500;letter-spacing:0}
+.display{font-size:clamp(30px,5vw,52px);line-height:1.08;font-weight:450;letter-spacing:-.5px}
+.headline{font-size:clamp(22px,3vw,30px);line-height:1.2;font-weight:450}
+.title-l{font-size:20px;font-weight:500}
+.title-m{font-size:16px;font-weight:550;letter-spacing:.1px}
+.label{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--md-on-surface-variant)}
+.muted{color:var(--md-on-surface-variant)}
+.small{font-size:13px}
+
+/* ---------- layout: top app bar + navigation rail / bar ---------- */
+.appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:10px 20px;background:var(--md-surface-c);border-bottom:1px solid var(--md-outline-variant)}
+.appbar .logo{width:36px;height:36px;border-radius:12px;background:var(--md-primary-container);display:grid;place-items:center;color:var(--md-on-primary-container);flex:none}
+.appbar h1{font-size:18px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar .sp{flex:1}
+.icon-btn{width:40px;height:40px;border-radius:20px;border:0;background:transparent;color:var(--md-on-surface-variant);display:grid;place-items:center;cursor:pointer;position:relative;overflow:hidden}
+.icon-btn:hover{background:color-mix(in srgb,var(--md-on-surface) 8%,transparent)}
+.shell{display:flex;min-height:calc(100vh - 57px)}
+.rail{position:sticky;top:57px;align-self:flex-start;height:calc(100vh - 57px);width:96px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 0;background:var(--md-surface)}
+.rail button{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;width:80px;padding:4px 0;font-size:12px;font-weight:550;color:var(--md-on-surface-variant);text-align:center}
+.rail .pill{width:56px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background .25s var(--ease)}
+.rail button:hover .pill{background:color-mix(in srgb,var(--md-on-surface) 8%,transparent)}
+.rail button[aria-current="page"]{color:var(--md-on-surface)}
+.rail button[aria-current="page"] .pill{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.rail button:focus-visible .pill{outline:2px solid var(--md-primary);outline-offset:2px}
+main{flex:1;min-width:0;padding:24px clamp(16px,3vw,40px) 120px}
+.page{display:none;max-width:1240px;margin:0 auto}
+.page.active{display:block;animation:pageIn .5s var(--ease-emph)}
+@keyframes pageIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.navbar{display:none}
+@media (max-width:860px){
+  .rail{display:none}
+  .navbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--md-surface-c);height:72px;justify-content:space-around;align-items:center;border-top:1px solid var(--md-outline-variant)}
+  .navbar button{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;font-weight:600;color:var(--md-on-surface-variant);min-width:44px}
+  .navbar .pill{width:48px;height:28px;border-radius:14px;display:grid;place-items:center}
+  .navbar button[aria-current="page"] .pill{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+  .navbar button[aria-current="page"]{color:var(--md-on-surface)}
+  main{padding-bottom:110px}
+  .appbar h1{font-size:16px}
+}
+
+/* ---------- components ---------- */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1000px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.g2,.g3,.g4{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--md-surface-c-low);border-radius:var(--r-l);padding:20px;min-width:0}
+.card.elev{background:var(--md-surface-c-lowest);box-shadow:var(--shadow-1)}
+.card.outlined{background:var(--md-surface);border:1px solid var(--md-outline-variant)}
+.card.filled{background:var(--md-surface-c-highest)}
+.card.primary{background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.card.tertiary{background:var(--md-tertiary-container);color:var(--md-on-tertiary-container)}
+.card h3{font-size:17px;font-weight:550;margin-bottom:6px}
+.section{margin-top:28px}
+.section > .head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.section > .head p{margin:4px 0 0;max-width:780px}
+.hero{border-radius:var(--r-xl);padding:clamp(22px,4vw,44px);background:linear-gradient(135deg,var(--md-primary-container),var(--md-tertiary-container));color:var(--md-on-primary-container);position:relative;overflow:hidden}
+.hero p{max-width:760px;font-size:16.5px}
+.hero .ball{position:absolute;right:-40px;top:-40px;width:220px;height:220px;opacity:.22}
+.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 20px;border-radius:20px;font-weight:600;font-size:14px;letter-spacing:.1px;transition:box-shadow .2s,background .2s;position:relative;overflow:hidden;user-select:none}
+.btn.filled{background:var(--md-primary);color:var(--md-on-primary)}
+.btn.filled:hover{box-shadow:var(--shadow-1)}
+.btn.tonal{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.btn.outlined{border:1px solid var(--md-outline);color:var(--md-primary)}
+.btn.text{color:var(--md-primary);padding:0 12px}
+.btn:focus-visible{outline:2px solid var(--md-primary);outline-offset:2px}
+.btn[disabled]{opacity:.38;pointer-events:none}
+.ripple{position:absolute;border-radius:50%;transform:scale(0);background:currentColor;opacity:.25;animation:rip .55s var(--ease);pointer-events:none}
+@keyframes rip{to{transform:scale(3.2);opacity:0}}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:8px;border:1px solid var(--md-outline-variant);font-size:13.5px;font-weight:550;color:var(--md-on-surface-variant);transition:background .2s}
+.chip[aria-pressed="true"]{background:var(--md-secondary-container);color:var(--md-on-secondary-container);border-color:transparent}
+.chip[aria-pressed="true"]::before{content:"✓";font-size:12px}
+.chip:focus-visible{outline:2px solid var(--md-primary)}
+.seg{display:inline-flex;border:1px solid var(--md-outline);border-radius:20px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;padding:0 16px;height:38px;display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;border-right:1px solid var(--md-outline);color:var(--md-on-surface)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.seg button[aria-pressed="true"]::before{content:"✓";font-size:12px}
+.seg button:focus-visible{outline:2px solid var(--md-primary);outline-offset:-2px}
+.kpi{display:flex;flex-direction:column;gap:2px}
+.kpi .v{font-size:clamp(26px,3.2vw,36px);font-weight:500;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .k{font-size:13px;color:var(--md-on-surface-variant)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--md-outline-variant);vertical-align:top}
+th{font-weight:600;color:var(--md-on-surface-variant);font-size:12.5px;letter-spacing:.3px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl-wrap{overflow-x:auto}
+.badge{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:11px;font-size:12px;font-weight:600;background:var(--md-tertiary-container);color:var(--md-on-tertiary-container)}
+.badge.ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.badge.no{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.slider{display:grid;grid-template-columns:120px 1fr 64px;align-items:center;gap:12px;margin:8px 0}
+.slider label{font-size:13.5px;font-weight:550}
+.slider output{font-family:var(--mono);text-align:right}
+input[type=range]{width:100%;accent-color:var(--md-primary);height:24px}
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:var(--r-m);background:var(--md-surface-c-high)}
+.callout .ic{flex:none;color:var(--md-primary)}
+.list{margin:6px 0 0;padding-left:20px}
+.list li{margin:3px 0}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--md-on-surface-variant);margin:6px 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.tooltip{position:fixed;z-index:50;pointer-events:none;background:var(--md-inverse-surface);color:var(--md-inverse-on-surface);padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.4;box-shadow:var(--shadow-2);opacity:0;transition:opacity .12s;max-width:300px}
+.tooltip b{font-weight:600}
+svg text{font-family:var(--font)}
+.axis text{fill:var(--md-on-surface-variant);font-size:11px}
+.axis line,.axis path{stroke:var(--grid)}
+.fade-up{opacity:0;transform:translateY(18px);transition:opacity .6s var(--ease-emph),transform .6s var(--ease-emph)}
+.fade-up.in{opacity:1;transform:none}
+.step-dots{display:flex;gap:6px;align-items:center}
+.step-dots i{width:8px;height:8px;border-radius:4px;background:var(--md-outline-variant);transition:all .3s}
+.step-dots i.on{background:var(--md-primary);width:22px}
+.code{position:relative;background:var(--md-surface-c-highest);border-radius:var(--r-m);padding:14px 16px;font-family:var(--mono);font-size:13px;white-space:pre;overflow-x:auto;line-height:1.6}
+.code .copy{position:absolute;top:6px;right:6px}
+.code .c{color:var(--md-on-surface-variant)}
+.next{display:flex;justify-content:flex-end;margin-top:32px}
+.snack{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(120px);background:var(--md-inverse-surface);color:var(--md-inverse-on-surface);padding:12px 18px;border-radius:6px;font-size:14px;z-index:60;transition:transform .3s var(--ease-emph)}
+.snack.show{transform:translateX(-50%) translateY(0)}
+@media (max-width:860px){.snack{bottom:88px}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ---------- pipeline (overview) ---------- */
+.pipe{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;position:relative}
+@media (max-width:1000px){.pipe{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.pipe{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stage{all:unset;box-sizing:border-box;cursor:pointer;border-radius:var(--r-l);padding:14px;background:var(--md-surface-c);border:2px solid transparent;transition:all .3s var(--ease);display:flex;flex-direction:column;gap:6px;min-height:118px;position:relative}
+.stage:hover{background:var(--md-surface-c-high)}
+.stage:focus-visible{outline:2px solid var(--md-primary)}
+.stage .n{width:28px;height:28px;border-radius:14px;display:grid;place-items:center;background:var(--md-surface-c-highest);font-weight:700;font-size:13px;transition:all .3s}
+.stage .t{font-weight:600;font-size:14.5px;line-height:1.25}
+.stage .s{font-size:12.5px;color:var(--md-on-surface-variant);line-height:1.35}
+.stage.on{border-color:var(--md-primary);background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.stage.on .s{color:inherit;opacity:.85}
+.stage.on .n{background:var(--md-primary);color:var(--md-on-primary)}
+.stage.done .n{background:var(--md-primary);color:var(--md-on-primary)}
+.stage .ph{position:absolute;top:10px;right:12px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;opacity:.7}
+.detail{margin-top:14px;border-radius:var(--r-l);padding:20px;background:var(--md-surface-c-lowest);box-shadow:var(--shadow-1);min-height:150px}
+.detail .row{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px}
+.detail .row div{min-width:120px}
+.detail .row b{display:block;font-size:20px;font-weight:550}
+.flowbar{height:6px;border-radius:3px;background:var(--md-surface-c-highest);overflow:hidden;margin:16px 0 4px}
+.flowbar i{display:block;height:100%;width:0;background:var(--md-primary);transition:width .6s var(--ease)}
+
+/* ---------- distillation sim ---------- */
+.cluster{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:700px){.cluster{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.node{border-radius:var(--r-m);background:var(--md-surface-c);padding:8px;border:1px solid var(--md-outline-variant)}
+.node .nm{font-size:11px;font-weight:600;color:var(--md-on-surface-variant);margin-bottom:6px;display:flex;justify-content:space-between}
+.gpus{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.gpu{height:46px;border-radius:8px;background:var(--md-surface-c-highest);position:relative;overflow:hidden;font-size:10px;font-family:var(--mono);padding:4px 6px;color:var(--md-on-surface-variant)}
+.gpu .fill{position:absolute;left:0;bottom:0;height:100%;width:0;background:color-mix(in srgb,var(--md-primary) 30%,transparent)}
+.gpu span{position:relative}
+.gpu.busy{box-shadow:inset 0 0 0 1.5px var(--md-primary)}
+.gpu .seqs{position:absolute;right:5px;bottom:4px;display:flex;gap:2px}
+.gpu .seqs i{width:5px;height:12px;border-radius:2px;background:var(--md-primary);opacity:.35;animation:pulse 1s infinite alternate}
+.gpu .seqs i:nth-child(2){animation-delay:.25s}.gpu .seqs i:nth-child(3){animation-delay:.5s}.gpu .seqs i:nth-child(4){animation-delay:.75s}
+@keyframes pulse{to{opacity:1;transform:scaleY(1.2)}}
+.counter-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+@media (max-width:700px){.counter-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cand{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:10px 12px;border-radius:var(--r-m);background:var(--md-surface-c);margin:6px 0;transition:all .35s var(--ease);border:2px solid transparent}
+.cand .bar{height:10px;border-radius:5px;background:var(--md-outline-variant);position:relative;overflow:hidden}
+.cand .bar i{position:absolute;inset:0 auto 0 0;background:var(--md-on-surface-variant);border-radius:5px;transition:width .8s var(--ease)}
+.cand.kept{border-color:var(--md-primary);background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.cand.kept .bar i{background:var(--md-primary)}
+.cand.dim{opacity:.4}
+.gates{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.gate{flex:1 1 150px;border-radius:var(--r-m);padding:12px;background:var(--md-surface-c);border-top:4px solid var(--md-outline-variant);transition:all .3s}
+.gate.on{border-top-color:var(--md-primary);background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.gate .k{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;opacity:.75}
+.gate .t{font-weight:600;margin:2px 0}
+.gate .s{font-size:12.5px;opacity:.85}
+
+/* ---------- fine-tune visuals ---------- */
+.layers{display:grid;grid-template-columns:repeat(32,1fr);gap:3px;margin:10px 0}
+.layers i{height:26px;border-radius:3px;background:var(--md-secondary-container);transition:transform .2s}
+.layers i.fa{background:var(--md-tertiary)}
+.layers i:hover{transform:scaleY(1.2)}
+@media (max-width:640px){.layers{grid-template-columns:repeat(16,1fr)}}
+.ddp{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:5px;margin:12px 0}
+@media (max-width:640px){.ddp{grid-template-columns:repeat(8,minmax(0,1fr))}}
+.dg{aspect-ratio:1;border-radius:6px;background:var(--md-surface-c-highest);position:relative;overflow:hidden;transition:background .3s}
+.dg::after{content:"";position:absolute;inset:auto 0 0 0;height:var(--h,0%);background:var(--phc,var(--md-primary));opacity:.75;transition:height .25s linear}
+.phase-row{display:flex;gap:8px;flex-wrap:wrap}
+.phase{flex:1 1 140px;padding:10px 12px;border-radius:var(--r-m);background:var(--md-surface-c);border-left:4px solid var(--md-outline-variant);transition:all .3s}
+.phase.on{background:var(--md-secondary-container);border-left-color:var(--md-primary)}
+.phase .t{font-weight:600;font-size:14px}
+.phase .s{font-size:12.5px;color:var(--md-on-surface-variant)}
+.lora{display:flex;align-items:center;justify-content:center;gap:clamp(6px,1.5vw,16px);flex-wrap:nowrap;margin:10px 0;min-height:130px}
+.mat{display:grid;place-items:center;border-radius:8px;font-weight:600;font-size:13px;text-align:center;transition:all .4s var(--ease)}
+.mat.w{width:120px;height:120px;background:repeating-linear-gradient(45deg,var(--md-surface-c-highest) 0 6px,var(--md-surface-c-high) 6px 12px);border:1px dashed var(--md-outline)}
+.mat.a{background:var(--md-primary);color:var(--md-on-primary)}
+.mat.b{background:var(--md-tertiary);color:var(--md-on-tertiary)}
+.op{font-size:26px;font-weight:300;color:var(--md-on-surface-variant)}
+.memstack{display:flex;height:40px;border-radius:8px;overflow:hidden;gap:2px;background:var(--md-surface)}
+.memstack div{height:100%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;transition:flex-grow .6s var(--ease)}
+.gantt{position:relative}
+.gantt .gr{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;margin:6px 0}
+.gantt .lane{position:relative;height:26px;background:var(--md-surface-c);border-radius:6px}
+.gantt .blk{position:absolute;top:3px;bottom:3px;border-radius:5px;background:var(--md-primary);transform-origin:left;animation:grow .9s var(--ease-emph) both}
+.gantt .blk.wait{background:repeating-linear-gradient(45deg,var(--md-outline-variant) 0 5px,transparent 5px 10px)}
+.gantt .blk.alt{background:var(--md-tertiary)}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media (max-width:640px){.gantt .gr{grid-template-columns:96px 1fr;font-size:12px}}
+
+/* ---------- results ---------- */
+.race{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:760px){.race{grid-template-columns:1fr}}
+.trace{border-radius:var(--r-l);background:var(--md-surface-c);padding:14px;display:flex;flex-direction:column;min-width:0}
+.trace .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.trace pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12.3px;line-height:1.55;height:300px;overflow:auto;background:var(--md-surface-c-lowest);border-radius:10px;padding:12px}
+.trace .tok{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.trace .pb{height:6px;border-radius:3px;background:var(--md-surface-c-highest);margin-top:8px;overflow:hidden}
+.trace .pb i{display:block;height:100%;width:0}
+.prompt{background:var(--md-surface-c-high);border-radius:var(--r-m);padding:12px 14px;font-size:14px;white-space:pre-wrap}
+.insight{display:flex;flex-direction:column;gap:8px}
+.insight .num{font-size:30px;font-weight:500;color:var(--md-primary)}
+.glossary dt{font-weight:600;margin-top:10px}
+.glossary dd{margin:2px 0 0;color:var(--md-on-surface-variant)}
+</style>
+</head>
+<body>
+<header class="appbar">
+  <div class="logo" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M5.5 6.5c3 2 3 9 0 11M18.5 6.5c-3 2-3 9 0 11" stroke-dasharray="1.6 1.6"/></svg>
+  </div>
+  <h1>Cricket Reasoning · 500K distillation &amp; 32-GPU fine-tune</h1>
+  <div class="sp"></div>
+  <button class="icon-btn" id="themeBtn" aria-label="Toggle light or dark theme" title="Toggle theme">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.4 5.4 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+  </button>
+</header>
+
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Sections"></nav>
+  <main id="main">
+
+<!-- =============================== OVERVIEW =============================== -->
+<section class="page" id="p-overview" aria-label="Overview">
+  <div class="hero">
+    <svg class="ball" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="currentColor"/><path d="M22 18c14 18 14 46 0 64M78 18C64 36 64 64 78 82" stroke="var(--md-surface)" stroke-width="3" fill="none" stroke-dasharray="4 4"/></svg>
+    <div class="label" style="color:inherit;opacity:.8">Hecate · NVIDIA Vera Rubin · October 2026</div>
+    <h2 class="display" style="margin:8px 0 12px">From 425,119 cricket deliveries to a faster-thinking 27B model</h2>
+    <p>We asked <b>Qwen3.8-27B</b> to reason through half a million cricket arithmetic questions, kept only answers we could
+      <b>prove correct</b>, and taught the model to reach those answers in fewer steps. The result is the same model, but it reasons in
+      <b>39% fewer tokens</b> and is slightly <b>more accurate</b>.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+      <button class="btn filled" id="playJourney"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Play the journey</button>
+      <button class="btn tonal" data-go="data">Start with the data</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="grid g4" id="kpis"></div>
+  </div>
+
+  <div class="section">
+    <div class="head"><div><h2 class="headline">The pipeline, end to end</h2>
+      <p class="muted">Eleven stages, each a SLURM batch job on Hecate. Select a stage to see what it does, or press <b>Play the journey</b>.</p></div>
+      <div class="step-dots" id="pipeDots" aria-hidden="true"></div></div>
+    <div class="pipe" id="pipe"></div>
+    <div class="flowbar"><i id="pipeBar"></i></div>
+    <div class="detail" id="pipeDetail" aria-live="polite"></div>
+  </div>
+
+  <div class="section grid g3">
+    <div class="card primary">
+      <div class="label" style="color:inherit">In plain words</div>
+      <h3 style="margin-top:6px">A student that learns from its own best work</h3>
+      <p class="small" style="margin:0">Imagine solving each homework question four times and keeping the shortest attempt that got the right answer.
+        Then study only those clean solutions. That is <b>self-distillation</b>. The teacher and the student are the same model. The checker is plain arithmetic computed from the real scorecard.</p>
+    </div>
+    <div class="card tertiary">
+      <div class="label" style="color:inherit">Why it is trustworthy</div>
+      <h3 style="margin-top:6px">Every training answer is verified</h3>
+      <p class="small" style="margin:0">Each question's answer (run rate, required rate, balls to 50…) is computed exactly from the ball-by-ball data.
+        A reasoning trace enters the dataset only if its final number matches. 2,002,672 traces were sampled, and the shortest correct one per question was kept.</p>
+    </div>
+    <div class="card filled">
+      <div class="label">What changed</div>
+      <h3 style="margin-top:6px">Shorter thinking, same or better answers</h3>
+      <p class="small" style="margin:0">On 600 held-out questions from 177 unseen matches: accuracy <b>97.29% → 97.88%</b>, mean reasoning
+        <b>748 → 458 tokens</b>, truncated answers <b>0.38% → 0%</b>. That is roughly 40% less inference compute per question.</p>
+    </div>
+  </div>
+  <div class="next"><button class="btn filled" data-go="data">Next: the source data →</button></div>
+</section>
+
+<!-- =============================== DATA =============================== -->
+<section class="page" id="p-data" aria-label="Source data">
+  <div class="section" style="margin-top:0">
+    <div class="label">Step 1 · Source</div>
+    <h2 class="headline" style="margin:4px 0 6px">Every delivery of every T20 International becomes a question</h2>
+    <p class="muted" style="max-width:820px;margin:0">The source is <a href="https://huggingface.co/datasets/Valarmathy/CricketData" target="_blank" rel="noopener">Valarmathy/CricketData</a>
+      (CC0): <b>425,119 rows</b>, one row per ball, with the score, wickets, batters, bowler and target at that moment. The job was to create
+      <b>at least one verified reasoning example per row</b>.</p>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card elev">
+      <div class="label">Try it · overs notation is the trap</div>
+      <h3 style="margin-top:6px">Build a match situation</h3>
+      <p class="small muted" style="margin-top:0">Cricket writes <code>14.3</code> overs to mean 14 overs and 3 balls (87 balls), <b>not</b> 14.3 decimal overs. Models that
+        miss this get the rate wrong. Move the sliders and the exact answers are recomputed the same way <code>cricket_qa.py</code> does.</p>
+      <div class="slider"><label for="sRuns">Runs</label><input type="range" id="sRuns" min="0" max="240" value="87"><output id="oRuns"></output></div>
+      <div class="slider"><label for="sOv">Overs completed</label><input type="range" id="sOv" min="0" max="19" value="11"><output id="oOv"></output></div>
+      <div class="slider"><label for="sBl">+ balls</label><input type="range" id="sBl" min="0" max="5" value="4"><output id="oBl"></output></div>
+      <div class="slider"><label for="sTg">Target (2nd inns)</label><input type="range" id="sTg" min="0" max="260" value="171"><output id="oTg"></output></div>
+      <div class="slider"><label for="sBr">Striker runs / balls</label><input type="range" id="sBr" min="1" max="49" value="31"><output id="oBr"></output></div>
+    </div>
+    <div class="card">
+      <div class="label">The questions this row produces</div>
+      <div id="qaOut" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card elev">
+      <h3>Six question types, chosen per row</h3>
+      <p class="small muted" style="margin-top:0">Some types are undefined for some rows (e.g. no target in the 1st innings, or a batter on 0). Each row gets the
+        <b>least-used type that is valid for it</b>. 74,881 training rows get a second type, giving exactly 500,000 rows.</p>
+      <div id="typeChart"></div>
+    </div>
+    <div class="card elev">
+      <h3>Split by match, never by row</h3>
+      <p class="small muted" style="margin-top:0">All questions from one match land in the same split, so the benchmark matches are truly unseen.</p>
+      <div id="splitChart"></div>
+      <div class="callout" style="margin-top:14px"><span class="ic">ⓘ</span><div class="small">
+        The fixed <b>600-question benchmark</b> (200 run_rate, 200 chase_rate, 200 milestone) lives entirely in the 177 test matches.
+        Part I and Part II used the same benchmark, so every model is compared on identical questions.</div></div>
+    </div>
+  </div>
+
+  <div class="section card outlined">
+    <h3>What the model actually sees</h3>
+    <p class="small muted" style="margin-top:0">A real benchmark prompt. Distractors such as batter scores and the bowler's name are included on purpose, because the model must decide what matters.</p>
+    <div class="prompt mono small" id="samplePrompt"></div>
+  </div>
+  <div class="next"><button class="btn filled" data-go="distill">Next: distillation with vLLM →</button></div>
+</section>
+
+<!-- =============================== DISTILL =============================== -->
+<section class="page" id="p-distill" aria-label="Distillation">
+  <div class="section" style="margin-top:0">
+    <div class="label">Step 2 · Distillation</div>
+    <h2 class="headline" style="margin:4px 0 6px">32 independent vLLM engines, 2 million reasoning traces, 1.9 hours</h2>
+    <p class="muted" style="max-width:860px;margin:0">The bf16 model (51 GB) fits easily on one Rubin GPU (279.5 GiB), so there is no need to split it.
+      Each GPU runs its <b>own vLLM engine</b> on its own shard of questions (data parallelism). There is no GPU-to-GPU traffic, scaling is linear, and a
+      job can be resubmitted with any node count because workers skip question ids that are already sampled.</p>
+  </div>
+
+  <div class="section card elev">
+    <div class="head" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center">
+      <div><h3 style="margin:0">Live simulation: job 697019 on 8 nodes × 4 GPUs</h3>
+        <div class="small muted">Shard id = node × 4 + GPU. Each engine pulls 256 questions per <code>generate()</code> call and samples 4 answers each (1,024 sequences in flight).</div></div>
+      <div style="display:flex;gap:8px"><button class="btn filled" id="simPlay">▶ Run</button><button class="btn outlined" id="simReset">Reset</button></div>
+    </div>
+    <div class="cluster" id="cluster" style="margin-top:14px"></div>
+    <div class="counter-row">
+      <div class="card"><div class="kpi"><span class="v" id="cQ">0</span><span class="k">questions done / 500,000</span></div></div>
+      <div class="card"><div class="kpi"><span class="v" id="cS">0</span><span class="k">samples (k = 4)</span></div></div>
+      <div class="card"><div class="kpi"><span class="v" id="cT">0</span><span class="k">tokens generated</span></div></div>
+      <div class="card"><div class="kpi"><span class="v" id="cTime">0:00</span><span class="k">simulated wall time</span></div></div>
+    </div>
+    <div class="small muted" style="margin-top:8px">Simulation speed: 1 s on screen ≈ 6 min of cluster time. Rates are from the real run: 8,238 tokens/s per GPU (±2% across all 32), ≈ 264,000 tokens/s total.</div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card elev">
+      <h3>Inside one vLLM engine</h3>
+      <div id="engineSvg"></div>
+      <ul class="list small">
+        <li><b>Continuous batching.</b> Finished sequences leave and new ones join every step, so the GPU never waits for the longest answer.</li>
+        <li><b>Prefix caching.</b> The system prompt and match context are shared by the 4 samples of a question and computed once.</li>
+        <li><b>Hybrid model.</b> Gated DeltaNet layers keep a fixed-size state, and only 16 full-attention layers grow a KV cache, so hundreds of sequences fit per GPU.</li>
+        <li><b>Resumable.</b> Results are appended after every call. A 100-minute deadline stops new work before the 2-hour job limit.</li>
+      </ul>
+    </div>
+    <div class="card elev">
+      <h3>Verify, then keep the shortest correct trace</h3>
+      <p class="small muted" style="margin-top:0">A real benchmark question with four candidate answers (illustrative lengths; 1,078 and 167 tokens are real correct outputs for it). Press <b>Verify &amp; select</b>.</p>
+      <div class="prompt small" id="candQ" style="margin-bottom:8px"></div>
+      <div id="cands"></div>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn filled" id="verifyBtn">Verify &amp; select</button><button class="btn text" id="verifyReset">Reset</button></div>
+      <p class="small muted" id="verifyMsg" style="min-height:22px"></p>
+    </div>
+  </div>
+
+  <div class="section card elev">
+    <div class="head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px">
+      <div><h3 style="margin:0">How the base model did on all 500,000 questions</h3>
+        <div class="small muted">2,002,672 samples before selection. After retries, every question had at least one correct answer.</div></div>
+      <div class="seg" id="qualSeg" role="group" aria-label="Metric"><button aria-pressed="true" data-m="acc">Correct per sample</button><button aria-pressed="false" data-m="tok">Tokens generated</button></div>
+    </div>
+    <div id="qualChart" style="margin-top:10px"></div>
+  </div>
+
+  <div class="section card elev">
+    <h3>Quality gates: nothing is published until every source row is covered</h3>
+    <p class="small muted" style="margin-top:0">Select a gate to see what happened at it.</p>
+    <div class="gates" id="gates"></div>
+    <div class="detail" id="gateDetail" style="min-height:110px"></div>
+  </div>
+
+  <div class="section grid g4" id="distillKpis"></div>
+
+  <div class="section card outlined">
+    <h3>Jobs and compute</h3>
+    <div class="tbl-wrap"><table id="jobTable"></table></div>
+  </div>
+  <div class="next"><button class="btn filled" data-go="train">Next: fine-tuning on 32 GPUs →</button></div>
+</section>
+
+<!-- =============================== TRAIN =============================== -->
+<section class="page" id="p-train" aria-label="Fine-tuning">
+  <div class="section" style="margin-top:0">
+    <div class="label">Step 3 · Fine-tuning</div>
+    <h2 class="headline" style="margin:4px 0 6px">One epoch over 457,689 traces with LoRA, DDP over 32 GPUs, in about 4 hours</h2>
+    <p class="muted" style="max-width:860px;margin:0">The 27B base weights stay frozen. Only small low-rank adapters (LoRA) are trained, which is <b>217.6 M parameters, 0.79% of the model</b>.
+      Every GPU holds a full model copy and processes its own 8 rows. After each backward pass only the adapter gradients are averaged across the 32 GPUs.</p>
+  </div>
+
+  <div class="section card elev">
+    <h3>The model: Qwen3.8-27B, a hybrid architecture</h3>
+    <p class="small muted" style="margin-top:0">64 decoder layers. Three of every four use <b>Gated DeltaNet</b> linear attention (fixed-size state), and every fourth uses <b>full attention</b>.
+      LoRA adapters attach to the attention, linear-attention and MLP projections of <b>every</b> layer. The vision tower is frozen.</p>
+    <div class="legend"><span><i style="background:var(--md-secondary-container)"></i>Gated DeltaNet layer (48)</span><span><i style="background:var(--md-tertiary)"></i>Full-attention layer (16)</span></div>
+    <div class="layers" id="layers" aria-label="64 layers"></div>
+    <div class="grid g2" style="margin-top:12px">
+      <div>
+        <div class="label">LoRA targets · select one</div>
+        <div class="chips" id="targetChips" style="margin-top:8px"></div>
+        <p class="small muted" id="targetDesc" style="margin-top:10px"></p>
+      </div>
+      <div>
+        <div class="label">How LoRA works · drag the rank</div>
+        <div class="lora" id="loraViz"></div>
+        <div class="slider" style="grid-template-columns:70px 1fr 50px"><label for="rank">rank r</label><input type="range" id="rank" min="0" max="6" value="5"><output id="rankOut"></output></div>
+        <p class="small" id="loraTxt" style="margin:4px 0 0"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section card elev">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div><h3 style="margin:0">One optimizer step across 32 GPUs (≈ 7.8 s)</h3>
+        <div class="small muted">8 nodes × 4 Rubin GPUs on batch-spx · 8 rows per GPU → global batch 256 · 1,788 steps per epoch · phase split is approximate, total 7.8 s measured</div></div>
+      <button class="btn filled" id="ddpPlay">▶ Animate a step</button>
+    </div>
+    <div class="ddp" id="ddp"></div>
+    <div class="phase-row" id="phases"></div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card elev">
+      <h3>Choosing the batch: benchmark on 1 node</h3>
+      <p class="small muted" style="margin-top:0">30 steps on 20,000 real rows for each variant. Length-grouped batches avoid padding waste.</p>
+      <div id="benchChart"></div>
+      <p class="small muted">Batch 16 fails because the output logits alone are 16 × 6,144 × 248,320 vocab × 4 B ≈ 98 GB, plus their gradient.</p>
+    </div>
+    <div class="card elev">
+      <h3>Memory on one GPU (279.5 GiB)</h3>
+      <p class="small muted" style="margin-top:0">Worst case: the longest length group (8 × 6,144 tokens). Hover a segment for details.</p>
+      <div class="memstack" id="mem"></div>
+      <div class="legend" id="memLegend"></div>
+      <h3 style="margin-top:18px">Network: why LoRA + DDP is cheap</h3>
+      <p class="small" style="margin:0">Per step each GPU averages 0.87 GB of adapter gradients (ring all-reduce ≈ 1.7 GB moved). Frozen weights are never sent
+        (<code>_ddp_params_and_buffers_to_ignore</code>), because every rank loads them from Lustre. The all-reduce runs over <b>multi-node NVLink</b>, and the RDMA NICs stayed idle.</p>
+    </div>
+  </div>
+
+  <div class="section card elev">
+    <div class="head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px">
+      <div><h3 style="margin:0">Training curve (real metrics, run sft-full-10070553)</h3>
+        <div class="small muted">Loss starts low because the targets are the model's own outputs. The held-out dev loss fell for the whole epoch.</div></div>
+      <div class="seg" id="lossSeg" role="group" aria-label="Series"><button aria-pressed="true" data-m="loss">Loss</button><button aria-pressed="false" data-m="lr">Learning rate</button><button aria-pressed="false" data-m="gn">Grad norm</button></div>
+    </div>
+    <div id="lossChart" style="margin-top:8px"></div>
+  </div>
+
+  <div class="section card elev">
+    <h3>How it actually ran (2026-10-07)</h3>
+    <p class="small muted" style="margin-top:0">Two allocations with checkpoint resume. Queue waits dominated wall time, while pure compute fits one 5-hour job.</p>
+    <div class="gantt" id="gantt"></div>
+    <div class="grid g4" style="margin-top:14px" id="trainKpis"></div>
+  </div>
+
+  <div class="section card outlined">
+    <h3>Configuration</h3>
+    <div class="tbl-wrap"><table id="cfgTable"></table></div>
+  </div>
+  <div class="next"><button class="btn filled" data-go="results">Next: results →</button></div>
+</section>
+
+<!-- =============================== RESULTS =============================== -->
+<section class="page" id="p-results" aria-label="Results">
+  <div class="section" style="margin-top:0">
+    <div class="label">Step 4 · Evaluation</div>
+    <h2 class="headline" style="margin:4px 0 6px">Same questions, same seeds: the fine-tuned model reaches the answer faster</h2>
+    <p class="muted" style="max-width:860px;margin:0">The adapter is merged into the base weights and served with vLLM. 600 benchmark questions × 4 samples each, identical sampling (temperature 1.0, top-p 0.95, top-k 20) for every model.</p>
+  </div>
+
+  <div class="section grid g4" id="resKpis"></div>
+
+  <div class="section card elev">
+    <div class="head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px">
+      <div><h3 style="margin:0">Base vs adapters by question type</h3><div class="small muted">Toggle the models and switch the metric.</div></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <div class="chips" id="modelChips"></div>
+        <div class="seg" id="resSeg" role="group" aria-label="Metric"><button aria-pressed="true" data-m="acc">Accuracy</button><button aria-pressed="false" data-m="tok">Mean tokens</button></div>
+      </div>
+    </div>
+    <div id="resChart" style="margin-top:10px"></div>
+    <details style="margin-top:8px"><summary class="small" style="cursor:pointer">Show as table</summary><div class="tbl-wrap"><table id="resTable"></table></div></details>
+  </div>
+
+  <div class="section card elev">
+    <h3>Watch them think: a reasoning race</h3>
+    <p class="small muted" style="margin-top:0">Real, correct outputs for the same held-out question. Both stream at the same tokens per second. Pick a question type and press Race.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <div class="seg" id="raceSeg" role="group" aria-label="Question type"></div>
+      <button class="btn filled" id="raceBtn">▶ Race</button>
+    </div>
+    <div class="prompt small" id="raceQ" style="margin-bottom:10px"></div>
+    <div class="race">
+      <div class="trace"><div class="hd"><b>Base Qwen3.8-27B</b><span class="tok" id="rbT">0 tok</span></div><pre id="rbP"></pre><div class="pb"><i id="rbB" style="background:var(--s-base)"></i></div></div>
+      <div class="trace"><div class="hd"><b>500K fine-tuned adapter</b><span class="tok" id="rfT">0 tok</span></div><pre id="rfP"></pre><div class="pb"><i id="rfB" style="background:var(--s-ft)"></i></div></div>
+    </div>
+    <p class="small muted" style="margin-top:8px">These examples were chosen to show the effect clearly: the longest correct base sample vs the shortest correct fine-tuned sample. Averages are in the charts.</p>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card elev">
+      <h3>Distribution of reasoning length</h3>
+      <p class="small muted" style="margin-top:0">All 2,400 samples per model, in 100-token bins. The long tail (1,000+ tokens) mostly disappears.</p>
+      <div class="legend"><span><i style="background:var(--s-base)"></i>Base</span><span><i style="background:var(--s-ft)"></i>500K adapter</span></div>
+      <div id="histChart"></div>
+    </div>
+    <div class="card elev">
+      <h3>Every question: base tokens vs fine-tuned tokens</h3>
+      <p class="small muted" style="margin-top:0">One dot per question (mean of 4 samples). Below the diagonal means shorter after fine-tuning.</p>
+      <div class="chips" id="scatChips"></div>
+      <div id="scatChart"></div>
+      <div class="small muted" id="scatNote"></div>
+    </div>
+  </div>
+  <div class="next"><button class="btn filled" data-go="insights">Next: insights →</button></div>
+</section>
+
+<!-- =============================== INSIGHTS =============================== -->
+<section class="page" id="p-insights" aria-label="Insights">
+  <div class="section" style="margin-top:0">
+    <div class="label">Step 5 · What we learned</div>
+    <h2 class="headline" style="margin:4px 0 6px">Insights and lessons from scaling up</h2>
+  </div>
+  <div class="section grid g3" id="insightCards"></div>
+  <div class="section card elev">
+    <h3>Part I vs Part II: what 100× more data bought</h3>
+    <div class="tbl-wrap"><table id="partTable"></table></div>
+  </div>
+  <div class="section card outlined">
+    <h3>Limitations to keep in mind</h3>
+    <ul class="list">
+      <li><b>Narrow task.</b> The model was trained only on numeric T20I match-state questions. Use the base model for anything else.</li>
+      <li><b>Self-distilled.</b> The adapter makes existing behaviour shorter and more consistent. It does not add knowledge the base model lacks.</li>
+      <li><b>Little headroom.</b> The base model already scores about 97%, so the +0.58-point accuracy gain is small (≈ 1.2 standard errors) but consistent.</li>
+      <li><b>Benchmark coverage.</b> The benchmark covers 3 of the 6 types. Projection, strike_rate and legal_balls were only checked during generation (97.9–100% base accuracy).</li>
+      <li><b>Source quirks.</b> Balls-faced counts include some wides, and the questions follow the source numbers.</li>
+    </ul>
+  </div>
+  <div class="next"><button class="btn filled" data-go="repro">Next: links &amp; reproduce →</button></div>
+</section>
+
+<!-- =============================== REPRO =============================== -->
+<section class="page" id="p-repro" aria-label="Links and reproduce">
+  <div class="section" style="margin-top:0">
+    <div class="label">Artifacts</div>
+    <h2 class="headline" style="margin:4px 0 6px">Published on Hugging Face (public)</h2>
+  </div>
+  <div class="section grid g2" id="links"></div>
+
+  <div class="section grid g2">
+    <div class="card elev">
+      <h3>Use the model</h3>
+      <div class="code" id="codeUse"></div>
+    </div>
+    <div class="card elev">
+      <h3>Re-run the whole pipeline on Hecate</h3>
+      <div class="code" id="codeRun"></div>
+    </div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card elev">
+      <h3>Software and hardware</h3>
+      <div class="tbl-wrap"><table id="swTable"></table></div>
+    </div>
+    <div class="card elev">
+      <h3>Glossary</h3>
+      <dl class="glossary small" id="glossary"></dl>
+    </div>
+  </div>
+  <p class="small muted" style="margin-top:24px">Full documentation: <code>cricket/README.md</code> (runbook), <code>ARCHITECTURE.md</code> (design &amp; diagrams), <code>DATASET.md</code> (source data), <code>MODEL.md</code> (model card).</p>
+</section>
+
+  </main>
+</div>
+<nav class="navbar" id="navbar" aria-label="Sections"></nav>
+<div class="tooltip" id="tip" role="tooltip"></div>
+<div class="snack" id="snack" role="status"></div>
+
+<script>window.CRICKET_RUN_DATA = {"train":[[1,0.3392,0.0,0.0968],[10,0.3213,0.3396,0.0798],[20,0.3193,0.717,0.0626],[30,0.3156,1.0943,0.05],[40,0.3185,1.4717,0.0391],[50,0.315,1.8491,0.0524],[60,0.3228,1.9999,0.046],[70,0.3174,1.9996,0.0454],[80,0.3212,1.9989,0.0654],[90,0.3208,1.9979,0.0428],[100,0.3187,1.9965,0.053],[110,0.3215,1.9949,0.0463],[120,0.319,1.9929,0.0539],[130,0.3217,1.9905,0.054],[140,0.3192,1.9879,0.0414],[150,0.3172,1.9849,0.0516],[160,0.3212,1.9816,0.0429],[170,0.3175,1.978,0.0444],[180,0.3211,1.9741,0.0504],[190,0.3225,1.9698,0.045],[200,0.319,1.9653,0.054],[210,0.3235,1.9604,0.0503],[220,0.3174,1.9552,0.0448],[230,0.3205,1.9496,0.0452],[240,0.3209,1.9438,0.0461],[250,0.3182,1.9377,0.0503],[260,0.3199,1.9312,0.0436],[270,0.3183,1.9245,0.0423],[280,0.3183,1.9174,0.0438],[290,0.3202,1.9101,0.0435],[300,0.3158,1.9024,0.0553],[310,0.3212,1.8945,0.0408],[320,0.3164,1.8862,0.039],[330,0.3176,1.8777,0.0451],[340,0.318,1.8689,0.0382],[350,0.3148,1.8598,0.0443],[360,0.3215,1.8504,0.0419],[370,0.3175,1.8407,0.0388],[380,0.3189,1.8308,0.0411],[390,0.3174,1.8206,0.039],[400,0.3173,1.8101,0.0448],[410,0.3203,1.7993,0.0376],[420,0.3154,1.7883,0.0388],[430,0.3177,1.7771,0.0422],[440,0.318,1.7655,0.0352],[450,0.3168,1.7538,0.0428],[460,0.3181,1.7417,0.0397],[470,0.3171,1.7295,0.0401],[480,0.3189,1.717,0.0413],[490,0.3188,1.7042,0.0386],[500,0.3155,1.6912,0.0494],[510,0.3196,1.6781,0.0377],[520,0.3175,1.6646,0.0399],[530,0.3195,1.651,0.0415],[540,0.3182,1.6371,0.0568],[550,0.3171,1.6231,0.0447],[560,0.3204,1.6088,0.0422],[570,0.3174,1.5944,0.0353],[580,0.321,1.5797,0.042],[590,0.318,1.5649,0.0358],[600,0.3173,1.5498,0.0438],[610,0.3175,1.5346,0.0362],[620,0.3152,1.5192,0.0418],[630,0.3174,1.5037,0.0443],[640,0.3182,1.4879,0.0365],[650,0.3155,1.472,0.0436],[660,0.3189,1.456,0.0395],[670,0.3166,1.4398,0.0367],[680,0.3194,1.4235,0.0383],[690,0.3171,1.407,0.033],[700,0.3128,1.3904,0.0384],[710,0.3156,1.3737,0.0361],[720,0.3172,1.3568,0.0356],[730,0.3154,1.3398,0.0398],[740,0.3168,1.3228,0.0329],[750,0.3164,1.3056,0.044],[760,0.3186,1.2883,0.0349],[770,0.3156,1.2709,0.0365],[780,0.3184,1.2534,0.0388],[790,0.3166,1.2359,0.0343],[800,0.3148,1.2182,0.0383],[810,0.3173,1.2005,0.0344],[820,0.3157,1.1828,0.0346],[830,0.3152,1.1649,0.0362],[840,0.3162,1.147,0.0316],[850,0.3142,1.1291,0.0424],[860,0.318,1.1111,0.0364],[870,0.3148,1.0931,0.0339],[880,0.3145,1.0751,0.0366],[890,0.3141,1.057,0.0325],[900,0.3128,1.0389,0.0382],[910,0.3183,1.0208,0.0349],[920,0.3156,1.0027,0.0336],[930,0.3142,0.9846,0.0361],[940,0.3137,0.9665,0.0291],[950,0.3134,0.9484,0.0413],[960,0.3168,0.9303,0.0348],[970,0.3146,0.9123,0.0336],[980,0.3179,0.8943,0.035],[990,0.3156,0.8763,0.0312],[1000,0.314,0.8583,0.0371],[1010,0.3151,0.8404,0.0319],[1020,0.3136,0.8226,0.0348],[1030,0.3149,0.8048,0.0351],[1040,0.3146,0.7871,0.0528],[1050,0.3123,0.7694,0.0372],[1060,0.3165,0.7518,0.032],[1070,0.3125,0.7343,0.0329],[1080,0.3164,0.7169,0.0471],[1090,0.3159,0.6996,0.0307],[1100,0.3116,0.6824,0.0369],[1110,0.3148,0.6653,0.0333],[1120,0.3144,0.6483,0.0352],[1130,0.3155,0.6314,0.0334],[1140,0.3131,0.6146,0.0289],[1150,0.3134,0.598,0.0365],[1160,0.3147,0.5814,0.0311],[1170,0.3131,0.5651,0.0293],[1180,0.313,0.5488,0.0329],[1190,0.3147,0.5328,0.0307],[1200,0.3108,0.5168,0.0362],[1210,0.3122,0.501,0.0317],[1220,0.3107,0.4854,0.0346],[1230,0.3131,0.47,0.0334],[1240,0.3114,0.4547,0.0298],[1250,0.3128,0.4396,0.0387],[1260,0.3133,0.4247,0.0343],[1270,0.3113,0.41,0.0295],[1280,0.3133,0.3955,0.032],[1290,0.3147,0.3812,0.0285],[1300,0.31,0.3671,0.036],[1310,0.315,0.3531,0.0303],[1320,0.3108,0.3394,0.0303],[1330,0.3117,0.326,0.0342],[1340,0.3121,0.3127,0.0285],[1350,0.312,0.2996,0.0356],[1360,0.3126,0.2868,0.032],[1370,0.3128,0.2743,0.0314],[1380,0.3132,0.2619,0.032],[1390,0.3132,0.2498,0.0302],[1400,0.3087,0.238,0.0361],[1410,0.3163,0.2264,0.0312],[1420,0.3108,0.215,0.0301],[1430,0.311,0.2039,0.0768],[1440,0.3159,0.1931,0.0309],[1450,0.3105,0.1826,0.0338],[1460,0.3147,0.1723,0.0312],[1470,0.3105,0.1622,0.0304],[1480,0.3094,0.1525,0.0334],[1490,0.31,0.143,0.0291],[1500,0.3078,0.1338,0.0331],[1510,0.312,0.1249,0.0306],[1520,0.3081,0.1163,0.0294],[1530,0.3126,0.108,0.0332],[1540,0.3099,0.0999,0.0302],[1550,0.3073,0.0922,0.034],[1560,0.3126,0.0847,0.0325],[1570,0.3118,0.0776,0.0601],[1580,0.3121,0.0708,0.0335],[1590,0.3109,0.0642,0.0309],[1600,0.309,0.058,0.0383],[1610,0.3115,0.0521,0.029],[1620,0.3101,0.0465,0.0331],[1630,0.3126,0.0412,0.0341],[1640,0.3115,0.0362,0.0317],[1650,0.313,0.0315,0.0319],[1660,0.3117,0.0272,0.0318],[1670,0.3093,0.0231,0.0304],[1680,0.3102,0.0194,0.0342],[1690,0.31,0.016,0.0281],[1700,0.309,0.013,0.0358],[1710,0.3143,0.0102,0.0305],[1720,0.3079,0.0078,0.0338],[1730,0.3124,0.0057,0.0336],[1740,0.3117,0.0039,0.0293],[1750,0.3083,0.0025,0.0345],[1760,0.3124,0.0014,0.0316],[1770,0.3112,0.0006,0.0302],[1780,0.3139,0.0001,0.0326]],"dev":[[100,0.3259],[200,0.3253],[300,0.3256],[400,0.3252],[500,0.3246],[600,0.3242],[700,0.3233],[800,0.3227],[900,0.3217],[1000,0.3211],[1100,0.3204],[1200,0.3198],[1300,0.3192],[1400,0.3187],[1500,0.3183],[1600,0.318],[1700,0.3178],[1788,0.3178]],"hist":{"base":[1,40,219,369,347,348,236,196,124,84,82,58,49,27,26,28,22,10,17,10,9,11,5,4,12,7,5,4,6,4,40],"ft":[4,166,481,524,459,338,168,89,53,42,22,11,8,6,4,5,5,1,1,1,0,0,1,0,1,1,1,0,1,1,6]},"pts":[["r",434,233,4,4],["c",930,555,4,4],["m",579,547,4,4],["r",349,328,4,4],["c",622,643,4,4],["m",603,410,4,4],["r",353,203,2,4],["c",950,408,3,4],["m",778,435,4,4],["r",386,288,4,4],["c",737,436,4,4],["m",1546,552,4,4],["r",464,291,4,4],["c",642,352,3,4],["m",1312,549,4,4],["r",346,302,4,4],["c",1608,699,4,4],["m",1050,781,4,4],["r",333,195,4,4],["c",566,325,4,4],["m",905,456,4,4],["r",544,316,4,3],["c",1094,878,4,4],["m",1394,726,4,4],["r",364,270,4,4],["c",831,518,4,4],["m",1802,743,4,4],["r",383,276,4,4],["c",877,450,4,3],["m",613,511,4,4],["r",265,190,4,4],["c",595,594,4,4],["m",495,380,4,4],["r",504,284,4,4],["c",789,494,4,4],["m",637,466,4,4],["r",426,360,4,4],["c",1344,574,4,4],["m",1914,528,4,4],["r",357,288,4,4],["c",593,455,4,4],["m",653,662,4,4],["r",248,296,4,3],["c",675,403,4,4],["m",597,505,4,4],["r",502,274,4,4],["c",1540,1014,4,4],["m",696,528,4,4],["r",278,234,4,4],["c",666,613,4,4],["m",773,435,4,4],["r",546,324,4,4],["c",1340,624,4,2],["m",559,499,4,4],["r",482,189,4,4],["c",528,456,4,4],["m",928,466,4,4],["r",559,272,4,4],["c",1030,598,3,3],["m",1668,642,4,4],["r",424,320,4,4],["c",1012,580,4,4],["m",594,435,4,4],["r",376,256,4,4],["c",1008,562,3,4],["m",494,383,4,4],["r",243,168,4,4],["c",626,333,4,4],["m",500,384,4,4],["r",404,269,4,4],["c",1461,658,3,4],["m",2251,1552,4,4],["r",324,242,4,4],["c",862,474,4,4],["m",689,1457,4,4],["r",609,373,3,4],["c",611,646,4,4],["m",1150,491,4,4],["r",386,290,4,4],["c",892,546,3,4],["m",738,575,4,4],["r",320,227,4,4],["c",820,626,3,4],["m",770,478,4,4],["r",346,260,4,4],["c",786,660,4,3],["m",540,429,4,4],["r",376,304,4,4],["c",1455,1074,4,4],["m",1593,642,4,4],["r",481,323,4,4],["c",1166,968,4,3],["m",1996,1026,4,4],["r",276,185,4,4],["c",518,416,4,4],["m",655,584,4,4],["r",450,261,4,4],["c",804,380,4,3],["m",592,447,4,4],["r",420,324,4,4],["c",1177,655,4,4],["m",1317,585,4,4],["r",431,347,4,4],["c",798,652,3,3],["m",715,538,4,4],["r",1026,265,4,4],["c",549,471,4,4],["m",959,422,4,4],["r",581,341,4,4],["c",883,917,4,4],["m",750,513,4,4],["r",445,289,4,4],["c",1085,1307,3,4],["m",634,562,4,4],["r",584,284,4,4],["c",1968,760,4,4],["m",1567,418,4,4],["r",399,239,4,4],["c",598,483,4,4],["m",613,397,4,4],["r",377,317,4,4],["c",964,636,3,4],["m",627,457,4,4],["r",482,326,4,4],["c",531,456,4,4],["m",553,463,4,4],["r",408,289,4,4],["c",1538,614,3,4],["m",739,464,4,4],["r",384,301,4,4],["c",1554,887,4,4],["m",869,404,4,4],["r",426,309,4,4],["c",758,635,3,3],["m",628,472,4,4],["r",460,229,2,4],["c",703,440,3,4],["m",524,398,4,4],["r",302,178,4,4],["c",986,560,4,4],["m",420,459,4,4],["r",297,196,4,4],["c",416,314,4,4],["m",424,369,4,4],["r",330,242,4,4],["c",747,1126,4,4],["m",2298,600,4,4],["r",377,262,4,4],["c",804,416,3,4],["m",664,424,4,4],["r",474,266,4,4],["c",804,711,4,4],["m",3969,713,3,4],["r",293,176,4,4],["c",522,302,4,4],["m",622,555,4,4],["r",430,284,4,4],["c",808,766,4,4],["m",1041,420,4,4],["r",375,315,4,4],["c",978,604,4,4],["m",1556,516,4,4],["r",257,249,3,4],["c",538,444,4,4],["m",1093,508,4,4],["r",236,182,4,4],["c",1674,469,4,4],["m",493,320,4,4],["r",533,339,4,4],["c",1534,878,4,4],["m",786,578,4,4],["r",422,318,4,4],["c",1790,704,4,3],["m",492,457,4,4],["r",445,308,3,4],["c",1240,624,4,4],["m",840,391,4,4],["r",531,291,4,4],["c",1009,591,4,4],["m",470,388,4,4],["r",428,336,4,4],["c",1266,591,4,2],["m",672,412,4,4],["r",344,287,4,4],["c",807,431,4,4],["m",597,373,4,4],["r",236,173,4,4],["c",423,450,4,4],["m",477,310,4,4],["r",339,262,4,4],["c",963,815,4,4],["m",582,518,4,4],["r",459,312,4,4],["c",1206,522,4,4],["m",490,388,4,4],["r",358,258,4,4],["c",1458,816,4,4],["m",2037,1266,4,4],["r",338,208,4,4],["c",794,609,4,4],["m",534,451,4,4],["r",419,330,4,4],["c",1341,779,4,4],["m",638,402,4,4],["r",218,175,4,4],["c",449,376,4,4],["m",514,321,4,4],["r",338,301,4,4],["c",674,454,4,4],["m",798,503,4,4],["r",424,213,4,4],["c",1095,461,4,4],["m",581,539,4,4],["r",201,164,4,4],["c",931,532,4,4],["m",1221,526,4,4],["r",227,172,4,4],["c",397,302,4,4],["m",1441,479,4,4],["r",326,251,4,4],["c",920,634,4,4],["m",1169,463,4,4],["r",320,255,4,4],["c",840,546,4,4],["m",897,494,4,4],["r",238,151,4,4],["c",351,267,4,4],["m",504,506,4,4],["r",458,356,3,4],["c",790,549,4,4],["m",560,442,4,4],["r",310,221,4,4],["c",805,612,4,4],["m",565,498,4,4],["r",328,280,4,4],["c",906,569,4,4],["m",798,482,4,4],["r",490,316,4,4],["c",616,476,3,4],["m",660,524,4,4],["r",274,172,4,4],["c",1214,394,4,4],["m",510,398,4,4],["r",321,215,4,4],["c",1083,605,4,4],["m",1434,409,4,4],["r",288,276,4,4],["c",673,502,4,4],["m",2024,812,4,4],["r",442,285,4,4],["c",858,619,4,4],["m",638,523,4,4],["r",421,356,4,4],["c",843,586,3,3],["m",608,431,4,4],["r",240,255,4,4],["c",1416,698,3,4],["m",790,647,4,4],["r",315,260,4,4],["c",700,586,4,3],["m",602,458,4,4],["r",316,303,4,4],["c",776,496,4,4],["m",550,386,4,4],["r",614,262,4,3],["c",1117,645,4,3],["m",604,608,4,4],["r",313,219,4,4],["c",1067,606,4,4],["m",452,515,4,4],["r",388,181,4,4],["c",486,338,4,4],["m",509,501,4,4],["r",248,184,4,4],["c",728,376,4,4],["m",554,378,4,4],["r",415,316,4,4],["c",641,491,4,4],["m",465,494,4,4],["r",339,182,4,4],["c",595,300,4,4],["m",1392,609,4,4],["r",1667,259,4,4],["c",874,433,4,2],["m",2239,1038,4,4],["r",398,229,4,4],["c",1981,440,4,4],["m",576,358,4,4],["r",255,175,4,4],["c",635,444,4,4],["m",636,405,4,4],["r",443,289,4,4],["c",1119,627,4,4],["m",610,423,4,4],["r",424,298,4,4],["c",1554,872,4,3],["m",1676,404,4,4],["r",362,180,4,4],["c",527,429,4,4],["m",492,394,4,4],["r",383,268,4,4],["c",893,419,3,3],["m",518,444,4,4],["r",336,237,4,4],["c",781,492,4,4],["m",551,350,4,4],["r",505,174,4,4],["c",960,325,4,4],["m",698,588,4,4],["r",291,164,4,4],["c",438,340,4,4],["m",530,423,4,4],["r",417,336,4,4],["c",1047,729,4,4],["m",2124,391,4,4],["r",499,283,4,4],["c",667,558,4,4],["m",628,382,4,4],["r",378,296,4,4],["c",761,585,4,4],["m",975,502,4,4],["r",504,269,4,4],["c",714,467,4,3],["m",772,462,4,4],["r",358,278,4,4],["c",1160,564,4,3],["m",646,437,4,4],["r",307,286,3,4],["c",1070,783,3,4],["m",1430,390,4,4],["r",293,232,4,4],["c",1225,648,4,3],["m",519,363,4,4],["r",310,241,4,4],["c",773,548,4,4],["m",587,525,4,4],["r",220,165,4,4],["c",448,316,4,4],["m",420,352,4,4],["r",694,314,4,4],["c",1035,748,4,3],["m",1844,712,4,4],["r",359,310,4,4],["c",1277,623,4,4],["m",712,428,4,4],["r",334,262,4,4],["c",791,620,4,3],["m",645,514,3,4],["r",412,373,4,4],["c",822,677,2,3],["m",655,434,4,4],["r",278,224,4,4],["c",927,500,4,4],["m",656,464,4,4],["r",481,230,4,4],["c",1956,535,3,4],["m",868,454,4,4],["r",412,366,4,4],["c",666,472,2,3],["m",2449,566,3,4],["r",425,302,4,4],["c",640,692,4,4],["m",1259,560,4,4],["r",414,305,4,4],["c",1545,566,4,4],["m",955,455,4,4],["r",375,336,4,4],["c",941,619,4,4],["m",606,476,4,4],["r",344,269,4,4],["c",812,546,3,3],["m",478,332,4,4],["r",457,208,4,4],["c",756,1042,4,4],["m",482,430,4,4],["r",511,291,4,3],["c",1119,785,3,4],["m",567,487,4,4],["r",348,257,4,4],["c",593,402,4,4],["m",984,480,4,4],["r",377,324,4,4],["c",676,502,4,2],["m",502,371,4,4],["r",390,269,4,4],["c",839,572,4,4],["m",571,436,4,4],["r",297,296,4,4],["c",645,574,4,4],["m",610,557,4,4],["r",302,217,4,4],["c",501,488,4,4],["m",517,602,4,4],["r",317,290,4,3],["c",695,554,4,4],["m",687,637,4,4],["r",284,271,4,4],["c",941,707,3,4],["m",805,384,4,4],["r",413,310,4,4],["c",715,515,4,4],["m",654,470,4,4],["r",329,288,4,4],["c",1154,708,4,4],["m",930,560,4,4],["r",298,194,4,4],["c",883,412,4,4],["m",1108,457,4,4],["r",278,278,4,4],["c",1028,596,4,4],["m",668,432,4,4],["r",1796,238,3,4],["c",2355,642,4,4],["m",780,388,4,4],["r",370,316,4,4],["c",549,604,4,4],["m",398,665,4,4],["r",344,245,4,4],["c",530,535,4,3],["m",1279,600,4,4],["r",465,356,4,4],["c",914,698,4,4],["m",1166,544,4,4],["r",362,325,3,4],["c",1104,535,4,4],["m",1096,512,4,4],["r",287,166,4,4],["c",1166,448,4,4],["m",477,447,4,4],["r",402,216,3,2],["c",1127,819,3,3],["m",1600,739,4,4],["r",369,299,4,4],["c",1020,794,4,4],["m",825,503,4,4],["r",495,322,4,4],["c",1034,890,2,3],["m",462,402,4,4],["r",559,312,4,4],["c",804,528,2,3],["m",1540,1174,4,4],["r",378,246,4,4],["c",1036,419,4,4],["m",564,472,4,4],["r",312,316,4,4],["c",1500,785,3,3],["m",1234,563,4,4],["r",439,299,4,4],["c",1082,601,4,4],["m",954,497,4,4],["r",370,244,4,4],["c",1058,506,4,4],["m",639,330,4,4],["r",252,212,4,4],["c",556,428,4,4],["m",481,442,4,4],["r",253,224,4,4],["c",806,446,4,4],["m",1107,468,4,4],["r",465,327,4,4],["c",1378,599,4,3],["m",569,414,4,4],["r",342,284,4,4],["c",807,668,4,4],["m",714,404,4,4],["r",421,265,4,4],["c",731,579,4,4],["m",594,351,4,4],["r",392,282,4,4],["c",724,573,3,4],["m",712,389,4,4],["r",262,196,4,4],["c",508,417,4,4],["m",596,438,4,4],["r",237,191,4,4],["c",794,574,4,4],["m",623,360,4,4],["r",464,299,4,4],["c",906,624,4,3],["m",4212,1004,2,4],["r",737,268,4,4],["c",932,453,3,3],["m",775,497,4,4],["r",406,297,4,4],["c",1150,722,4,4],["m",600,765,4,4],["r",394,288,4,4],["c",605,560,3,4],["m",2329,1435,3,4],["r",315,230,4,4],["c",2165,590,3,4],["m",1167,366,4,4],["r",253,150,4,4],["c",565,391,4,4],["m",618,384,4,4],["r",512,346,4,4],["c",900,802,3,3],["m",976,763,4,4],["r",344,230,4,4],["c",613,370,4,4],["m",2050,1656,4,4],["r",316,262,4,4],["c",818,594,4,4],["m",528,494,4,4],["r",362,212,4,4],["c",1051,415,4,4],["m",678,564,4,4],["r",323,259,4,4],["c",1093,528,4,4],["m",704,511,4,4],["r",367,284,3,4],["c",738,661,2,4],["m",1043,440,4,4],["r",352,220,4,4],["c",580,440,4,4],["m",824,422,4,4],["r",237,262,4,4],["c",750,538,4,3],["m",801,471,4,4],["r",380,247,4,4],["c",831,422,4,4],["m",1276,522,4,4],["r",412,282,4,4],["c",740,507,4,4],["m",593,352,4,4],["r",270,232,4,4],["c",1075,455,4,4],["m",719,485,4,4],["r",371,279,4,4],["c",931,616,4,4],["m",930,421,4,4],["r",330,190,4,4],["c",957,486,4,4],["m",608,485,4,4],["r",421,345,4,4],["c",745,600,4,4],["m",1931,552,4,4],["r",371,289,4,4],["c",846,725,4,4],["m",657,545,4,4],["r",616,410,4,4],["c",849,643,1,3],["m",825,550,4,4],["r",1042,261,4,4],["c",1512,1232,4,4],["m",1277,400,4,4],["r",374,275,4,4],["c",1862,834,4,4],["m",864,743,4,4],["r",688,237,4,4],["c",937,1564,4,3],["m",1012,626,4,4],["r",298,232,4,4],["c",640,648,4,4],["m",658,622,4,4],["r",451,318,4,4],["c",718,476,4,4],["m",674,354,4,4],["r",215,151,4,4],["c",651,293,4,4],["m",593,396,4,4],["r",436,322,4,4],["c",1380,652,4,3],["m",554,404,4,4],["r",374,230,4,4],["c",1062,953,3,4],["m",689,399,4,4],["r",545,358,4,4],["c",820,776,3,4],["m",2875,1266,3,4],["r",312,198,4,4],["c",465,367,4,4],["m",848,554,4,4],["r",244,104,4,4],["c",456,267,4,4],["m",560,378,4,4],["r",354,270,4,4],["c",711,452,4,4],["m",684,511,4,4],["r",443,368,4,4],["c",2306,590,4,4],["m",830,454,4,4],["r",427,340,4,3],["c",964,662,4,4],["m",886,482,4,4],["r",374,358,4,4],["c",964,756,4,3],["m",605,410,4,4],["r",432,252,4,4],["c",1007,572,4,4],["m",568,514,4,4],["r",522,319,4,4],["c",1428,706,4,4],["m",924,443,4,4],["r",365,268,4,4],["c",776,574,4,4],["m",626,457,4,4],["r",418,264,4,4],["c",1917,609,4,4],["m",420,351,4,4]],"examples":[{"qtype":"run_rate","prompt":"T20 International: West Indies v Australia at Darren Sammy National Cricket Stadium, 2021-07-16.\nWest Indies are batting first. After 2.3 overs (cricket notation: overs.balls) they are 25/0. E Lewis is on 19 off 7 balls and ADS Fletcher is on 4 off 9. JP Behrendorff bowled the last delivery.\n\nWhat is West Indies's current run rate in runs per over? Round to 2 decimal places.","gold":10.0,"base":"We need answer user: cricket T20, West Indies batting first. After 2.3 overs (cricket notation: overs.balls) they are 25/0. E Lewis 19 off 7, Fletcher 4 off 9. JP Behrendorff bowled last delivery. What is West Indies current run rate in runs per over? Round to 2 decimals.\n\nNeed parse cricket notation: overs.balls, 2.3 means 2 overs and 3 balls. That's 2*6+3 = 15 balls. Total runs 25. Run rate = runs / overs (where overs in decimal? Usually run rate runs per over = total runs / total overs completed including partial over as fraction). So 25 / (2 + 3/6) = 25 / 2.5 = 10.00. Need final answer 10.00 maybe.\n\nBut check maybe trick: T20 current run rate after 2.3 overs 25/0: 10.00. They mention batsman balls maybe to validate? Let's verify: E Lewis 19 off 7, Fletcher 4 off 9, total balls faced 16, but overs bowled 15? Wait inconsistency? In cricket, if 2.3 overs bowled, 15 deliveries. Batsmen faced 7+9 = 16 balls. How? Because non-striker could face a ball? Actually each delivery is faced by striker only, except byes/leg byes? Balls faced includes legal balls struck, plus? If 25/0 no wickets, 15 deliveries. Sum balls faced 16 impossible unless one ball faced by both? Not possible. Maybe because over count includes last ball? JP Behrendorff bowled the last delivery. Let's analyze maybe the \"current run rate\" might require considering current over balls? 2.3 overs, 25 runs. Run rate 25 / 2.5 = 10.0. Why include batsmen balls and bowler? Could be red herring or maybe they expect use balls faced to compute overs? Let's inspect.\n\nQuestion: \"T20 International: West Indies v Australia at Darren Sammy National Cricket Stadium, 2021-07-16.\nWest Indies are batting first. After 2.3 overs (cricket notation: overs.balls) they are 25/0. E Lewis is on 19 off 7 balls and ADS Fletcher is on 4 off 9. JP Behrendorff bowled the last delivery.\n\nWhat is West Indies's current run rate in runs per over? Round to 2 decimal places.\"\n\nLikely from cricket data context; ask current run rate. Given score after 2.3 overs 25/0. Run rate = 25 / 2.5 = 10.00.\n\nBut maybe need use \"current\" run rate in runs per over at that point, not required. They might ask with balls faced because the over notation 2.3 means 2 overs 3 balls = 15 balls; current run rate = 25/(2.3?) Some might erroneously do 25/2.3=10.87. Need know cricket notation. They explicitly say overs.balls. So 2.3 is 2 overs and 3 balls, not decimal 2.3. Therefore 25 / 2.5. Need final as number. Could include brief step-by-step? User asks final answer format. System: cricket analyst, work through step by step, then final answer on its own line. So final answer line.\n\nNeed be careful: \"current run rate in runs per over\" could be defined as runs divided by overs bowled. If 2.3 overs = 2 overs + 3 balls = 15 balls. 15/6 = 2.5 overs. 25/2.5 = 10. Rounded 2 decimals = 10.00.\n\nCheck real match? West Indies v Australia at Darren Sammy, 2021-07-16? Let's recall? T20I? On 2021-07-16 maybe Australia tour? Darren Sammy stadium Bridgetown. West Indies vs Australia 3rd T20I? Date 16 July 2021? West Indies batted first 25/0 after 2.3? Lewis 19, Fletcher 4? Yes maybe. Run rate 10.0. The extra info may be for ball-by-ball? But question only run rate.\n\nNeed final with exact line.\n<\/think>\n\nThe score is 25 runs after 2 overs and 3 balls, which is 2.5 overs.\n\nCurrent run rate = 25 ÷ 2.5 = 10.00 runs per over.\n\nFinal answer: 10.00","base_tokens":1078,"ft":"We need answer cricket run rate. Need compute runs per over after 2.3 overs = 2 overs and 3 balls = 2 + 3/6 = 2.5 overs. Runs 25. Run rate = 25 / 2.5 = 10.00. Need final answer line 'Final answer: <number>' likely 10.00. Need maybe explain step by step. Ensure rounding 2 decimal places. Final answer: 10.00.\n<\/think>\n\n2.3 overs = 2 + 3/6 = 2.5 overs.\n\nRun rate = 25 runs ÷ 2.5 overs = 10.00 runs per over.\n\nFinal answer: 10.00","ft_tokens":167},{"qtype":"chase_rate","prompt":"T20 International: Netherlands v Ireland at Dubai International Cricket Stadium, 2012-03-23.\nNetherlands are batting first. After 15.0 overs (cricket notation: overs.balls) they are 87/3. W Barresi is on 3 off 10 balls and AN Kervezee is on 47 off 38. KJ O'Brien bowled the last delivery.\n\nNetherlands finished their 20 overs on 114. At what run rate (runs per over) did they score over the rest of their innings from this point? Round to 2 decimal places.","gold":5.4,"base":"We need answer cricket math. Need analyze.\n\nUser: T20 Netherlands v Ireland, 2012-03-23. Netherlands batting first. After 15.0 overs they are 87/3. W Barresi 3 off 10, AN Kervezee 47 off 38. KJ O'Brien bowled last delivery.\n\nNetherlands finished 20 overs on 114. At what run rate (runs per over) did they score over the rest of their innings from this point? Round to 2 decimal places.\n\nWe need compute run rate over rest of innings from point after 15.0 overs? They are 87 at 15.0. Finished 114 at 20.0. Runs scored in rest = 114-87=27. Overs remaining = 20 - 15.0 = 5.0 overs = 30 balls. Run rate = 27/5 = 5.4 runs per over. Round 5.40.\n\nBut check if \"after 15.0 overs (cricket notation: overs.balls) they are 87/3. ... KJ O'Brien bowled the last delivery.\" Last delivery at 15.0? In cricket notation overs.balls: 15.0 means 15 overs completed, 0 balls into 16th? Yes 15.0 = 15 overs exactly. So remaining 5 overs. If finished on 114, maybe all 20 overs? They finished their 20 overs on 114 (not all out? 3? probably 114 all out? irrelevant). So RR = 5.40.\n\nNeed final answer on own line 'Final answer: <number>'. Could include step-by-step. Need ensure number only? final line with number. Maybe 5.40.\n\nDouble-check: \"over the rest of their innings from this point\" after 15.0 overs. 27 runs in 5 overs. 27/5=5.4. Round 2 decimals 5.40. If they consider 15.0 as 15 overs and 0 balls? yes. If 15.0 could be 15 overs 0 balls = 90 balls. Finished 20.0 = 120 balls. 30 balls = 5 overs.\n\nAny nuance: W Barresi on 3 off 10, AN Kervezee on 47 off 38. KJ O'Brien bowled last delivery. Could be to calculate if last over incomplete? 15.0 overs is exact, no. Maybe after 15.0 overs means 15 overs completed? In cricket score, 15.0 = 15 overs and 0 balls. If \"KJ O'Brien bowled the last delivery\" maybe last ball of 15th over? He might have bowled 15.0? If last delivery was at 15.0, exactly end of 15th over. Yes.\n\nNeed provide final answer. Final: 5.40.\n<\/think>\n\nFrom 87/3 at 15.0 overs to 114 at 20.0 overs, the Netherlands scored:\n\n114 − 87 = 27 runs in the remaining 5.0 overs.\n\nRun rate = 27 ÷ 5 = 5.40 runs per over.\n\nFinal answer: 5.40","base_tokens":781,"ft":"We need answer cricket math. Need compute run rate from point after 15.0 overs 87/3 to end 114 total. Rest of innings means from 15.0 to 20.0 overs = 5 overs. Runs scored in that period = 114 - 87 = 27. Run rate = 27/5 = 5.4 runs per over. Round 2 decimals 5.40. Need final line 'Final answer: 5.40'. Need maybe consider wicket irrelevant. Check if any nuance: 15.0 overs means 15 completed overs, 0 balls. Last delivery by O'Brien irrelevant. So yes.\n<\/think>\n\nFinal answer: 5.40","ft_tokens":165},{"qtype":"milestone","prompt":"T20 International: Pakistan v Scotland at Grange Cricket Club, 2018-06-13.\nPakistan are batting first. After 13.2 overs (cricket notation: overs.balls) they are 95/3. Hussain Talat is on 17 off 17 balls and Shoaib Malik is on 1 off 3. MA Leask bowled the last delivery.\n\nHussain Talat wants to reach 50. If they keep scoring at their current strike rate, how many more balls will they need? Give the smallest whole number of balls.","gold":33,"base":"We need answer cricket calculation. Need compute. User: T20I Pakistan v Scotland at Grange Cricket Club, 2018-06-13. Pakistan batting first. After 13.2 overs (13 overs and 2 balls) they are 95/3. Hussain Talat is on 17 off 17 balls and Shoaib Malik is on 1 off 3. MA Leask bowled last delivery.\n\nHussain Talat wants to reach 50 runs. If Hussain Talat keeps scoring at their own current strike rate (their runs per ball faced so far), how many more balls must Hussain Talat face to reach 50? Round up to whole number balls.\n\nNeed careful: current strike rate = runs/balls faced = 17/17 = 1 run per ball. Needs 50-17=33 more runs. At 1 run/ball, 33 balls. Round up = 33. But need consider \"their own current strike rate\" maybe team's current strike rate? Wording: \"their runs per ball faced so far\" for Hussain Talat. \"Hussain Talat wants to reach 50 runs. If Hussain Talat keeps scoring at their own current strike rate (their runs per ball faced so far)\" So his own SR = 17/17 = 100%. Additional balls = ceil((50-17)/(17/17))=33.\n\nBut potential trick: T20, overs notation after 13.2, no relevance except maybe balls remaining? But question just asks how many more balls must face to reach 50 if keeps scoring at current SR. Could there be maximum balls? He can face at most? T20 has 20 overs = 120 balls. At 13.2 overs, 14 balls remain. He is on 17. At SR 100%, needs 33 balls, but only 14 balls remain in innings if no extra? But question not asking feasibility, just \"how many more balls must Hussain Talat face to reach 50?\" Could be 33, even if not possible in T20? Need examine.\n\nThey mention match context and current score/players. The question specifically: \"Hussain Talat wants to reach 50 runs. If Hussain Talat keeps scoring at their own current strike rate (their runs per ball faced so far), how many more balls must Hussain Talat face to reach 50? Round up to a whole number of balls.\" This is a simple calculation. The context may include balls remaining but not asked. Should we incorporate remaining balls? If he only has 14 balls left, cannot reach 50 at his SR. But question asks how many more balls must he face, not whether possible. It says round up to whole number. So 33.\n\nNeed provide step by step. final line 'Final answer: <number>'. Ensure final answer 33.\n\nDouble-check: current strike rate \"their runs per ball faced so far\" maybe not percentage but runs/ball: 17/17=1. Need 33 runs. 33/1=33 balls. Yes.\n\nPotential alternate: The score after 13.2 overs is 95/3. Last delivery bowled by MA Leask. Shoaib Malik on strike? Not relevant. Hussain Talat not necessarily on strike? \"must face\" means assuming continues batting and facing balls. The balls he has faced 17. His SR is exactly 1. 50 off 50 balls. He is on 17 off 17, so needs 33 more runs, 33 balls. Round up = 33.\n\nNeed maybe consider no-balls/wides? \"runs per ball faced so far\" includes legal balls faced. Use given. Fine.\n\nNeed final concise but step-by-step. final on own line.\n<\/think>\n\nHussain Talat’s current strike rate is:\n\n\\[\n\\frac{17 \\text{ runs}}{17 \\text{ balls}} = 1 \\text{ run per ball}\n\\]\n\nHe needs:\n\n\\[\n50 - 17 = 33 \\text{ more runs}\n\\]\n\nAt 1 run per ball, he needs:\n\n\\[\n\\frac{33}{1} = 33 \\text{ more balls}\n\\]\n\nFinal answer: 33","base_tokens":982,"ft":"We need answer user's cricket math. Need think carefully. Need compute current strike rate of Hussain Talat: 17 runs off 17 balls = 1.00 run per ball. Needs 50 runs. Already 17, needs 33 more. At 1 run/ball, 33 balls. Round up 33. But check wording: \"their own current strike rate (their runs per ball faced so far)\" = 17/17 = 1. So 33 balls. Could there be issue with T20? No. Just answer with final line. Need maybe step-by-step. Ensure final answer: 33. Let's craft concise.\n<\/think>\n\nHussain Talat has scored 17 runs off 17 balls.\n\nCurrent strike rate = 17 ÷ 17 = 1.00 run per ball.\n\nRuns needed to reach 50 = 50 − 17 = 33 runs.\n\nAt 1 run per ball, he needs to face 33 more balls.\n\nFinal answer: 33","ft_tokens":240}]};</script>
+<script>
+(() => {
+"use strict";
+const D = window.CRICKET_RUN_DATA;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const fmt = n => n.toLocaleString("en-US");
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sleep = ms => new Promise(r => setTimeout(r, reduce ? 0 : ms));
+
+/* ---------- theme ---------- */
+const store = { get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }, set(k,v){ try { localStorage.setItem(k,v); } catch(e){} } };
+const savedTheme = store.get("crk-theme"); if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+$("#themeBtn").onclick = () => {
+  const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = dark ? "light" : "dark"; store.set("crk-theme", document.documentElement.dataset.theme);
+  redrawCharts();
+};
+
+/* ---------- ripple ---------- */
+document.addEventListener("pointerdown", e => {
+  const b = e.target.closest(".btn,.icon-btn"); if (!b || reduce) return;
+  const r = b.getBoundingClientRect(), s = Math.max(r.width, r.height), d = document.createElement("span");
+  d.className = "ripple"; d.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s/2}px;top:${e.clientY - r.top - s/2}px`;
+  b.appendChild(d); setTimeout(() => d.remove(), 600);
+});
+
+/* ---------- tooltip ---------- */
+const tip = $("#tip");
+function showTip(html, x, y){ tip.innerHTML = html; tip.style.opacity = 1; const w = tip.offsetWidth, h = tip.offsetHeight;
+  let L = x + 14, T = y - h - 10; if (L + w > innerWidth - 8) L = x - w - 14; if (T < 8) T = y + 16; tip.style.left = L + "px"; tip.style.top = T + "px"; }
+function hideTip(){ tip.style.opacity = 0; }
+function snack(t){ const s = $("#snack"); s.textContent = t; s.classList.add("show"); clearTimeout(snack.t); snack.t = setTimeout(() => s.classList.remove("show"), 2200); }
+
+/* ---------- navigation ---------- */
+const ICONS = {
+  overview: '<path d="M4 5h16v4H4zM4 11h7v8H4zM13 11h7v8h-7z"/>',
+  data: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
+  distill: '<path d="M7 3h10l-3 7v6l-4 3v-9z"/>',
+  train: '<path d="M3 18l6-6 4 4 8-8M15 8h6v6"/>',
+  results: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  insights: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
+  repro: '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>'
+};
+const PAGES = [["overview","Overview"],["data","Data"],["distill","Distill"],["train","Fine-tune"],["results","Results"],["insights","Insights"],["repro","Links"]];
+const navHTML = PAGES.map(([id, name]) => `<button data-nav="${id}"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[id]}</svg></span>${name}</button>`).join("");
+$("#rail").innerHTML = navHTML; $("#navbar").innerHTML = navHTML;
+const inited = {};
+function go(id, push = true){
+  if (!PAGES.some(p => p[0] === id)) id = "overview";
+  $$(".page").forEach(p => p.classList.toggle("active", p.id === "p-" + id));
+  $$("[data-nav]").forEach(b => b.setAttribute("aria-current", b.dataset.nav === id ? "page" : "false"));
+  if (id !== "distill" && simTimer) simToggle();
+  if (push) { try { history.replaceState(null, "", location.href.split("#")[0] + "#" + id); } catch (e) { /* sandboxed viewers */ } }
+  scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  if (!inited[id]) { inited[id] = true; INIT[id] && INIT[id](); } else redrawCharts();  /* charts on hidden pages may have been resized at width 0 */
+  observeFade();
+}
+document.addEventListener("click", e => { const n = e.target.closest("[data-nav],[data-go]"); if (n) go(n.dataset.nav || n.dataset.go); });
+
+/* fade-in on scroll */
+const io = "IntersectionObserver" in window ? new IntersectionObserver(es => es.forEach(x => { if (x.isIntersecting) { x.target.classList.add("in"); io.unobserve(x.target); } }), { threshold: .12 }) : null;
+function observeFade(){ $$(".page.active .section").forEach(s => { if (!s.classList.contains("in")) { s.classList.add("fade-up"); io ? io.observe(s) : s.classList.add("in"); } }); }
+
+/* animated number */
+function countUp(node, to, { dur = 1400, dec = 0, suffix = "", prefix = "" } = {}){
+  if (reduce) { node.textContent = prefix + to.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec }) + suffix; return; }
+  const t0 = performance.now();
+  const step = t => { const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    node.textContent = prefix + (to * e).toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec }) + suffix;
+    if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function kpiCards(container, items, cls = "card elev"){
+  container.innerHTML = items.map((k, i) => `<div class="${cls}"><div class="kpi"><span class="v" data-i="${i}">0</span><span class="k">${k.k}</span></div></div>`).join("");
+  items.forEach((k, i) => countUp($(`[data-i="${i}"]`, container), k.v, k));
+}
+
+/* ---------- generic SVG chart helpers ---------- */
+const charts = [];
+function redrawCharts(){ charts.forEach(f => f()); }
+let rT, lastW = innerWidth; addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; clearTimeout(rT); rT = setTimeout(redrawCharts, 150); });
+function svgBox(container, h){ container.innerHTML = ""; const w = Math.max(280, container.clientWidth || 600);
+  const s = el("svg", { width: w, height: h, viewBox: `0 0 ${w} ${h}`, role: "img" }, container); return [s, w]; }
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p; return 10 * p; }
+function yAxis(s, x0, x1, y, ticks, fmtT){
+  const g = el("g", { class: "axis" }, s);
+  ticks.forEach(t => { const yy = y(t); el("line", { x1: x0, x2: x1, y1: yy, y2: yy, "stroke-width": 1 }, g);
+    const tx = el("text", { x: x0 - 6, y: yy + 4, "text-anchor": "end" }, g); tx.textContent = fmtT(t); });
+}
+
+/* horizontal bar chart */
+function hbar(container, rows, { valueFmt = fmt, color = () => css("--md-primary"), max, label = r => r.label, tipFn, noPush } = {}){
+  const draw = () => {
+    const bh = 26, gap = 10, lw = Math.min(150, (container.clientWidth || 500) * .32), h = rows.length * (bh + gap) + 6;
+    const [s, w] = svgBox(container, h); const mx = max || Math.max(...rows.map(r => r.value)); const vw = 70;
+    rows.forEach((r, i) => {
+      const y = i * (bh + gap) + 3, bw = Math.max(2, (w - lw - vw - 8) * r.value / mx);
+      const t = el("text", { x: lw - 8, y: y + bh/2 + 4, "text-anchor": "end", "font-size": 12.5, fill: css("--md-on-surface") }, s); t.textContent = label(r);
+      el("rect", { x: lw, y, width: w - lw - vw - 8, height: bh, rx: 4, fill: css("--md-surface-c-highest"), opacity: .5 }, s);
+      const b = el("rect", { x: lw, y, width: reduce ? bw : 0, height: bh, rx: 4, fill: color(r) }, s);
+      if (!reduce) requestAnimationFrame(() => { b.style.transition = "width .9s cubic-bezier(.2,0,0,1)"; b.setAttribute("width", bw); });
+      const v = el("text", { x: lw + bw + 8, y: y + bh/2 + 4, "font-size": 12.5, "font-weight": 600, fill: css("--md-on-surface") }, s); v.textContent = valueFmt(r.value, r);
+      const hit = el("rect", { x: 0, y: y - 4, width: w, height: bh + 8, fill: "transparent" }, s);
+      if (tipFn) { hit.addEventListener("mousemove", e => showTip(tipFn(r), e.clientX, e.clientY)); hit.addEventListener("mouseleave", hideTip); }
+    });
+  };
+  draw(); if (!noPush) charts.push(draw); return draw;
+}
+
+/* ================================================================== OVERVIEW */
+const STAGES = [
+  { ph:"data", t:"Source data", s:"Valarmathy/CricketData", d:"Download the CSV pinned to revision <code>a2518e9d</code> and re-count it with <code>csv.reader</code>. The build stops unless there are exactly <b>425,119 rows</b>.", stats:[["425,119","source rows"],["1,842","matches"],["CC0","license"]] },
+  { ph:"data", t:"Build questions", s:"prepare.py --mode full", d:"Turn every row into a natural-language match situation and a question with an <b>exact</b> numeric answer. Assign the least-used valid type per row and split by match (train / test / benchmark).", stats:[["500,000","questions"],["6","question types"],["0:48","job time"]] },
+  { ph:"distill", t:"Pilot", s:"240 questions × 4", d:"Stratified pilot (40 per type) before spending 60 GPU-hours. It caught the <b>projection overthinking</b> problem (88.7% correct, 10% truncated). After rewording, the same type was 98.1% correct with 0.6% truncated.", stats:[["240","questions"],["2:43","job time"],["1","wording fix"]] },
+  { ph:"distill", t:"vLLM distillation", s:"32 GPUs · data parallel", d:"One vLLM engine per GPU, 4 thinking-mode samples per question, appended to per-shard files. The main job took <b>1 h 43 min</b> on 8 nodes.", stats:[["2.0 M","samples"],["1.58 B","tokens"],["8,238","tok/s per GPU"]] },
+  { ph:"distill", t:"Verify & select", s:"build_full_dataset.py", d:"Parse <code>Final answer:</code> from every sample, compare it with the exact answer, and keep the <b>shortest correct finished trace</b> per question. Unsolved questions go to <code>retry.jsonl</code>.", stats:[["97.30%","correct / sample"],["464","tokens kept (mean)"],["100%","questions solved"]] },
+  { ph:"distill", t:"Gates & retries", s:"retry · fix-ambiguous", d:"87 questions stayed unsolved, so 63 source rows were uncovered and the upload <b>refused</b>. All 87 had scores like 1/3, which Australians read as wickets/runs. Spelling these out (\"1 run for the loss of 3 wickets\") solved all of them.", stats:[["87","fixed questions"],["63 → 0","uncovered rows"],["425,119","rows covered"]] },
+  { ph:"distill", t:"Publish dataset", s:"HF dataset repo", d:"Push train (5 shards), test and benchmark splits with a dataset card. The script refuses while any source row is uncovered.", stats:[["2.08 GB","on the Hub"],["458,702","train rows"],["41,298","test rows"]] },
+  { ph:"train", t:"LoRA SFT", s:"8 nodes × 4 GPUs · DDP", d:"Rank 0 tokenizes all rows once into an <code>.npz</code> cache. 32 ranks train one epoch with LoRA r32, global batch 256 and length-grouped batches, resuming from <code>checkpoint-272</code> after the first allocation's deadline.", stats:[["1,788","steps"],["≈ 4.0 h","training"],["128","GPU-hours"]] },
+  { ph:"eval", t:"Merge", s:"merge.py · 1 GPU", d:"Merge the adapter into the bf16 base weights (<code>merge_and_unload</code>) and write a vLLM-loadable 51 GB checkpoint with tokenizer and chat template.", stats:[["1:22","job time"],["51 GB","merged model"],["12","shards"]] },
+  { ph:"eval", t:"Evaluate", s:"vLLM · 600 × 4", d:"Answer the fixed 600-question benchmark 4 times per question with identical sampling and seeds. Compute accuracy, pass@4, tokens and truncation per type, then compare with base.", stats:[["97.88%","accuracy"],["−39%","tokens"],["0%","truncated"]] },
+  { ph:"eval", t:"Publish model", s:"HF model repo + W&B", d:"Push the adapter, model card with results, <code>eval_report/</code> and plots. W&B logs the curves and the base-vs-fine-tuned table under the same run id.", stats:[["870 MB","adapter"],["16:14","pushed"],["public","visibility"]] },
+];
+let pipeIdx = 0, journeyRun = 0;
+function selectStage(i){
+  pipeIdx = i; const st = STAGES[i];
+  $$(".stage").forEach((b, j) => { b.classList.toggle("on", j === i); b.classList.toggle("done", j < i); b.setAttribute("aria-pressed", j === i); });
+  $("#pipeBar").style.width = ((i + 1) / STAGES.length * 100) + "%";
+  $$("#pipeDots i").forEach((d, j) => d.classList.toggle("on", j === i));
+  $("#pipeDetail").innerHTML = `<div class="label">Stage ${i + 1} of ${STAGES.length} · ${st.ph}</div><h3 class="title-l" style="margin:4px 0 6px">${st.t}</h3><div>${st.d}</div>
+    <div class="row">${st.stats.map(([v, k]) => `<div><b>${v}</b><span class="small muted">${k}</span></div>`).join("")}</div>`;
+  $("#pipeDetail").animate?.([{ opacity: .3, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], { duration: reduce ? 0 : 350, easing: "cubic-bezier(.2,0,0,1)" });
+}
+const INIT = {};
+INIT.overview = () => {
+  kpiCards($("#kpis"), [
+    { v: 425119, k: "source deliveries (rows), all covered" },
+    { v: 500000, k: "verified reasoning rows created" },
+    { v: 2002672, k: "reasoning traces sampled with vLLM" },
+    { v: 1.58, dec: 2, suffix: " B", k: "tokens generated (32 GPUs, 1.9 h)" },
+    { v: 32, k: "Rubin GPUs for distillation and training" },
+    { v: 128, k: "GPU-hours of training (1 epoch, ≈ 4.0 h)" },
+    { v: 97.88, dec: 2, suffix: "%", k: "benchmark accuracy (base 97.29%)" },
+    { v: 39, prefix: "−", suffix: "%", k: "reasoning tokens vs base (748 → 458)" },
+  ]);
+  $("#pipe").innerHTML = STAGES.map((s, i) => `<button class="stage" data-st="${i}" aria-pressed="false"><span class="ph">${s.ph}</span><span class="n">${i + 1}</span><span class="t">${s.t}</span><span class="s">${s.s}</span></button>`).join("");
+  $("#pipeDots").innerHTML = STAGES.map(() => "<i></i>").join("");
+  $$(".stage").forEach(b => b.onclick = () => { journeyRun++; selectStage(+b.dataset.st); });
+  selectStage(0);
+};
+$("#playJourney").onclick = async () => {
+  const my = ++journeyRun; $("#pipe").scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+  for (let i = 0; i < STAGES.length; i++) { if (my !== journeyRun) return; selectStage(i); await sleep(2300); }
+};
+
+/* ================================================================== DATA */
+INIT.data = () => {
+  const ids = ["Runs","Ov","Bl","Tg","Br"]; ids.forEach(k => $("#s" + k).addEventListener("input", calc)); calc();
+  const TYPES = [
+    { label: "run_rate", value: 424776, d: "Current run rate: runs × 6 ÷ balls" },
+    { label: "strike_rate", value: 400092, d: "Striker's runs × 100 ÷ balls faced" },
+    { label: "chase_rate", value: 378962, d: "Rate needed to win (2nd innings) or scored over the rest (1st)" },
+    { label: "milestone", value: 369258, d: "Balls to the next 50 at the striker's own strike rate" },
+    { label: "projection", value: 223081, d: "Projected 20-over total at the current rate (1st innings)" },
+    { label: "legal_balls", value: 40, d: "Legal deliveries left after an opening wide/no-ball. Used only where nothing else is defined" },
+  ];
+  hbar($("#typeChart"), TYPES, { max: 425119, valueFmt: v => fmt(v), tipFn: r => `<b>${r.label}</b><br>${r.d}<br>valid for ${fmt(r.value)} of 425,119 rows (${(r.value / 4251.19).toFixed(1)}%)` });
+  const SPLIT = [
+    { label: "train", value: 458702, d: "1,597 matches + 68 rain-revised matches" },
+    { label: "test", value: 41298, d: "177 held-out matches" },
+    { label: "benchmark", value: 600, d: "200 run_rate, 200 chase_rate, 200 milestone, from the test matches" },
+  ];
+  hbar($("#splitChart"), SPLIT, { valueFmt: v => fmt(v), color: r => r.label === "train" ? css("--md-primary") : css("--md-tertiary"), tipFn: r => `<b>${r.label}</b>: ${fmt(r.value)} rows<br>${r.d}` });
+  $("#samplePrompt").textContent = "system: You are a cricket analyst. Work through the problem step by step, then give the final answer on its own line as 'Final answer: <number>'.\n\nuser: " + D.examples[1].prompt;
+};
+function calc(){
+  const R = +$("#sRuns").value, O = +$("#sOv").value, B = +$("#sBl").value, T = +$("#sTg").value, br = +$("#sBr").value;
+  const balls = O * 6 + B, left = 120 - balls, sr_balls = Math.max(1, Math.round(br * 0.85) + 4);
+  $("#oRuns").textContent = R; $("#oOv").textContent = O; $("#oBl").textContent = B; $("#oTg").textContent = T || "—"; $("#oBr").textContent = `${br}/${sr_balls}`;
+  const r2 = x => (Math.round(x * 100) / 100).toFixed(2);
+  const rows = [];
+  if (balls > 0) {
+    rows.push(["run_rate", `After <b>${O}.${B}</b> overs at <b>${R}</b>: what is the run rate?`, `${O}.${B} overs = ${O}×6 + ${B} = <b>${balls} balls</b> → ${R} × 6 ÷ ${balls}`, r2(R * 6 / balls),
+      `Wrong reading: ${R} ÷ ${O}.${B} = ${r2(R / (O + B / 10))}`]);
+    if (T > R && left > 0) rows.push(["chase_rate", `Chasing <b>${T}</b>: what rate is needed over the remaining overs?`, `need ${T} − ${R} = ${T - R} in ${left} balls → ${T - R} × 6 ÷ ${left}`, r2((T - R) * 6 / left), ""]);
+    else if (T && T <= R) rows.push(["chase_rate", "Target already reached, so the question is not valid for this row", "", "—", ""]);
+    rows.push(["projection", "1st innings: projected 20-over total at the current rate?", `${R} × 120 ÷ ${balls}, rounded half up`, Math.floor(R * 120 / balls + .5), ""]);
+  } else rows.push(["legal_balls", "No legal ball bowled yet: how many legal deliveries remain?", "", "120", ""]);
+  rows.push(["strike_rate", `Striker on <b>${br}</b> off <b>${sr_balls}</b>: strike rate?`, `${br} × 100 ÷ ${sr_balls}`, r2(br * 100 / sr_balls), ""]);
+  rows.push(["milestone", `How many more balls to reach 50 at their own strike rate? (round up)`, `need ${50 - br} runs × ${sr_balls} ÷ ${br} balls per run`, Math.ceil((50 - br) * sr_balls / br), ""]);
+  $("#qaOut").innerHTML = rows.map(([t, q, how, a, warn]) => `<div style="padding:10px 0;border-bottom:1px solid var(--md-outline-variant)">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="badge">${t}</span><span class="mono" style="font-size:20px;font-weight:600;color:var(--md-primary)">${a}</span></div>
+    <div class="small" style="margin-top:4px">${q}</div>${how ? `<div class="small muted mono" style="margin-top:2px">${how}</div>` : ""}
+    ${warn ? `<div class="small" style="color:var(--bad);margin-top:2px">✗ ${warn}</div>` : ""}</div>`).join("");
+}
+
+/* ================================================================== DISTILL */
+let simTimer = null, simState = null;
+function buildCluster(){
+  const nodes = ["0325","0328","0334","0336","0337","0338","0340","0341"];
+  $("#cluster").innerHTML = nodes.map((n, i) => `<div class="node"><div class="nm"><span>node ${i} · hecate${n}</span><span>4× Rubin</span></div><div class="gpus">${[0,1,2,3].map(g =>
+    `<div class="gpu" id="g${i * 4 + g}"><div class="fill"></div><span>shard ${i * 4 + g}</span><div class="seqs"><i></i><i></i><i></i><i></i></div></div>`).join("")}</div></div>`).join("");
+  $$(".gpu .seqs").forEach(s => s.style.visibility = "hidden");
+}
+function simReset(){ clearInterval(simTimer); simTimer = null; simState = { t: 0 }; buildCluster(); ["cQ","cS","cT"].forEach(i => $("#" + i).textContent = "0"); $("#cTime").textContent = "0:00"; $("#simPlay").textContent = "▶ Run"; }
+function simToggle(){
+  if (simTimer) { clearInterval(simTimer); simTimer = null; $("#simPlay").textContent = "▶ Resume"; return; }
+  $("#simPlay").textContent = "❚❚ Pause"; $$(".gpu").forEach(g => { g.classList.add("busy"); $(".seqs", g).style.visibility = "visible"; });
+  const total = 6180; /* simulated seconds: ~103 min */
+  const jitter = Array.from({ length: 32 }, (_, i) => 1 + Math.sin(i * 7.3) * .02);
+  simTimer = setInterval(() => {
+    simState.t = Math.min(total, simState.t + 36);
+    const p = simState.t / total, startup = Math.min(1, simState.t / 52);
+    $$(".gpu").forEach((g, i) => { $(".fill", g).style.width = Math.min(100, p * 100 * jitter[i] * startup) + "%"; });
+    const q = Math.round(497552 * p), tok = 8238 * 32 * Math.max(0, simState.t - 52) * (1580 / 1581.9) * 0.97;
+    $("#cQ").textContent = fmt(Math.min(500000, q)); $("#cS").textContent = fmt(q * 4); $("#cT").textContent = (Math.min(tok, 1.5e9) / 1e9).toFixed(2) + " B";
+    const m = Math.floor(simState.t / 60); $("#cTime").textContent = `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+    if (simState.t >= total) { clearInterval(simTimer); simTimer = null; $("#simPlay").textContent = "✓ Done";
+      $("#cQ").textContent = "500,000"; $("#cS").textContent = "2,002,672"; $("#cT").textContent = "1.58 B";
+      $$(".gpu").forEach(g => { g.classList.remove("busy"); $(".seqs", g).style.visibility = "hidden"; });
+      snack("Main pass done. The continuation and retry jobs finished the last 2,448 + 87 questions"); }
+  }, reduce ? 5 : 60);
+}
+function engineDiagram(){
+  const c = $("#engineSvg"); const draw = () => {
+    c.innerHTML = ""; const w = 440; const s = el("svg", { viewBox: "0 0 440 236", width: "100%", role: "img", "aria-label": "vLLM engine diagram" }, c); const fg = css("--md-on-surface"), mut = css("--md-on-surface-variant"), pc = css("--md-primary-container"), opc = css("--md-on-primary-container"), sc = css("--md-surface-c-highest"), pr = css("--md-primary");
+    const box = (x, y, bw, bh, t1, t2, fill, col) => { el("rect", { x, y, width: bw, height: bh, rx: 12, fill }, s);
+      const a = el("text", { x: x + bw/2, y: y + bh/2 - (t2 ? 3 : -4), "text-anchor": "middle", "font-size": 13, "font-weight": 600, fill: col }, s); a.textContent = t1;
+      if (t2) { const b = el("text", { x: x + bw/2, y: y + bh/2 + 14, "text-anchor": "middle", "font-size": 11, fill: col, opacity: .8 }, s); b.textContent = t2; } };
+    const u = w / 100;
+    box(2 * u, 20, 22 * u, 60, "questions", "shard file · 256/call", sc, fg);
+    box(32 * u, 10, 36 * u, 80, "vLLM engine (1 GPU)", "continuous batching · prefix cache", pc, opc);
+    box(76 * u, 20, 22 * u, 60, "samples", "4 per question", sc, fg);
+    box(32 * u, 140, 36 * u, 70, "Qwen3.8-27B bf16", "51 GiB weights + KV / state", sc, fg);
+    const arr = (x1, y1, x2, y2, dash) => { const l = el("line", { x1, y1, x2, y2, stroke: pr, "stroke-width": 2, "stroke-dasharray": dash || "6 6" }, s);
+      if (!reduce) { const a = el("animate", { attributeName: "stroke-dashoffset", from: 24, to: 0, dur: "1s", repeatCount: "indefinite" }, l); } };
+    arr(24 * u, 50, 32 * u, 50); arr(68 * u, 50, 76 * u, 50); arr(50 * u, 90, 50 * u, 140, "3 4");
+    for (let k = 0; k < 4; k++) { const d = el("circle", { r: 4, fill: pr }, s); if (!reduce) { const m = el("animateMotion", { dur: "2s", begin: (k * .5) + "s", repeatCount: "indefinite", path: `M${24*u},50 L${32*u},50 M${68*u},50 L${76*u},50` }, d); } else d.setAttribute("cx", -10); }
+    const t = el("text", { x: 50 * u, y: 228, "text-anchor": "middle", "font-size": 11, fill: mut }, s); t.textContent = "GPU memory 90% · context 8,192 · max_tokens 6,144";
+  }; draw(); charts.push(draw);
+}
+const CANDS = [ { tok: 1078, ok: true }, { tok: 512, ok: false, pred: "9.62" }, { tok: 167, ok: true }, { tok: 391, ok: true } ];
+function renderCands(stage){
+  const mx = 1100; $("#candQ").innerHTML = D.examples[0].prompt.replace(/\n/g, "<br>") + `<div style="margin-top:6px"><span class="badge">exact answer: ${D.examples[0].gold.toFixed ? D.examples[0].gold.toFixed(2) : D.examples[0].gold}</span></div>`;
+  $("#cands").innerHTML = CANDS.map((c, i) => `<div class="cand ${stage === 2 ? (i === 2 ? "kept" : "dim") : ""}"><b class="small">#${i + 1}</b><div class="bar"><i style="width:${stage ? c.tok / mx * 100 : 0}%"></i></div>
+    <span class="mono small">${stage ? c.tok + " tok" : "…"}</span><span>${stage ? (c.ok ? '<span class="badge ok">✓ 10.00</span>' : `<span class="badge no">✗ ${c.pred}</span>`) : '<span class="badge">?</span>'}</span></div>`).join("");
+}
+INIT.distill = () => {
+  simReset(); $("#simPlay").onclick = simToggle; $("#simReset").onclick = simReset;
+  engineDiagram();
+  renderCands(0);
+  $("#verifyBtn").onclick = async () => { renderCands(1); $("#verifyMsg").textContent = "Parsing 'Final answer:' and comparing with the exact value…"; await sleep(1100);
+    renderCands(2); $("#verifyMsg").innerHTML = "Kept <b>#3</b>: the shortest correct and finished trace (167 tokens). Wrong or truncated samples are discarded. Questions with no correct sample are retried with 8 more."; };
+  $("#verifyReset").onclick = () => { renderCands(0); $("#verifyMsg").textContent = ""; };
+  const Q = [
+    { label: "run_rate", acc: 97.75, tok: 172.1 }, { label: "chase_rate", acc: 92.52, tok: 435.3 }, { label: "milestone", acc: 99.20, tok: 350.6 },
+    { label: "projection", acc: 97.89, tok: 396.8 }, { label: "strike_rate", acc: 99.13, tok: 226.9 }, { label: "legal_balls", acc: 100, tok: 0.14 }];
+  let qm = "acc";
+  const drawQual = () => hbar($("#qualChart"), Q.map(q => ({ ...q, value: qm === "acc" ? q.acc : q.tok })), { max: qm === "acc" ? 100 : 450, noPush: true,
+      valueFmt: v => qm === "acc" ? v.toFixed(2) + "%" : v + " M", tipFn: r => `<b>${r.label}</b><br>${r.acc}% of samples correct<br>${r.tok} M tokens generated` });
+  drawQual(); charts.push(drawQual);
+  $$("#qualSeg button").forEach(b => b.onclick = () => { $$("#qualSeg button").forEach(x => x.setAttribute("aria-pressed", x === b)); qm = b.dataset.m; drawQual(); });
+  const GATES = [
+    { k: "gate 1", t: "Row count", s: "exactly 425,119 rows", d: "<code>prepare.py</code> re-counts the CSV and aborts on any mismatch. Revision and count are written to <code>stats.json</code>." },
+    { k: "gate 2", t: "Stratified pilot", s: "40 questions per type", d: "The projection wording made the model debate which \"current rate\" was meant: 88.7% correct, 10% truncated, 2,215 tokens. Defining the rate in the question gave 98.1% correct, 0.6% truncated and 869 tokens <b>before</b> spending 60 GPU-hours." },
+    { k: "gate 3", t: "Verification", s: "exact answer match", d: "Rates must match within 0.011 and integers exactly, and the trace must have finished (not truncated). Overall 97.30% of 2.0 M samples passed." },
+    { k: "gate 4", t: "Retry", s: "8 more samples", d: "Unsolved questions get 8 extra samples. 87 still failed after 12 attempts each, and all had scores where runs ≤ wickets." },
+    { k: "gate 5", t: "Ambiguity fix", s: "\"1/3\" spelled out", d: "Most countries write runs/wickets, but Australia writes wickets/runs. <code>fix_ambiguous_scores.py</code> rewrote the 87 questions (\"1 run for the loss of 3 wickets\") and <code>retry2</code> solved all of them." },
+    { k: "gate 6", t: "Coverage", s: "0 uncovered rows", d: "<code>push-full</code> refused while 63 rows were uncovered and succeeded once coverage was 425,119 / 425,119." },
+  ];
+  $("#gates").innerHTML = GATES.map((g, i) => `<button class="gate" data-g="${i}" style="all:unset;box-sizing:border-box;cursor:pointer;flex:1 1 150px"><div class="gate"><div class="k">${g.k}</div><div class="t">${g.t}</div><div class="s">${g.s}</div></div></button>`).join("");
+  const selG = i => { $$("#gates .gate").forEach((x, j) => x.classList.toggle("on", j <= i)); $("#gateDetail").innerHTML = `<div class="label">${GATES[i].k}</div><h3 class="title-m" style="margin:2px 0 6px">${GATES[i].t}</h3><div>${GATES[i].d}</div>`; };
+  $$("#gates [data-g]").forEach(b => b.onclick = () => selG(+b.dataset.g)); selG(0);
+  kpiCards($("#distillKpis"), [
+    { v: 8238, k: "tokens/s per GPU (≈ 55× HF generate)" }, { v: 264, suffix: "K", k: "tokens/s across 32 GPUs" },
+    { v: 62, k: "GPU-hours for the whole dataset" }, { v: 480, k: "questions per GPU-hour (4 samples each)" }]);
+  const J = [["prepare-full","696975","1 × 4","0:48","build + verify 500K questions"],["pilot-full","696976","1 × 4","2:43","240 questions × 4"],
+    ["datagen-full","697019","8 × 32","1:42:51","main pass, 497,552 questions"],["datagen-full","697021","8 × 32","8:20","last 2,448 questions"],
+    ["retry-full","697022","1 × 4","5:15","87 unsolved × 8"],["push-full","697023","1 × 4","0:54","refused: 63 rows uncovered"],
+    ["fix-ambiguous","700650","1 × 4","0:50","clarify runs ≤ wickets"],["retry2","700651","1 × 4","4:12","all 87 solved"],["push-full","700652","1 × 4","1:12","published"]];
+  $("#jobTable").innerHTML = `<tr><th>stage</th><th>job</th><th>nodes × GPUs</th><th class="num">wall time</th><th>notes</th></tr>` + J.map(r => `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td><td>${r[2]}</td><td class="num mono">${r[3]}</td><td class="muted">${r[4]}</td></tr>`).join("") +
+    `<tr><td colspan="3"><b>total</b></td><td class="num"><b>≈ 15.4 node-h</b></td><td><b>≈ 62 GPU-hours</b></td></tr>`;
+};
+
+/* ================================================================== TRAIN */
+const TARGETS = [
+  ["q,k,v,o_proj", "Query/key/value/output projections of the 16 full-attention layers."],
+  ["in_proj_qkv", "Input projection of the Gated DeltaNet (linear attention) layers, producing queries, keys and values."],
+  ["in_proj_z", "Gate projection of the Gated DeltaNet layers."],
+  ["out_proj", "Output projection of the Gated DeltaNet layers."],
+  ["gate/up/down_proj", "The three MLP projections in every one of the 64 layers, which hold most of the model's parameters."],
+];
+function drawLayers(sel){
+  $("#layers").innerHTML = Array.from({ length: 64 }, (_, i) => { const fa = i % 4 === 3;
+    const hit = sel == null || sel === 4 || (sel === 0 ? fa : !fa);
+    return `<i class="${fa ? "fa" : ""}" title="layer ${i + 1}: ${fa ? "full attention" : "Gated DeltaNet"}" style="opacity:${hit ? 1 : .25}"></i>`; }).join("");
+}
+function drawLora(){
+  const rs = [0, 4, 8, 16, 24, 32, 64], r = rs[+$("#rank").value]; $("#rankOut").textContent = r;
+  const d = 5120, sz = Math.max(4, r * 1.25);
+  $("#loraViz").innerHTML = `<div class="mat w" style="flex:none">W<br><span class="small" style="font-weight:400">frozen<br>${d} × ${d}</span></div><span class="op">+</span>
+    <div class="mat b" style="width:${sz}px;height:120px;flex:none" title="B: ${d} × ${r}">${r >= 16 ? "B" : ""}</div><span class="op">×</span>
+    <div class="mat a" style="width:120px;height:${sz}px;flex:none" title="A: ${r} × ${d}">${r >= 16 ? "A" : ""}</div>`;
+  const full = d * d, lo = 2 * d * r;
+  $("#loraTxt").innerHTML = r ? `Instead of updating all <b>${fmt(full)}</b> weights of a ${fmt(d)} × ${fmt(d)} matrix (example size), train B·A with <b>${fmt(lo)}</b> (${(lo / full * 100).toFixed(2)}%). The output becomes Wx + (α/r)·BAx with α = 64${r === 32 ? " (the setting used: <b>r = 32, α = 64</b>, dropout 0.05)" : ""}.` : "With r = 0 nothing is trained, which is the base model.";
+}
+let ddpBusy = false;
+async function ddpStep(){
+  if (ddpBusy) return; ddpBusy = true;
+  const P = [["forward", "Forward", "8 rows per GPU through 64 layers (bf16). Activations are checkpointed.", 2.6, "--md-primary"],
+    ["backward", "Backward", "Recompute activations and send gradients only into the LoRA weights.", 4.2, "--md-tertiary"],
+    ["allreduce", "All-reduce", "Average 0.87 GB of adapter gradients over 32 GPUs via NCCL over multi-node NVLink.", .6, "--s-base"],
+    ["update", "AdamW", "Each GPU applies the same update (lr 2e-4, cosine), so the replicas stay identical.", .4, "--md-secondary"]];
+  const cells = $$("#ddp .dg");
+  for (const [id, , , sec, col] of P) {
+    $$("#phases .phase").forEach(p => p.classList.toggle("on", p.dataset.p === id));
+    cells.forEach(c => { c.style.setProperty("--phc", css(col)); c.style.setProperty("--h", "0%"); });
+    const steps = Math.max(4, Math.round(sec * 6));
+    for (let k = 1; k <= steps; k++) { cells.forEach((c, i) => c.style.setProperty("--h", Math.min(100, k / steps * 100 * (id === "allreduce" ? 1 : (.92 + ((i * 37) % 9) / 100))) + "%")); await sleep(60); }
+    if (id === "allreduce") cells.forEach(c => c.style.setProperty("--h", "100%"));
+    await sleep(200);
+  }
+  $$("#phases .phase").forEach(p => p.classList.remove("on")); ddpBusy = false; snack("1 of 1,788 steps done. 256 rows learned");
+}
+function lossChart(){
+  const c = $("#lossChart"); let mode = "loss";
+  const draw = () => {
+    const H = 300, [s, w] = svgBox(c, H), m = { l: 52, r: 16, t: 14, b: 34 };
+    const xs = st => m.l + (st / 1788) * (w - m.l - m.r);
+    let series, lo, hi, fmtT;
+    if (mode === "loss") { series = [{ pts: D.train.map(r => [r[0], r[1]]), col: css("--md-primary"), name: "train loss" }, { pts: D.dev, col: css("--s-base"), name: "dev loss", dots: true }]; lo = .30; hi = .345; fmtT = v => v.toFixed(3); }
+    else if (mode === "lr") { series = [{ pts: D.train.map(r => [r[0], r[2] * 1e-4]), col: css("--md-primary"), name: "learning rate" }]; lo = 0; hi = 2.2e-4; fmtT = v => v ? (v * 1e4).toFixed(1) + "e-4" : "0"; }
+    else { series = [{ pts: D.train.map(r => [r[0], r[3]]), col: css("--md-primary"), name: "grad norm" }]; lo = 0; hi = niceMax(Math.max(...D.train.map(r => r[3]))); fmtT = v => v.toFixed(2); }
+    const ys = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+    yAxis(s, m.l, w - m.r, ys, Array.from({ length: 5 }, (_, i) => lo + (hi - lo) * i / 4), fmtT);
+    const gx = el("g", { class: "axis" }, s);
+    [0, 300, 600, 900, 1200, 1500, 1788].forEach(t => { const tx = el("text", { x: xs(t), y: H - 12, "text-anchor": "middle" }, gx); tx.textContent = t; });
+    const xl = el("text", { x: w - m.r, y: H - 0, "text-anchor": "end", "font-size": 11, fill: css("--md-on-surface-variant") }, s); xl.textContent = "optimizer step";
+    /* resume marker */
+    el("line", { x1: xs(272), x2: xs(272), y1: m.t, y2: H - m.b, stroke: css("--md-outline"), "stroke-dasharray": "4 4" }, s);
+    const rt = el("text", { x: xs(272) + 5, y: m.t + 12, "font-size": 11, fill: css("--md-on-surface-variant") }, s); rt.textContent = "resumed from checkpoint-272";
+    series.forEach(se => {
+      const d = se.pts.map((p, i) => (i ? "L" : "M") + xs(p[0]).toFixed(1) + "," + ys(Math.max(lo, Math.min(hi, p[1]))).toFixed(1)).join("");
+      const path = el("path", { d, fill: "none", stroke: se.col, "stroke-width": 2, "stroke-linejoin": "round" }, s);
+      if (!reduce) { const L = path.getTotalLength(); path.style.strokeDasharray = L; path.style.strokeDashoffset = L; path.getBoundingClientRect(); path.style.transition = "stroke-dashoffset 1.6s cubic-bezier(.2,0,0,1)"; path.style.strokeDashoffset = 0; }
+      if (se.dots) se.pts.forEach(p => el("circle", { cx: xs(p[0]), cy: ys(p[1]), r: 4, fill: se.col, stroke: css("--md-surface-c-lowest"), "stroke-width": 2 }, s));
+      const last = se.pts[se.pts.length - 1]; const lb = el("text", { x: Math.min(xs(last[0]) - 4, w - m.r - 4), y: ys(last[1]) - 8, "text-anchor": "end", "font-size": 12, "font-weight": 600, fill: css("--md-on-surface") }, s); lb.textContent = se.name;
+    });
+    const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--md-on-surface-variant"), "stroke-width": 1, opacity: 0 }, s);
+    const hit = el("rect", { x: m.l, y: m.t, width: w - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }, s);
+    hit.addEventListener("mousemove", e => { const r = s.getBoundingClientRect(), st = (e.clientX - r.left - m.l) / (w - m.l - m.r) * 1788;
+      const near = arr => arr.reduce((a, b) => Math.abs(b[0] - st) < Math.abs(a[0] - st) ? b : a);
+      const tr = near(D.train); cross.setAttribute("x1", xs(tr[0])); cross.setAttribute("x2", xs(tr[0])); cross.setAttribute("opacity", .5);
+      const dv = near(D.dev);
+      showTip(`<b>step ${tr[0]}</b> · epoch ${(tr[0] / 1788).toFixed(2)}<br>train loss ${tr[1].toFixed(4)}<br>lr ${(tr[2]).toFixed(2)}e-4 · grad norm ${tr[3].toFixed(3)}${mode === "loss" ? `<br>dev loss ${dv[1].toFixed(4)} (step ${dv[0]})` : ""}`, e.clientX, e.clientY); });
+    hit.addEventListener("mouseleave", () => { hideTip(); cross.setAttribute("opacity", 0); });
+  };
+  draw(); charts.push(draw);
+  $$("#lossSeg button").forEach(b => b.onclick = () => { $$("#lossSeg button").forEach(x => x.setAttribute("aria-pressed", x === b)); mode = b.dataset.m; draw(); });
+}
+INIT.train = () => {
+  drawLayers(null);
+  $("#targetChips").innerHTML = TARGETS.map((t, i) => `<button class="chip" aria-pressed="false" data-t="${i}">${t[0]}</button>`).join("");
+  $$("#targetChips .chip").forEach(b => b.onclick = () => { const on = b.getAttribute("aria-pressed") !== "true"; $$("#targetChips .chip").forEach(x => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", on); drawLayers(on ? +b.dataset.t : null); $("#targetDesc").textContent = on ? TARGETS[+b.dataset.t][1] : ""; });
+  $("#targetDesc").textContent = "217,579,520 trainable parameters in total (0.79% of 27B). The adapter file is 870 MB.";
+  $("#rank").oninput = drawLora; drawLora();
+  $("#ddp").innerHTML = Array.from({ length: 32 }, (_, i) => `<div class="dg" title="node ${i >> 2}, GPU ${i % 4}"></div>`).join("");
+  $("#phases").innerHTML = [["forward","Forward","≈ 2.6 s","8 rows × up to 6,144 tokens, bf16, activations checkpointed"],["backward","Backward","≈ 4.2 s","recompute + gradients into LoRA only"],
+    ["allreduce","All-reduce","≈ 0.6 s","0.87 GB of LoRA grads, NCCL over multi-node NVLink"],["update","AdamW","≈ 0.4 s","fp32 optimizer states (3.5 GB)"]]
+    .map(([id, t, s2, d]) => `<div class="phase" data-p="${id}"><div class="t">${t} <span class="muted small">${s2}</span></div><div class="s">${d}</div></div>`).join("");
+  $("#ddpPlay").onclick = ddpStep;
+  const BENCH = [ { label: "D · Part I (2 × accum 2)", value: .47, d: "random order; 1 epoch on 32 GPUs ≈ 8.5 h" }, { label: "A · batch 8, grouped", value: 1.14, d: "chosen: 2.4× faster; 1 epoch ≈ 3.4 h" },
+    { label: "B · batch 16", value: 0, d: "out of memory: tried to allocate 90.7 GiB with 252 GiB in use" }, { label: "C · no grad ckpt", value: 0, d: "out of memory: activations exceed 279 GiB" } ];
+  hbar($("#benchChart"), BENCH, { max: 1.3, valueFmt: v => v ? v.toFixed(2) + " rows/s/GPU" : "OOM", color: r => r.label.startsWith("A") ? css("--md-primary") : css("--md-outline"), tipFn: r => `<b>${r.label}</b><br>${r.d}` });
+  const MEM = [["frozen weights (bf16)", 51, "--md-primary", "Full bf16 copy of Qwen3.8-27B on every GPU"], ["LoRA + AdamW", 3.5, "--s-ref", "fp32 adapter weights, gradients and two Adam moments"],
+    ["activations", 40, "--md-tertiary", "checkpointed layer inputs; one layer recomputed at a time (estimate)"], ["logits + grad", 98, "--s-base", "8 × 6,144 × 248,320 × 4 B × 2 for the longest batch, transient"], ["free", 87, "--md-surface-c-highest", "headroom (measured peak 277 GiB on the longest group)"]];
+  $("#mem").innerHTML = MEM.map(([n, g, c, d]) => `<div style="flex:${g} 1 0;background:var(${c});${c.includes("surface") ? "color:var(--md-on-surface-variant)" : ""}" data-tip="<b>${n}</b>: ≈ ${g} GiB<br>${d}">${g >= 30 ? n : ""}</div>`).join("");
+  $$("#mem div").forEach(d => { d.onmousemove = e => showTip(d.dataset.tip, e.clientX, e.clientY); d.onmouseleave = hideTip; });
+  $("#memLegend").innerHTML = MEM.map(([n, g, c]) => `<span><i style="background:var(${c})"></i>${n} ≈ ${g} GiB</span>`).join("");
+  lossChart();
+  /* gantt: 10-07 05:30 .. 16:30 */
+  const t0 = 5.5, t1 = 16.5, pct = h => ((h - t0) / (t1 - t0) * 100).toFixed(2) + "%";
+  const G = [["chunk 1 · 711070", [[5.97, 6.08, "", "startup + tokenize 458,702 rows (377 s)"], [6.08, 6.8, "", "steps 1–272, deadline stop, checkpoint-272"]]],
+    ["queue wait", [[6.8, 12.8, "wait", "next 8-node allocation pending for 6 h"]]],
+    ["resume · 711522", [[12.8, 16.1, "", "steps 273–1,788 in 195.9 min (7.8 s/step)"]]],
+    ["safety · 711523", [[16.1, 16.12, "alt", "saw finished run, exited in 58 s"]]],
+    ["merge · 711524", [[16.12, 16.15, "alt", "merge LoRA → 51 GB checkpoint (1:22)"]]],
+    ["eval + push · 711525", [[16.15, 16.23, "alt", "vLLM eval 600 × 4, report, W&B, HF push (4:21)"]]]];
+  $("#gantt").innerHTML = `<div class="gr"><span></span><div class="small muted" style="position:relative;height:18px">${[6, 9, 12, 15].map(h => `<span style="position:absolute;left:${pct(h)};transform:translateX(-50%)">${String(h).padStart(2, "0")}:00</span>`).join("")}</div></div>` +
+    G.map(([n, bl]) => `<div class="gr"><span class="small">${n}</span><div class="lane">${bl.map(([a, b, cl, d], i) => `<div class="blk ${cl}" style="left:${pct(a)};width:max(4px,calc(${pct(b)} - ${pct(a)}));animation-delay:${i * .2}s" data-tip="${d}"></div>`).join("")}</div></div>`).join("");
+  $$("#gantt .blk").forEach(b => { b.onmousemove = e => showTip(b.dataset.tip, e.clientX, e.clientY); b.onmouseleave = hideTip; });
+  kpiCards($("#trainKpis"), [{ v: 1788, k: "steps (1 epoch)" }, { v: 7.8, dec: 1, suffix: " s", k: "per step, resumed job" }, { v: 0.318, dec: 3, k: "final dev loss (from 0.326)" }, { v: 128, k: "GPU-hours of training" }], "card");
+  const CFG = [["base model","Qwen/Qwen3.8-27B @ 1d4bf0f2 (qwen3_5, bf16)"],["data","457,689 train + 1,000 dev rows, mean 686 tokens, max 6,144; prompt masked from the loss"],
+    ["LoRA","r 32, α 64, dropout 0.05 · q/k/v/o, in_proj_qkv, in_proj_z, out_proj, gate/up/down · 217.6 M params"],
+    ["batch","8 per GPU × 32 = 256, no accumulation, length-grouped sampler"],["optimizer","AdamW, lr 2e-4, cosine, warmup 3%, bf16, gradient checkpointing (non-reentrant)"],
+    ["parallelism","DDP, NCCL; frozen weights excluded from broadcast and all-reduce"],["checkpoints","dev loss every 100 steps, checkpoint every 100 steps, keep 2; deadline callback at minute 280"],
+    ["hardware","8 × batch-spx nodes, 4 × Rubin (279.5 GiB, 2,300 W) each, Vera CPUs, 1.43 TB RAM, multi-node NVLink"],
+    ["software","PyTorch 2.15 (NVIDIA), transformers 5.18.0, peft 0.21.2, accelerate 1.15.0, flash-linear-attention 0.5.2, CUDA 13.4"],
+    ["tracking","W&B balabala76/qwen38-cricket-reasoning · run general_sa-cricket.sft-full-10070553"]];
+  $("#cfgTable").innerHTML = CFG.map(([k, v]) => `<tr><th style="width:150px">${k}</th><td>${v}</td></tr>`).join("");
+};
+
+/* ================================================================== RESULTS */
+const RES = {
+  types: ["run_rate", "chase_rate", "milestone", "overall"],
+  base: { acc: [98.38, 94.38, 99.12, 97.29], tok: [403, 939, 904, 748] },
+  ref: { acc: [99.00, 92.25, 99.88, 97.04], tok: [280, 610, 557, 482] },
+  ft: { acc: [99.00, 94.62, 100.00, 97.88], tok: [266, 586, 522, 458] },
+};
+const MODELS = [["base", "Base Qwen3.8-27B", "--s-base"], ["ref", "4.5K adapter (Part I)", "--s-ref"], ["ft", "500K adapter (Part II)", "--s-ft"]];
+let resOn = { base: true, ref: true, ft: true }, resMetric = "acc";
+function resChart(){
+  const c = $("#resChart");
+  const draw = () => {
+    const H = 300, [s, w] = svgBox(c, H), m = { l: 48, r: 10, t: 16, b: 34 };
+    const on = MODELS.filter(x => resOn[x[0]]); const acc = resMetric === "acc";
+    const lo = acc ? 90 : 0, hi = acc ? 100 : 1000;
+    const ys = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+    yAxis(s, m.l, w - m.r, ys, acc ? [90, 92, 94, 96, 98, 100] : [0, 250, 500, 750, 1000], v => acc ? v + "%" : v);
+    const gw = (w - m.l - m.r) / 4, bw = Math.min(46, (gw - 24) / Math.max(1, on.length) - 2);
+    RES.types.forEach((t, gi) => {
+      const gx = m.l + gi * gw + gw / 2; const lb = el("text", { x: gx, y: H - 12, "text-anchor": "middle", "font-size": 12.5, "font-weight": t === "overall" ? 700 : 500, fill: css("--md-on-surface") }, s); lb.textContent = t;
+      on.forEach(([k, name, col], mi) => {
+        const v = RES[k][resMetric][gi], x = gx - (on.length * (bw + 2)) / 2 + mi * (bw + 2), y = ys(Math.max(lo, v)), h = ys(lo) - y;
+        const r = el("rect", { x, y: reduce ? y : ys(lo), width: bw, height: reduce ? h : 0, rx: 4, fill: css(col) }, s);
+        if (!reduce) requestAnimationFrame(() => { r.style.transition = `all .8s cubic-bezier(.05,.7,.1,1) ${gi * .06 + mi * .05}s`; r.setAttribute("y", y); r.setAttribute("height", h); });
+        if (k === "ft" || on.length === 1) { const tx = el("text", { x: x + bw / 2, y: y - 6, "text-anchor": "middle", "font-size": 11.5, "font-weight": 600, fill: css("--md-on-surface") }, s); tx.textContent = acc ? v.toFixed(1) : v; }
+        const hit = el("rect", { x: x - 1, y: m.t, width: bw + 2, height: H - m.t - m.b, fill: "transparent" }, s);
+        hit.addEventListener("mousemove", e => { const b = RES.base[resMetric][gi]; showTip(`<b>${name}</b> · ${t}<br>${acc ? "accuracy" : "mean tokens"}: <b>${acc ? v.toFixed(2) + "%" : v}</b>${k !== "base" ? `<br>vs base: ${acc ? (v - b >= 0 ? "+" : "") + (v - b).toFixed(2) + " pts" : ((v / b - 1) * 100).toFixed(0) + "%"}` : ""}`, e.clientX, e.clientY); });
+        hit.addEventListener("mouseleave", hideTip);
+      });
+    });
+    if (acc) { const n = el("text", { x: m.l + 4, y: m.t + 2, "font-size": 10.5, fill: css("--md-on-surface-variant") }, s); n.textContent = "axis starts at 90%"; }
+  };
+  draw(); charts.push(draw); return draw;
+}
+function race(){
+  const ex = D.examples[raceIdx]; const my = ++race.run;
+  const tpS = 160; /* displayed tokens per second */
+  const go1 = (txt, tok, pre, tEl, bar) => new Promise(res => {
+    const t0 = performance.now(), dur = tok / tpS * 1000;
+    const f = t => { if (my !== race.run) return res(); const p = reduce ? 1 : Math.min(1, (t - t0) / dur);
+      pre.textContent = txt.slice(0, Math.round(txt.length * p)); pre.scrollTop = pre.scrollHeight;
+      tEl.textContent = Math.round(tok * p) + " tok" + (p >= 1 ? " ✓" : ""); bar.style.width = (Math.round(tok * p) / ex.base_tokens * 100) + "%";
+      if (p < 1) requestAnimationFrame(f); else res(); }; requestAnimationFrame(f); });
+  go1(ex.ft, ex.ft_tokens, $("#rfP"), $("#rfT"), $("#rfB")).then(() => { if (my === race.run) snack(`Fine-tuned model done: ${ex.ft_tokens} vs ${ex.base_tokens} tokens`); });
+  go1(ex.base, ex.base_tokens, $("#rbP"), $("#rbT"), $("#rbB"));
+}
+race.run = 0; let raceIdx = 0;
+function setRace(i){ raceIdx = i; race.run++; const ex = D.examples[i];
+  $$("#raceSeg button").forEach((b, j) => b.setAttribute("aria-pressed", j === i));
+  $("#raceQ").innerHTML = ex.prompt.replace(/\n/g, "<br>") + `<div style="margin-top:6px"><span class="badge">exact answer: ${ex.gold}</span></div>`;
+  ["#rbP","#rfP"].forEach(s => $(s).textContent = ""); $("#rbT").textContent = "0 tok"; $("#rfT").textContent = "0 tok"; $("#rbB").style.width = $("#rfB").style.width = "0"; }
+function histChart(){
+  const c = $("#histChart");
+  const draw = () => {
+    const H = 260, [s, w] = svgBox(c, H), m = { l: 44, r: 8, t: 10, b: 30 }, nb = 21;
+    const b = D.hist.base.slice(0, nb), f = D.hist.ft.slice(0, nb);
+    b[nb - 1] = D.hist.base.slice(nb - 1).reduce((a, x) => a + x, 0); f[nb - 1] = D.hist.ft.slice(nb - 1).reduce((a, x) => a + x, 0);
+    const mx = niceMax(Math.max(...b, ...f)), ys = v => m.t + (1 - v / mx) * (H - m.t - m.b);
+    yAxis(s, m.l, w - m.r, ys, [0, mx / 4, mx / 2, 3 * mx / 4, mx], v => fmt(Math.round(v)));
+    const bwid = (w - m.l - m.r) / nb;
+    for (let i = 0; i < nb; i++) {
+      [[b[i], "--s-base", 0, "Base"], [f[i], "--s-ft", 1, "500K adapter"]].forEach(([v, col, k, name]) => {
+        const x = m.l + i * bwid + 2 + k * (bwid - 4) / 2, ww = (bwid - 4) / 2 - 1, y = ys(v);
+        const r = el("rect", { x, y: reduce ? y : ys(0), width: Math.max(1, ww), height: reduce ? ys(0) - y : 0, rx: 2, fill: css(col) }, s);
+        if (!reduce) requestAnimationFrame(() => { r.style.transition = `all .7s cubic-bezier(.05,.7,.1,1) ${i * .02}s`; r.setAttribute("y", y); r.setAttribute("height", ys(0) - y); });
+      });
+      const hit = el("rect", { x: m.l + i * bwid, y: m.t, width: bwid, height: H - m.t - m.b, fill: "transparent" }, s);
+      hit.addEventListener("mousemove", e => showTip(`<b>${i * 100}${i === nb - 1 ? "+" : "–" + (i * 100 + 99)} tokens</b><br>Base: ${fmt(b[i])} samples<br>500K adapter: ${fmt(f[i])} samples`, e.clientX, e.clientY));
+      hit.addEventListener("mouseleave", hideTip);
+      if (i % 5 === 0 && i < nb - 1) { const t = el("text", { x: m.l + i * bwid + bwid / 2, y: H - 10, "text-anchor": "middle", class: "axis", "font-size": 11, fill: css("--md-on-surface-variant") }, s); t.textContent = i * 100; }
+    }
+    const t = el("text", { x: w - m.r, y: H - 10, "text-anchor": "end", "font-size": 11, fill: css("--md-on-surface-variant") }, s); t.textContent = "2,000+";
+  };
+  draw(); charts.push(draw);
+}
+let scatOn = { r: true, c: true, m: true };
+function scatChart(){
+  const c = $("#scatChart");
+  const draw = () => {
+    const H = 310, [s, w] = svgBox(c, H), m = { l: 48, r: 12, t: 22, b: 36 }, mx = 1800;
+    const xs = v => m.l + Math.min(v, mx) / mx * (w - m.l - m.r), ys = v => m.t + (1 - Math.min(v, mx) / mx) * (H - m.t - m.b);
+    yAxis(s, m.l, w - m.r, ys, [0, 450, 900, 1350, 1800], v => v);
+    const gx = el("g", { class: "axis" }, s); [0, 450, 900, 1350, 1800].forEach(v => { const t = el("text", { x: xs(v), y: H - 18, "text-anchor": "middle" }, gx); t.textContent = v; });
+    const xl = el("text", { x: (w + m.l) / 2, y: H - 2, "text-anchor": "middle", "font-size": 11, fill: css("--md-on-surface-variant") }, s); xl.textContent = "base model: mean tokens per question →";
+    const yl = el("text", { x: 4, y: 11, "font-size": 11, fill: css("--md-on-surface-variant") }, s); yl.textContent = "↑ fine-tuned: mean tokens per question";
+    el("line", { x1: xs(0), y1: ys(0), x2: xs(mx), y2: ys(mx), stroke: css("--md-outline"), "stroke-dasharray": "5 5" }, s);
+    const lt = el("text", { x: xs(1250), y: ys(1330), "font-size": 11, fill: css("--md-on-surface-variant") }, s); lt.textContent = "no change";
+    const names = { r: "run_rate", c: "chase_rate", m: "milestone" }; let shown = 0, shorter = 0;
+    D.pts.forEach((p, i) => { if (!scatOn[p[0]]) return; shown++; if (p[2] < p[1]) shorter++;
+      const d = el("circle", { cx: xs(p[1]), cy: ys(p[2]), r: reduce ? 4 : 0, fill: css("--s-ft"), "fill-opacity": .55, stroke: css("--md-surface-c-lowest"), "stroke-width": 1 }, s);
+      if (!reduce) setTimeout(() => { d.style.transition = "r .4s"; d.setAttribute("r", 4); }, i * 1.2);
+      d.addEventListener("mousemove", e => { d.setAttribute("r", 7); showTip(`<b>${names[p[0]]}</b><br>base ${p[1]} tok · ${p[3]}/4 correct<br>fine-tuned ${p[2]} tok · ${p[4]}/4 correct`, e.clientX, e.clientY); });
+      d.addEventListener("mouseleave", () => { d.setAttribute("r", 4); hideTip(); }); });
+    $("#scatNote").textContent = `${shorter} of ${shown} questions shown got shorter (${shown ? Math.round(shorter / shown * 100) : 0}%). Points above 1,800 tokens are drawn at the edge.`;
+  };
+  draw(); charts.push(draw); return draw;
+}
+INIT.results = () => {
+  kpiCards($("#resKpis"), [{ v: 97.88, dec: 2, suffix: "%", k: "accuracy (base 97.29%, +0.58 pts)" }, { v: 458, k: "mean tokens per answer (base 748)" },
+    { v: 0, suffix: "%", k: "truncated answers (base 0.38%)" }, { v: 44, k: "questions more reliable (31 less, of 600)" }]);
+  $("#modelChips").innerHTML = MODELS.map(([k, n, c]) => `<button class="chip" aria-pressed="true" data-k="${k}"><i style="width:10px;height:10px;border-radius:3px;background:var(${c});display:inline-block"></i>${n}</button>`).join("");
+  const rd = resChart();
+  $$("#modelChips .chip").forEach(b => b.onclick = () => { const k = b.dataset.k; if (resOn[k] && Object.values(resOn).filter(Boolean).length === 1) return; resOn[k] = !resOn[k]; b.setAttribute("aria-pressed", resOn[k]); rd(); });
+  $$("#resSeg button").forEach(b => b.onclick = () => { $$("#resSeg button").forEach(x => x.setAttribute("aria-pressed", x === b)); resMetric = b.dataset.m; rd(); });
+  $("#resTable").innerHTML = `<tr><th>type</th>${MODELS.map(m => `<th class="num">${m[1]} acc</th>`).join("")}${MODELS.map(m => `<th class="num">${m[1].split(" (")[0]} tokens</th>`).join("")}</tr>` +
+    RES.types.map((t, i) => `<tr><td>${t}</td>${MODELS.map(m => `<td class="num">${RES[m[0]].acc[i].toFixed(2)}%</td>`).join("")}${MODELS.map(m => `<td class="num">${RES[m[0]].tok[i]}</td>`).join("")}</tr>`).join("");
+  $("#raceSeg").innerHTML = D.examples.map((e, i) => `<button aria-pressed="${i === 0}">${e.qtype}</button>`).join("");
+  $$("#raceSeg button").forEach((b, i) => b.onclick = () => setRace(i)); setRace(0); $("#raceBtn").onclick = () => { setRace(raceIdx); race(); };
+  histChart();
+  $("#scatChips").innerHTML = [["r","run_rate"],["c","chase_rate"],["m","milestone"]].map(([k, n]) => `<button class="chip" aria-pressed="true" data-k="${k}">${n}</button>`).join("");
+  const sd = scatChart();
+  $$("#scatChips .chip").forEach(b => b.onclick = () => { scatOn[b.dataset.k] = !scatOn[b.dataset.k]; b.setAttribute("aria-pressed", scatOn[b.dataset.k]); sd(); });
+};
+
+/* ================================================================== INSIGHTS */
+INIT.insights = () => {
+  const I = [
+    ["−39%", "Efficiency is the main win", "The base model already knew the arithmetic (97% correct). Fine-tuning on its own <b>shortest correct</b> answers removed second-guessing: 748 → 458 tokens, with no truncated answers."],
+    ["+2.4 pts", "More data fixed a regression", "The 4.5K adapter lost accuracy on chase_rate (94.38 → 92.25%) because mid-over notation was under-represented. With every delivery covered, chase_rate is 94.62%, above base."],
+    ["55×", "vLLM made 500K feasible", "HF <code>generate()</code> managed ~110 tokens/s per GPU. vLLM with one engine per GPU reached 8,238 tokens/s. 2 M samples took 1.9 h instead of about 4 days."],
+    ["0", "Data parallel beats tensor parallel here", "The 51 GB model fits one 279.5 GiB Rubin GPU, so 32 independent engines need no communication. Load was even (±2%) and a node failure only loses one shard."],
+    ["1 sentence", "Wording matters more than compute", "Two phrasing problems (\"current rate\", and scores like \"1/3\") would have cost ~10% of 2 M samples or broken coverage. A 240-question pilot and the coverage gate caught both."],
+    ["2.4×", "Benchmark before scaling", "A 30-step benchmark per configuration picked batch 8 + length grouping (1.14 rows/s/GPU) and ruled out two OOM settings before reserving 8 nodes for 5 hours."],
+    ["< 1%", "LoRA + DDP is compute-bound", "Only 0.87 GB of gradients per step crosses the fabric, a tiny share of NVLink/InfiniBand bandwidth. GPU utilization (50–72%) was limited by recomputation and variable lengths, not the network."],
+    ["6 h", "Queues, not GPUs, set the wall clock", "Training needed ≈ 4 h, but the run spanned 10 h due to a 6-hour wait for 8 free nodes. Chunked jobs with checkpoint resume and multi-partition submission made it robust."],
+    ["0.318", "Dev loss still falling", "Unlike Part I's flat curve, the 500K run improved the whole epoch (0.326 → 0.318). A second epoch or harder question types are natural next experiments."],
+  ];
+  $("#insightCards").innerHTML = I.map(([n, t, d]) => `<div class="card elev insight"><span class="num">${n}</span><h3 style="margin:0">${t}</h3><p class="small" style="margin:0">${d}</p></div>`).join("");
+  const P = [["source rows used", "1,500 sampled", "all 425,119"], ["training rows", "4,410", "457,689"], ["question types", "3", "6"], ["distillation", "HF + vLLM, 1 node", "vLLM, 32 GPUs, 1.9 h"],
+    ["training GPUs / time", "16 GPUs · 20 min", "32 GPUs · ≈ 4.0 h"], ["epochs · global batch · lr", "2 · 64 · 1e-4", "1 · 256 · 2e-4"], ["overall accuracy", "97.04%", "<b>97.88%</b>"],
+    ["chase_rate accuracy", "92.25%", "<b>94.62%</b>"], ["mean tokens", "482", "<b>458</b>"], ["dev loss trend", "flat ≈ 0.311", "falling 0.326 → 0.318"]];
+  $("#partTable").innerHTML = `<tr><th></th><th>Part I · 4.5K</th><th>Part II · 500K</th></tr>` + P.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("");
+};
+
+/* ================================================================== REPRO */
+INIT.repro = () => {
+  const L = [
+    ["Model · recommended", "Qwen3.8-27B-Cricket-Reasoning-Full-LoRA", "https://huggingface.co/Balab2021/Qwen3.8-27B-Cricket-Reasoning-Full-LoRA", "500K adapter · rev 5f21ce65 · adapter 870 MB + merged/ 54.7 GB", "primary"],
+    ["Dataset · 500K", "CricketData-T20-Reasoning-Qwen3.8-Full", "https://huggingface.co/datasets/Balab2021/CricketData-T20-Reasoning-Qwen3.8-Full", "500,000 verified rows · rev ad669766 · 2.08 GB", "primary"],
+    ["Model · reference", "Qwen3.8-27B-Cricket-Reasoning-LoRA", "https://huggingface.co/Balab2021/Qwen3.8-27B-Cricket-Reasoning-LoRA", "4.5K adapter (Part I) · rev 40af7e4f", ""],
+    ["Dataset · reference", "CricketData-T20-Reasoning-Qwen3.8", "https://huggingface.co/datasets/Balab2021/CricketData-T20-Reasoning-Qwen3.8", "4,500 rows · rev efa29528", ""],
+    ["Source data", "Valarmathy/CricketData", "https://huggingface.co/datasets/Valarmathy/CricketData", "425,119 T20I deliveries · CC0 · rev a2518e9d", ""],
+    ["Base model", "Qwen/Qwen3.8-27B", "https://huggingface.co/Qwen/Qwen3.8-27B", "Apache-2.0 · rev 1d4bf0f2", ""],
+  ];
+  $("#links").innerHTML = L.map(([k, n, u, d, cl]) => `<a class="card ${cl ? "primary" : "elev"}" href="${u}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">
+    <div class="label" style="color:inherit;opacity:.8">${k}</div><div class="title-m" style="margin:4px 0;word-break:break-word">${n} ↗</div><div class="small" style="opacity:.85">${d}</div><div class="small mono" style="opacity:.7;margin-top:6px;word-break:break-all">${u}</div></a>`).join("");
+  const code = (id, txt) => { const b = $(id); b.innerHTML = `<button class="btn text copy">Copy</button>` + txt.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/(#[^\n]*)/g, '<span class="c">$1</span>');
+    $(".copy", b).onclick = () => { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => snack("Copied"), () => snack("Copy not available here")); }; };
+  code("#codeUse", `# vLLM with the merged weights (fastest)
+huggingface-cli download Balab2021/Qwen3.8-27B-Cricket-Reasoning-Full-LoRA \\
+  --include "merged/*" --local-dir ./cricket-full
+
+from vllm import LLM, SamplingParams
+llm = LLM(model="./cricket-full/merged", dtype="bfloat16", max_model_len=8192)
+tok = llm.get_tokenizer()
+msgs = [{"role": "system", "content": "You are a cricket analyst. Work through the problem "
+         "step by step, then give the final answer on its own line as 'Final answer: <number>'."},
+        {"role": "user", "content": "<match situation>\\n\\n<question>"}]
+prompt = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=True)
+out = llm.generate([prompt], SamplingParams(temperature=1.0, top_p=0.95, top_k=20, max_tokens=6144))
+print(out[0].outputs[0].text)          # ... Final answer: 10.00`);
+  code("#codeRun", `C=/lustre/fsw/general_sa/bbalakreshna/clustercodes/code/cricket/submit.sh
+# 1. dataset (≈ 62 GPU-hours)
+bash $C prepare-full        # verify 425,119 rows, build 500K questions
+bash $C pilot-full          # 240 questions, check every type
+bash $C generate-full       # vLLM on 8 nodes × 4 GPUs, resumable
+bash $C retry-full          # 8 more samples for unsolved questions
+bash $C push-full           # refuses while any source row is uncovered
+# 2. fine-tune + merge + eval + push (≈ 128 GPU-hours)
+PARTITION=batch-xdr,batch-spx GEN_NAME=train-full \\
+  TRAIN_TIME=04:59:00 TRAIN_MIN=280 SAVE_STEPS=100 bash $C train-full`);
+  $("#swTable").innerHTML = [["cluster","Hecate (Vera Rubin), SLURM, account general_sa"],["node","4 × Rubin sm_107, 279.5 GiB, 2,300 W · 2 × Vera aarch64 · 1.43 TB RAM"],
+    ["network","8 × 800 Gb/s XDR InfiniBand (xdr) / Spectrum-X Ethernet (spx) · multi-node NVLink"],["distillation image","dl/dgx/vllm:rubin-py3-devel · vLLM 0.30.0, torch 2.15, Triton 3.6"],
+    ["training image","dl/dgx/pytorch:main-py3-devel + venv qwen38-ft"],["storage","Lustre $LUSTRE_DIR: data, code, checkpoints, logs; jobs run from $HOME"]]
+    .map(([k, v]) => `<tr><th style="width:130px">${k}</th><td>${v}</td></tr>`).join("");
+  $("#glossary").innerHTML = [["Distillation","Training a model on outputs generated by a model. Here the teacher is the same model (self-distillation)."],
+    ["Rejection sampling","Generate several answers, reject the wrong ones and keep a good one (here the shortest correct one)."],
+    ["Thinking mode","Qwen writes its reasoning before the final answer. Shorter reasoning means cheaper, faster inference."],
+    ["LoRA","Low-Rank Adaptation: freeze the big weight matrices and learn a small low-rank correction B·A."],
+    ["DDP","Distributed Data Parallel: every GPU has a model copy, sees different rows, and gradients are averaged."],
+    ["vLLM","A high-throughput inference engine with continuous batching and paged KV cache."],
+    ["pass@4","Share of questions where at least one of 4 samples is correct."],
+    ["Overs notation","14.3 overs = 14 overs and 3 balls = 87 balls (an over has 6 legal balls)."]]
+    .map(([t, d]) => `<dt>${t}</dt><dd>${d}</dd>`).join("");
+};
+
+/* boot */
+go((location.hash || "#overview").slice(1), false);
+addEventListener("hashchange", () => go(location.hash.slice(1), false));
+})();
+</script>
+</body>
+</html>
