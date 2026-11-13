@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cricket RLVR Run Report</title>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f6f5f2; --surface:#fcfcfb; --border:#e3e1da; --grid:#e9e7e0;
+  --text:#0b0b0b; --text2:#52514e; --muted:#84827a; --track:#eceae4;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --base:#8a887f; --good:#1a7f37; --bad:#b3261e;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#111110; --surface:#1a1a19; --border:#33322f; --grid:#2a2a27;
+    --text:#f0efec; --text2:#c3c2b7; --muted:#8f8e85; --track:#2a2a27;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --base:#9a988f; --good:#4cc26b; --bad:#f2817a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111110; --surface:#1a1a19; --border:#33322f; --grid:#2a2a27;
+  --text:#f0efec; --text2:#c3c2b7; --muted:#8f8e85; --track:#2a2a27;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --base:#9a988f; --good:#4cc26b; --bad:#f2817a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1080px;margin:0 auto;padding:28px 16px 64px}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px}
+h2{font-size:18px;margin:36px 0 4px}
+h3{font-size:14px;margin:0 0 2px;font-weight:600}
+p{margin:6px 0}
+.sub{color:var(--text2);max-width:76ch}
+.note{color:var(--muted);font-size:13px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;min-width:0}
+.grid{display:grid;gap:12px}
+.tiles{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-top:18px}
+.tile .k{color:var(--text2);font-size:13px}
+.tile .v{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.25}
+.tile .v small{font-size:14px;font-weight:500;color:var(--muted)}
+.tile .d{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.two{grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--text2);margin:6px 0 2px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+.legend i.dot{width:10px;height:10px;border-radius:50%}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{fill:var(--text2);font-size:12px;font-variant-numeric:tabular-nums}
+svg .lab{fill:var(--text);font-size:13px}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0 4px}
+button,select{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer}
+button.primary{background:var(--s1);border-color:var(--s1);color:#fff;min-width:84px}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--s1)}
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:8px 0 12px}
+.readout div{border:1px solid var(--border);border-radius:8px;padding:6px 10px}
+.readout .k{font-size:12px;color:var(--text2)}
+.readout .v{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+#tip{position:fixed;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.18);display:none;z-index:9;font-variant-numeric:tabular-nums;max-width:270px}
+#tip b{font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--text2);font-weight:600}
+.scroll{overflow-x:auto;max-height:420px;overflow-y:auto}
+ul.ins{padding-left:20px;margin:8px 0}
+ul.ins li{margin:8px 0;max-width:80ch}
+details{margin-top:10px}
+summary{cursor:pointer;color:var(--text2);font-size:13px}
+/* cluster map */
+.nodes{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:760px){.nodes{grid-template-columns:repeat(2,1fr)}}
+.node{border:1px solid var(--border);border-radius:8px;padding:8px}
+.node .nm{font-size:12px;color:var(--text2);display:flex;justify-content:space-between;gap:6px;margin-bottom:6px}
+.gp{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.gpu{height:44px;border-radius:5px;background:var(--track);position:relative;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;cursor:default}
+.gpu .ph{position:absolute;inset:0;display:flex;gap:2px}
+.gpu .ph b{display:block;height:100%;transition:opacity .12s}
+.gpu .ph .r{background:var(--s1)} .gpu .ph .u{background:var(--s2)}
+.gpu span{position:relative;font-size:11px;font-weight:600;color:#fff;padding-bottom:2px;text-shadow:0 0 3px rgba(0,0,0,.55)}
+.phase{font-size:14px;margin:10px 0 2px;min-height:22px}
+.phase b{font-weight:600}
+/* horizontal bars */
+.hbar{display:flex;gap:2px;height:26px;border-radius:5px;overflow:hidden;margin:10px 0 6px}
+.hbar div{height:100%}
+.mem{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13px;margin-top:8px}
+.mem .tr{height:14px;background:var(--track);border-radius:4px;overflow:hidden}
+.mem .tr div{height:100%;background:var(--s1);border-radius:0 4px 4px 0}
+.mem .n{font-variant-numeric:tabular-nums;color:var(--text2)}
+</style>
+</head>
+<body>
+<main>
+<h1>RLVR on 32 Vera Rubin GPUs: what the run did and how well the GPUs were used</h1>
+<p class="sub">Qwen3.8-27B was trained with reinforcement learning with verifiable rewards on T20 cricket questions (Rhea job 39000, 13 Nov 2026). The model answered questions itself and was rewarded only for a correct final number, with a small bonus for shorter answers.</p>
+
+<div class="grid tiles" id="tiles"></div>
+
+<h2>How the 32 GPUs worked together</h2>
+<p class="sub" id="how"></p>
+<div class="card">
+  <div class="controls">
+    <button class="primary" id="play">Replay</button>
+    <input type="range" id="scrub" min="1" max="100" step="1" value="100" aria-label="Training step">
+    <label class="note">Speed <select id="speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="3">3x</option></select></label>
+  </div>
+  <div class="readout" id="readout"></div>
+  <div class="nodes" id="nodes"></div>
+  <div class="phase" id="phase"></div>
+  <div class="legend"><span><i style="background:var(--s1)"></i>Rollouts (the model answers questions)</span><span><i style="background:var(--s2)"></i>Update (gradients on those answers)</span></div>
+  <p class="note" id="gridnote"></p>
+</div>
+
+<h2>What the model learned, step by step</h2>
+<p class="sub">Accuracy and length are measured on the training rollouts, which are capped at 1,024 tokens. They are not benchmark numbers.</p>
+<div class="grid two">
+  <div class="card"><h3>Rollout accuracy</h3><p class="note">Share of the 1,024 answers per step that were correct</p><svg id="cAcc"></svg></div>
+  <div class="card"><h3>Mean answer length</h3><p class="note">Tokens per answer, reasoning included</p><svg id="cTok"></svg></div>
+  <div class="card"><h3>Questions that still taught something</h3><p class="note">Share of questions with both right and wrong answers among their 8 samples</p><svg id="cMix"></svg></div>
+  <div class="card"><h3>Measured GPU utilisation</h3><p class="note" id="utilNote"></p><svg id="cUtil"></svg></div>
+</div>
+
+<h2>Where the time went</h2>
+<div class="grid two">
+  <div class="card"><h3>Whole job</h3><p class="note" id="budgetNote"></p><div class="hbar" id="budget"></div><div class="legend" id="budgetLegend"></div>
+    <h3 style="margin-top:18px">GPU memory in use at peak</h3><p class="note" id="memNote"></p><div class="mem" id="mem"></div></div>
+  <div class="card"><h3>Seconds per step</h3><p class="note" id="stepNote"></p><svg id="cTime"></svg>
+    <div class="legend"><span><i style="background:var(--s1)"></i>Rollouts</span><span><i style="background:var(--s2)"></i>Update</span></div></div>
+</div>
+
+<h2>Before and after on the benchmark</h2>
+<p class="sub">600 held-out questions, 4 samples each, up to 4,096 tokens. "Before" is the base model; "after" is the base model with the RLVR adapter.</p>
+<div class="grid two">
+  <div class="card"><h3>Accuracy</h3><svg id="bAcc"></svg></div>
+  <div class="card"><h3>Mean tokens per answer</h3><svg id="bTok"></svg></div>
+</div>
+<div class="legend"><span><i class="dot" style="background:var(--base)"></i>Before (base model)</span><span><i class="dot" style="background:var(--s3)"></i>After (RLVR)</span></div>
+
+<h2>How well were the GPUs used?</h2>
+<div class="grid two">
+  <div class="card"><h3>What worked</h3><ul class="ins" id="good"></ul></div>
+  <div class="card"><h3>What was left on the table</h3><ul class="ins" id="bad"></ul></div>
+</div>
+<p class="note" id="caveat"></p>
+
+<details><summary>Per-step table</summary><div class="scroll"><table id="tbl"></table></div></details>
+</main>
+<div id="tip"></div>
+<script>
+const D = {"steps":[{"s":1,"acc":0.7275390625,"tok":649.45703125,"cut":0.2470703125,"mixed":0.609375,"rew":0.6902103424072266,"ro":307.62815081328154,"up":127.22680800408125,"st":434.8155996799469,"el":435.02670073509216,"util":[15.8,17.6,21.9,39.3]},{"s":2,"acc":0.787109375,"tok":610.3310546875,"cut":0.1982421875,"mixed":0.5546875,"rew":0.7481770515441895,"ro":58.65239819139242,"up":102.04411808401346,"st":160.69482421875,"el":595.799723148346,"util":[68.8,90.5,92.5,46.3]},{"s":3,"acc":0.8173828125,"tok":585.2900390625,"cut":0.1611328125,"mixed":0.5859375,"rew":0.7775681495666504,"ro":56.08013927191496,"up":47.17388841509819,"st":103.25400733947754,"el":699.1060869693756,"util":[82.6,54.1,92.7,78.0]},{"s":4,"acc":0.9150390625,"tok":457.8916015625,"cut":0.0625,"mixed":0.3359375,"rew":0.8774968147277832,"ro":51.39382863044739,"up":40.07769113779068,"st":91.47132563591003,"el":790.5961747169495,"util":[79.7,68.0,83.7,79.5]},{"s":5,"acc":0.9560546875,"tok":304.6220703125,"cut":0.005859375,"mixed":0.234375,"rew":0.9280729293823242,"ro":39.95118577033281,"up":53.593124471604824,"st":93.54354190826416,"el":884.1911931037903,"util":[82.8,74.7,93.2,76.7]},{"s":6,"acc":0.9736328125,"tok":206.3837890625,"cut":0.0,"mixed":0.140625,"rew":0.9540779113769531,"ro":23.936758801341057,"up":54.79455158859491,"st":78.73003029823303,"el":962.9665572643279,"util":[69.7,73.5,78.0,80.3]},{"s":7,"acc":0.9794921875,"tok":147.0908203125,"cut":0.0,"mixed":0.1015625,"rew":0.9654782295227051,"ro":17.78183801472187,"up":48.626023292541504,"st":66.40597581863403,"el":1029.417249917984,"util":[90.5,66.5,72.8,92.8]},{"s":8,"acc":0.9951171875,"tok":117.5947265625,"cut":0.0,"mixed":0.0390625,"rew":0.983714485168457,"ro":12.51116032898426,"up":30.71969050168991,"st":43.2291042804718,"el":1072.6928734779358,"util":[55.0,55.0,92.7,59.0]},{"s":9,"acc":0.9951171875,"tok":113.75390625,"cut":0.0,"mixed":0.0390625,"rew":0.9840662002563476,"ro":10.835718758404255,"up":23.31028289347887,"st":34.143736600875854,"el":1106.8819742202759,"util":[82.5,75.0,40.5,39.5]},{"s":10,"acc":0.9892578125,"tok":105.83203125,"cut":0.0,"mixed":0.0625,"rew":0.9790241241455078,"ro":10.12780699133873,"up":21.47771818935871,"st":31.60463833808899,"el":1138.5065650939941,"util":[56.5,32.0,38.0,38.0]},{"s":11,"acc":0.99609375,"tok":110.2607421875,"cut":0.0,"mixed":0.03125,"rew":0.9854093551635742,"ro":10.91465812921524,"up":26.949668683111668,"st":37.863932371139526,"el":1178.7028968334198,"util":[33.3,65.3,59.7,66.7]},{"s":12,"acc":0.986328125,"tok":109.8701171875,"cut":0.0,"mixed":0.046875,"rew":0.9759121894836426,"ro":11.787349179387093,"up":25.78855288028717,"st":37.57451510429382,"el":1216.3060281276703,"util":[54.7,75.3,92.7,92.0]},{"s":13,"acc":0.9970703125,"tok":106.1474609375,"cut":0.0,"mixed":0.015625,"rew":0.9867384910583497,"ro":10.454997718334198,"up":24.101737648248672,"st":34.55494499206543,"el":1250.8955755233765,"util":[50.0,83.5,100.0,100.0]},{"s":14,"acc":0.994140625,"tok":109.109375,"cut":0.0,"mixed":0.0234375,"rew":0.9835961341857911,"ro":11.1965918764472,"up":31.726373247802258,"st":42.9231321811676,"el":1293.8516743183136,"util":[88.3,91.7,100.0,93.3]},{"s":15,"acc":0.9951171875,"tok":104.48828125,"cut":0.0,"mixed":0.03125,"rew":0.984980583190918,"ro":9.949352771043777,"up":25.58569087833166,"st":35.53336262702942,"el":1329.4322152137756,"util":[100.0,50.0,50.0,53.5]},{"s":16,"acc":0.9970703125,"tok":126.0234375,"cut":0.0,"mixed":0.0234375,"rew":0.9848267555236816,"ro":12.947944402694702,"up":35.789173893630505,"st":48.73464298248291,"el":1378.2140204906464,"util":[88.0,85.0,59.0,92.0]},{"s":17,"acc":0.998046875,"tok":116.04296875,"cut":0.0,"mixed":0.0078125,"rew":0.986729621887207,"ro":11.777998618781567,"up":28.943532705307007,"st":40.72013568878174,"el":1418.973315000534,"util":[88.7,77.7,58.3,58.7]},{"s":18,"acc":1.0,"tok":121.3798828125,"cut":0.0,"mixed":0.0,"rew":0.9881464958190918,"ro":13.094675168395042,"up":32.888265907764435,"st":45.98158526420593,"el":1464.98703789711,"util":[88.0,88.3,93.0,92.3]},{"s":19,"acc":1.0,"tok":115.248046875,"cut":0.0,"mixed":0.0,"rew":0.9887453079223633,"ro":12.619967512786388,"up":25.557733237743378,"st":38.17636799812317,"el":1503.183023929596,"util":[87.3,54.7,91.7,58.7]},{"s":20,"acc":1.0,"tok":115.779296875,"cut":0.0,"mixed":0.0,"rew":0.9886934280395507,"ro":13.035973705351353,"up":23.92272762209177,"st":36.95779490470886,"el":1540.1543321609497,"util":[33.0,82.5,90.5,100.0]},{"s":21,"acc":1.0,"tok":107.8095703125,"cut":0.0,"mixed":0.0,"rew":0.98947172164917,"ro":12.215291865170002,"up":25.115924030542374,"st":37.329928398132324,"el":1579.5997042655945,"util":[47.0,21.0,59.3,25.0]},{"s":22,"acc":0.99609375,"tok":112.884765625,"cut":0.0,"mixed":0.015625,"rew":0.9850940704345703,"ro":13.530539438128471,"up":24.163531213998795,"st":37.69306516647339,"el":1617.3059129714966,"util":[82.5,83.0,90.5,50.0]},{"s":23,"acc":1.0,"tok":125.2236328125,"cut":0.0,"mixed":0.0,"rew":0.9877711296081543,"ro":14.118284903466702,"up":28.789769366383553,"st":42.90578603744507,"el":1660.2597365379333,"util":[88.0,77.7,88.0,91.7]},{"s":24,"acc":0.998046875,"tok":144.8681640625,"cut":0.0,"mixed":0.0078125,"rew":0.983922004699707,"ro":15.115756191313267,"up":23.282141506671906,"st":38.397584438323975,"el":1698.7043154239655,"util":[54.7,87.7,20.3,25.0]},{"s":25,"acc":1.0,"tok":130.7060546875,"cut":0.0,"mixed":0.0,"rew":0.9872357368469238,"ro":14.245805509388447,"up":28.22696241736412,"st":42.47176694869995,"el":1741.189600944519,"util":[55.3,61.7,66.7,100.0]},{"s":26,"acc":0.998046875,"tok":157.857421875,"cut":0.0,"mixed":0.015625,"rew":0.9826582908630371,"ro":17.322713054716587,"up":26.71438653767109,"st":44.03614950180054,"el":1785.262610912323,"util":[83.5,83.0,90.5,90.0]},{"s":27,"acc":0.9990234375,"tok":142.2509765625,"cut":0.0,"mixed":0.0078125,"rew":0.9851430892944336,"ro":16.019962519407272,"up":26.65112217515707,"st":42.67010283470154,"el":1827.952302694321,"util":[55.7,55.3,68.7,60.0]},{"s":28,"acc":0.9970703125,"tok":151.5009765625,"cut":0.0,"mixed":0.0078125,"rew":0.9822916030883789,"ro":17.131236776709557,"up":31.81576929986477,"st":48.94652199745178,"el":1876.919334888458,"util":[82.8,57.8,69.0,68.5]},{"s":29,"acc":1.0,"tok":143.8173828125,"cut":0.0,"mixed":0.0,"rew":0.9859553337097168,"ro":16.3357909694314,"up":28.86077570170164,"st":45.196853160858154,"el":1922.1443378925323,"util":[55.7,88.3,27.3,60.0]},{"s":30,"acc":1.0,"tok":142.0126953125,"cut":0.0,"mixed":0.0,"rew":0.9861315727233887,"ro":17.01661852747202,"up":50.459463357925415,"st":67.47405314445496,"el":1989.6672554016113,"util":[91.5,66.5,70.5,70.2]},{"s":31,"acc":1.0,"tok":152.6640625,"cut":0.0,"mixed":0.0,"rew":0.9850914001464843,"ro":17.747790940105915,"up":28.25073316693306,"st":45.99755930900574,"el":2037.822491645813,"util":[44.0,86.0,54.3,91.3]},{"s":32,"acc":1.0,"tok":137.3837890625,"cut":0.0,"mixed":0.0,"rew":0.9865836143493653,"ro":16.08839913457632,"up":33.5159977003932,"st":49.60348677635193,"el":2087.4377915859222,"util":[90.8,60.0,77.5,68.8]},{"s":33,"acc":0.9970703125,"tok":140.822265625,"cut":0.0,"mixed":0.0234375,"rew":0.9833878517150879,"ro":16.04045732319355,"up":28.19389034062624,"st":44.23330903053284,"el":2131.6979734897614,"util":[22.0,100.0,94.0,59.7]},{"s":34,"acc":0.9990234375,"tok":134.2607421875,"cut":0.0,"mixed":0.0078125,"rew":0.9859268188476562,"ro":16.565940611064434,"up":32.43321608006954,"st":48.99763774871826,"el":2180.7258813381195,"util":[87.3,85.3,100.0,100.0]},{"s":35,"acc":0.9951171875,"tok":129.0517578125,"cut":0.0,"mixed":0.0234375,"rew":0.9825916290283203,"ro":15.07752887904644,"up":44.638461612164974,"st":59.715585231781006,"el":2240.454311609268,"util":[91.5,91.2,100.0,95.0]},{"s":36,"acc":0.99609375,"tok":140.7490234375,"cut":0.0,"mixed":0.015625,"rew":0.9823980331420898,"ro":17.569051802158356,"up":41.85559418797493,"st":59.42312502861023,"el":2299.919276237488,"util":[66.2,91.2,76.2,44.2]},{"s":37,"acc":0.9970703125,"tok":158.130859375,"cut":0.0,"mixed":0.0234375,"rew":0.9817058563232421,"ro":21.54391770809889,"up":44.85016793757677,"st":66.39525032043457,"el":2366.3240053653717,"util":[72.8,66.5,94.8,95.0]},{"s":38,"acc":1.0,"tok":136.9580078125,"cut":0.0,"mixed":0.0,"rew":0.9866251945495605,"ro":18.330543488264084,"up":51.51732152700424,"st":69.84579658508301,"el":2436.206733942032,"util":[91.0,52.8,100.0,94.6]},{"s":39,"acc":1.0,"tok":142.3642578125,"cut":0.0,"mixed":0.0,"rew":0.9860972404479981,"ro":16.571151733398438,"up":42.61384478211403,"st":59.183860301971436,"el":2495.426279783249,"util":[91.2,91.2,95.0,69.8]},{"s":40,"acc":1.0,"tok":131.888671875,"cut":0.0,"mixed":0.0,"rew":0.987120246887207,"ro":16.572481088340282,"up":53.68877528607845,"st":70.26105213165283,"el":2565.6975519657135,"util":[84.2,66.5,95.0,94.2]},{"s":41,"acc":1.0,"tok":156.251953125,"cut":0.0,"mixed":0.0,"rew":0.9847410202026368,"ro":17.608685463666916,"up":57.91263795644045,"st":75.5187292098999,"el":2643.4067146778107,"util":[60.0,73.2,76.2,100.0]},{"s":42,"acc":1.0,"tok":141.189453125,"cut":0.0,"mixed":0.0,"rew":0.9862119674682617,"ro":14.624681539833546,"up":25.681613825261593,"st":40.30424618721008,"el":2683.7668027877808,"util":[77.0,61.5,89.5,50.0]},{"s":43,"acc":0.9921875,"tok":138.8759765625,"cut":0.0,"mixed":0.0,"rew":0.9787284851074218,"ro":16.666649989783764,"up":43.029943846166134,"st":59.69490361213684,"el":2743.5088181495667,"util":[56.8,65.5,90.0,93.2]},{"s":44,"acc":0.998046875,"tok":129.421875,"cut":0.0,"mixed":0.0078125,"rew":0.9854335784912109,"ro":15.010364912450314,"up":30.121315978467464,"st":45.12934732437134,"el":2788.6845021247864,"util":[44.7,66.7,58.0,18.7]},{"s":45,"acc":0.9970703125,"tok":133.3310546875,"cut":0.0,"mixed":0.0078125,"rew":0.9841081619262695,"ro":14.182755410671234,"up":25.778246827423573,"st":39.95869040489197,"el":2828.687509536743,"util":[82.0,43.7,76.3,91.7]},{"s":46,"acc":1.0,"tok":136.478515625,"cut":0.0,"mixed":0.0,"rew":0.9866720199584961,"ro":15.998136438429356,"up":45.60704641789198,"st":61.60367226600647,"el":2890.3388900756836,"util":[91.2,91.2,94.2,93.8]},{"s":47,"acc":1.0,"tok":134.869140625,"cut":0.0,"mixed":0.0,"rew":0.9868291854858399,"ro":14.062839448451996,"up":27.809841714799404,"st":41.8740119934082,"el":2932.2556965351105,"util":[88.0,88.0,92.7,92.7]},{"s":48,"acc":1.0,"tok":125.412109375,"cut":0.0,"mixed":0.0,"rew":0.9877527236938477,"ro":14.390069268643856,"up":41.01051016896963,"st":55.40219020843506,"el":2987.6671454906464,"util":[69.2,91.2,100.0,94.2]},{"s":49,"acc":1.0,"tok":121.888671875,"cut":0.0,"mixed":0.0,"rew":0.988096809387207,"ro":13.555654890835285,"up":28.459865137934685,"st":42.013323068618774,"el":3029.7235491275787,"util":[82.5,53.0,100.0,100.0]},{"s":50,"acc":0.9990234375,"tok":121.21484375,"cut":0.0,"mixed":0.0078125,"rew":0.9872019767761231,"ro":13.65029190480709,"up":27.566266231238842,"st":41.21469473838806,"el":3070.985074043274,"util":[62.0,89.0,33.3,33.3]},{"s":51,"acc":1.0,"tok":119.2412109375,"cut":0.0,"mixed":0.0,"rew":0.9883553504943847,"ro":12.38843496888876,"up":25.285032331943512,"st":37.67015504837036,"el":3110.800377368927,"util":[54.3,59.0,58.7,58.0]},{"s":52,"acc":1.0,"tok":117.4794921875,"cut":0.0,"mixed":0.0,"rew":0.9885273933410644,"ro":12.707942977547646,"up":27.48725714534521,"st":40.19255590438843,"el":3151.040864467621,"util":[100.0,88.0,100.0,100.0]},{"s":53,"acc":1.0,"tok":112.7255859375,"cut":0.0,"mixed":0.0,"rew":0.988991641998291,"ro":12.70254547148943,"up":30.424728699028492,"st":43.12520623207092,"el":3194.213595867157,"util":[82.5,100.0,100.0,84.5]},{"s":54,"acc":0.9951171875,"tok":109.9755859375,"cut":0.0,"mixed":0.0078125,"rew":0.9844436645507812,"ro":12.740901790559292,"up":27.980033338069916,"st":40.72012901306152,"el":3234.944713830948,"util":[91.7,55.7,91.3,58.3]},{"s":55,"acc":1.0,"tok":105.8623046875,"cut":0.0,"mixed":0.0,"rew":0.9896618843078613,"ro":11.676059275865555,"up":25.556255400180817,"st":37.230013608932495,"el":3272.2224411964417,"util":[88.0,55.0,92.7,92.0]},{"s":56,"acc":1.0,"tok":112.8212890625,"cut":0.0,"mixed":0.0,"rew":0.9889822959899902,"ro":12.650786764919758,"up":34.93994852900505,"st":47.59004878997803,"el":3319.8431515693665,"util":[46.0,99.0,66.7,100.0]},{"s":57,"acc":0.9990234375,"tok":109.765625,"cut":0.0,"mixed":0.0078125,"rew":0.9883214950561523,"ro":11.783461064100266,"up":29.191373504698277,"st":40.97394585609436,"el":3360.8269352912903,"util":[82.5,83.0,100.0,83.5]},{"s":58,"acc":1.0,"tok":110.4521484375,"cut":0.0,"mixed":0.0,"rew":0.9892136573791503,"ro":11.73523112386465,"up":25.394042156636715,"st":37.12766146659851,"el":3397.9859158992767,"util":[100.0,100.0,100.0,100.0]},{"s":59,"acc":1.0,"tok":115.8798828125,"cut":0.0,"mixed":0.0,"rew":0.9886836051940918,"ro":12.553676426410675,"up":30.170084297657013,"st":42.72305774688721,"el":3440.7172479629517,"util":[55.0,88.0,100.0,59.0]},{"s":60,"acc":1.0,"tok":102.19921875,"cut":0.0,"mixed":0.0,"rew":0.9900196075439454,"ro":10.840976178646088,"up":25.631309509277344,"st":36.47044849395752,"el":3477.2337777614594,"util":[97.5,77.0,71.0,89.5]},{"s":61,"acc":0.998046875,"tok":106.54296875,"cut":0.0,"mixed":0.015625,"rew":0.9876707077026368,"ro":11.154474690556526,"up":27.495020277798176,"st":38.64868116378784,"el":3518.0338220596313,"util":[88.3,56.0,66.7,92.7]},{"s":62,"acc":1.0,"tok":101.9326171875,"cut":0.0,"mixed":0.0,"rew":0.9900456428527832,"ro":11.295933179557323,"up":27.47051401436329,"st":38.7638726234436,"el":3556.8453238010406,"util":[55.0,88.0,59.7,59.0]},{"s":63,"acc":1.0,"tok":105.0419921875,"cut":0.0,"mixed":0.0,"rew":0.9897419929504394,"ro":12.159117817878723,"up":30.874822556972504,"st":43.03235960006714,"el":3599.923108816147,"util":[50.5,100.0,90.5,100.0]},{"s":64,"acc":1.0,"tok":103.6806640625,"cut":0.0,"mixed":0.0,"rew":0.9898749351501465,"ro":10.59635253995657,"up":27.619293615221977,"st":38.2143280506134,"el":3638.1690928936005,"util":[66.7,100.0,86.0,100.0]},{"s":65,"acc":1.0,"tok":96.365234375,"cut":0.0,"mixed":0.0,"rew":0.9905893325805664,"ro":9.88285981118679,"up":35.12708405405283,"st":45.00822973251343,"el":3683.2095482349396,"util":[88.0,88.3,72.0,100.0]},{"s":66,"acc":0.9990234375,"tok":94.322265625,"cut":0.0,"mixed":0.0078125,"rew":0.9898241996765137,"ro":9.59264100342989,"up":28.79909534752369,"st":38.39011788368225,"el":3721.629503965378,"util":[55.0,100.0,100.0,100.0]},{"s":67,"acc":1.0,"tok":93.2880859375,"cut":0.0,"mixed":0.0,"rew":0.9908898353576661,"ro":8.585904911160469,"up":25.813030384480953,"st":34.3977689743042,"el":3756.0588829517365,"util":[50.0,50.0,50.0,50.0]},{"s":68,"acc":1.0,"tok":91.6220703125,"cut":0.0,"mixed":0.0,"rew":0.9910525321960449,"ro":8.152831256389618,"up":22.07239208370447,"st":30.223859310150146,"el":3786.318712949753,"util":[50.0,83.0,100.0,80.5]},{"s":69,"acc":1.0,"tok":78.7294921875,"cut":0.0,"mixed":0.0,"rew":0.9923115730285644,"ro":7.086695559322834,"up":22.655865482985973,"st":29.74153423309326,"el":3816.0923924446106,"util":[100.0,50.0,50.0,50.0]},{"s":70,"acc":0.998046875,"tok":81.8916015625,"cut":0.0,"mixed":0.0078125,"rew":0.9900612831115723,"ro":8.154563806951046,"up":25.733778417110443,"st":33.887702226638794,"el":3850.016403913498,"util":[83.0,100.0,83.0,50.0]},{"s":71,"acc":0.9990234375,"tok":88.591796875,"cut":0.0,"mixed":0.0078125,"rew":0.9903873443603516,"ro":7.564211145043373,"up":25.541890241205692,"st":33.103179693222046,"el":3885.3074848651886,"util":[81.5,82.0,88.5,88.5]},{"s":72,"acc":1.0,"tok":94.576171875,"cut":0.0,"mixed":0.0,"rew":0.990764045715332,"ro":8.688387982547283,"up":25.49119161069393,"st":34.17789077758789,"el":3919.53063416481,"util":[100.0,65.0,54.0,100.0]},{"s":73,"acc":1.0,"tok":95.4287109375,"cut":0.0,"mixed":0.0,"rew":0.9906807899475097,"ro":8.701511561870575,"up":22.49937005341053,"st":31.19891881942749,"el":3950.7773604393,"util":[83.0,82.5,50.0,100.0]},{"s":74,"acc":1.0,"tok":89.3564453125,"cut":0.0,"mixed":0.0,"rew":0.9912737846374512,"ro":7.719641767442226,"up":23.792018584907055,"st":31.509703159332275,"el":3982.332337379456,"util":[100.0,82.5,100.0,100.0]},{"s":75,"acc":0.998046875,"tok":88.658203125,"cut":0.0,"mixed":0.0078125,"rew":0.9894157409667969,"ro":7.339560970664024,"up":20.458552204072475,"st":27.797743320465088,"el":4010.153549909591,"util":[32.5,82.5,90.0,100.0]},{"s":76,"acc":1.0,"tok":81.3447265625,"cut":0.0,"mixed":0.0,"rew":0.9920561790466309,"ro":6.827713467180729,"up":20.762140288949013,"st":27.589451789855957,"el":4037.7509315013885,"util":[100.0,50.0,100.0,0.0]},{"s":77,"acc":0.998046875,"tok":76.6875,"cut":0.0,"mixed":0.015625,"rew":0.9905788421630859,"ro":6.4841577634215355,"up":20.166450895369053,"st":26.65286374092102,"el":4064.4092171192165,"util":[100.0,1.0,100.0,0.0]},{"s":78,"acc":0.990234375,"tok":76.34375,"cut":0.0,"mixed":0.0078125,"rew":0.9828316688537597,"ro":6.719582639634609,"up":20.960923850536346,"st":27.678117036819458,"el":4092.131897687912,"util":[100.0,99.0,93.0,50.0]},{"s":79,"acc":0.9990234375,"tok":89.310546875,"cut":0.0,"mixed":0.0078125,"rew":0.9903172492980957,"ro":7.976436883211136,"up":21.394772201776505,"st":29.368722915649414,"el":4121.549612998962,"util":[81.5,82.0,89.0,87.0]},{"s":80,"acc":0.9990234375,"tok":92.748046875,"cut":0.0,"mixed":0.0078125,"rew":0.9899785995483399,"ro":8.678840935230255,"up":22.94742565602064,"st":31.624387741088867,"el":4153.222058296204,"util":[79.5,82.0,87.0,87.0]},{"s":81,"acc":0.9921875,"tok":109.4453125,"cut":0.0,"mixed":0.015625,"rew":0.9815580368041992,"ro":10.683280557394028,"up":21.797868743538857,"st":32.48010587692261,"el":4187.7921414375305,"util":[58.3,99.7,100.0,66.7]},{"s":82,"acc":1.0,"tok":111.2919921875,"cut":0.0,"mixed":0.0,"rew":0.9891316413879394,"ro":11.379134513437748,"up":24.205856569111347,"st":35.58351182937622,"el":4223.424243450165,"util":[83.0,83.0,50.0,100.0]},{"s":83,"acc":1.0,"tok":115.5908203125,"cut":0.0,"mixed":0.0,"rew":0.9887118339538574,"ro":12.432599686086178,"up":27.53028716146946,"st":39.96015763282776,"el":4263.432090044022,"util":[100.0,88.0,93.0,93.0]},{"s":84,"acc":0.9990234375,"tok":123.1455078125,"cut":0.0,"mixed":0.0078125,"rew":0.9870113372802735,"ro":12.139526762068272,"up":23.446476824581623,"st":35.58465838432312,"el":4299.050114631653,"util":[81.0,26.5,90.0,40.5]},{"s":85,"acc":0.9990234375,"tok":106.7568359375,"cut":0.0,"mixed":0.0078125,"rew":0.9886127471923828,"ro":9.857885487377644,"up":23.50267419219017,"st":33.36027431488037,"el":4332.419018030167,"util":[32.0,82.0,83.0,88.5]},{"s":86,"acc":0.9990234375,"tok":102.130859375,"cut":0.0,"mixed":0.0078125,"rew":0.989067268371582,"ro":8.810178615152836,"up":26.839101895689964,"st":35.64794707298279,"el":4368.114156484604,"util":[87.7,88.0,92.3,59.0]},{"s":87,"acc":1.0,"tok":102.4560546875,"cut":0.0,"mixed":0.0,"rew":0.9899945259094238,"ro":9.324320212006569,"up":23.413139075040817,"st":32.736266136169434,"el":4400.882077932358,"util":[83.0,100.0,100.0,100.0]},{"s":88,"acc":0.9990234375,"tok":100.892578125,"cut":0.0,"mixed":0.0078125,"rew":0.9891825675964355,"ro":8.601605080068111,"up":25.026594169437885,"st":33.62695074081421,"el":4434.554476737976,"util":[82.5,95.0,100.0,100.0]},{"s":89,"acc":0.9970703125,"tok":97.5185546875,"cut":0.0,"mixed":0.015625,"rew":0.9875875473022461,"ro":7.839802265167236,"up":24.99136584997177,"st":32.8293821811676,"el":4467.429477214813,"util":[82.5,32.5,89.0,89.0]},{"s":90,"acc":1.0,"tok":92.6357421875,"cut":0.0,"mixed":0.0,"rew":0.9909535408020019,"ro":7.578155539929867,"up":21.28113581240177,"st":28.856655836105347,"el":4496.333548784256,"util":[82.0,82.0,38.0,87.5]},{"s":91,"acc":1.0,"tok":98.8046875,"cut":0.0,"mixed":0.0,"rew":0.9903511047363281,"ro":9.071155041456223,"up":21.38074130564928,"st":30.450905799865723,"el":4528.843699455261,"util":[81.5,81.5,38.5,88.5]},{"s":92,"acc":0.9990234375,"tok":101.166015625,"cut":0.0,"mixed":0.0078125,"rew":0.9891568183898926,"ro":9.02902464568615,"up":21.42246575653553,"st":30.449955940246582,"el":4559.329476594925,"util":[81.0,75.0,88.0,88.0]},{"s":93,"acc":1.0,"tok":96.3984375,"cut":0.0,"mixed":0.0,"rew":0.9905860900878907,"ro":8.415958032011986,"up":23.00770165026188,"st":31.422394514083862,"el":4590.765188217163,"util":[85.5,50.0,89.5,87.5]},{"s":94,"acc":0.998046875,"tok":101.3662109375,"cut":0.0,"mixed":0.015625,"rew":0.988161277770996,"ro":9.314440116286278,"up":23.16894755512476,"st":32.48159599304199,"el":4623.285812616348,"util":[66.7,79.3,100.0,83.3]},{"s":95,"acc":0.9990234375,"tok":103.29296875,"cut":0.0,"mixed":0.0078125,"rew":0.9889462471008301,"ro":9.037605799734592,"up":23.51660130918026,"st":32.552212715148926,"el":4655.871495723724,"util":[100.0,83.0,50.0,100.0]},{"s":96,"acc":0.9951171875,"tok":98.7021484375,"cut":0.0,"mixed":0.015625,"rew":0.9855257987976074,"ro":8.797752983868122,"up":22.227755300700665,"st":31.0267436504364,"el":4686.903586864471,"util":[33.0,82.0,90.0,100.0]},{"s":97,"acc":1.0,"tok":101.8798828125,"cut":0.0,"mixed":0.0,"rew":0.9900507926940918,"ro":9.047652453184128,"up":22.314842708408833,"st":31.360193252563477,"el":4718.308065414429,"util":[32.5,82.5,100.0,85.0]},{"s":98,"acc":0.998046875,"tok":95.9541015625,"cut":0.0,"mixed":0.015625,"rew":0.9886989593505859,"ro":8.360567778348923,"up":21.860791325569153,"st":30.221511125564575,"el":4748.5623099803925,"util":[82.0,82.5,89.0,38.5]},{"s":99,"acc":0.9970703125,"tok":95.3388671875,"cut":0.0,"mixed":0.0234375,"rew":0.9877887725830078,"ro":8.641797222197056,"up":23.15412601828575,"st":31.79449987411499,"el":4780.403240203857,"util":[82.0,82.5,89.5,100.0]},{"s":100,"acc":1.0,"tok":103.30859375,"cut":0.0,"mixed":0.0,"rew":0.9899112701416015,"ro":9.35646378993988,"up":21.895031481981277,"st":31.250701189041138,"el":4811.700184345245,"util":[82.5,82.0,89.0,89.0]}],"job":{"id":39000,"elapsed_s":4925,"limit_h":5,"start":"06:16:06","end":"07:38:11","gpus":32,"gpu_gb":286,"nodes":["rhea0271","rhea0272","rhea0273","rhea0274","rhea0275","rhea0276","rhea0281","rhea0288"],"eval_gpus":16,"eval_s":243},"gpu":{"sampled_node":"rhea0271","samples":321,"interval_s":15,"util_avg":[69.3,70.2,76.1,73.7],"util_rollout":64.5,"util_update":76.4,"mem_peak_gb":[216.2,170.4,182.9,209.8],"mem_avg_gb":[201.2,159.7,171.7,194.6],"power_avg_w":631,"power_peak_w":1414,"temp_peak_c":38},"bench":{"base":{"run_rate":{"questions":200,"samples":800,"accuracy":0.9875,"pass@4":1.0,"mean_tokens":394.04875,"mean_tokens_correct":389.1860759493671,"truncated_rate":0.00125,"no_answer_rate":0.0},"chase_rate":{"questions":200,"samples":800,"accuracy":0.93625,"pass@4":1.0,"mean_tokens":950.085,"mean_tokens_correct":935.7409879839786,"truncated_rate":0.01,"no_answer_rate":0.0},"milestone":{"questions":200,"samples":800,"accuracy":0.98625,"pass@4":1.0,"mean_tokens":858.23625,"mean_tokens_correct":813.0963244613434,"truncated_rate":0.01375,"no_answer_rate":0.0},"overall":{"questions":600,"samples":2400,"accuracy":0.97,"pass@4":1.0,"mean_tokens":734.1233333333333,"mean_tokens_correct":708.7027491408935,"truncated_rate":0.008333333333333333,"no_answer_rate":0.0},"_wall_s":0.8623976707458496},"ft":{"run_rate":{"questions":200,"samples":800,"accuracy":0.9975,"pass@4":1.0,"mean_tokens":86.35375,"mean_tokens_correct":86.32080200501254,"truncated_rate":0.0,"no_answer_rate":0.0},"chase_rate":{"questions":200,"samples":800,"accuracy":0.9775,"pass@4":0.995,"mean_tokens":157.27125,"mean_tokens_correct":157.27877237851663,"truncated_rate":0.0,"no_answer_rate":0.0},"milestone":{"questions":200,"samples":800,"accuracy":1.0,"pass@4":1.0,"mean_tokens":83.2525,"mean_tokens_correct":83.2525,"truncated_rate":0.0,"no_answer_rate":0.0},"overall":{"questions":600,"samples":2400,"accuracy":0.9916666666666667,"pass@4":0.9983333333333333,"mean_tokens":108.95916666666666,"mean_tokens_correct":108.60420168067228,"truncated_rate":0.0,"no_answer_rate":0.0},"_wall_s":137.28665494918823}},"train":{"finished":true,"steps":100,"world_size":32,"rollouts_total":102400,"first_steps":{"rollout_accuracy":0.91357421875,"reward_mean":0.8887886238098144,"mean_tokens":329.82470703125,"truncated_rate":0.06748046875},"last_steps":{"rollout_accuracy":0.9986328125,"reward_mean":0.9889177131652833,"mean_tokens":99.62119140625,"truncated_rate":0.0},"window":10,"train_hours":1.3302541000975503},"args":{"questions_per_gpu":4,"group":8,"max_new_tokens":1024,"len_coef":0.1,"lr":0.0001,"lora_r":32,"steps":100}};
+const S = D.steps, N = S.length, J = D.job, G = D.gpu, B = D.bench.base, F = D.bench.ft, A = D.args;
+const $ = q => document.querySelector(q), NS = "http://www.w3.org/2000/svg";
+const el = (t, a = {}, txt) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; return e; };
+const fmt = (x, d = 0) => x.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (x, d = 1) => fmt(x * 100, d) + "%";
+const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
+const tip = $("#tip");
+function showTip(ev, html) { tip.innerHTML = html; tip.style.display = "block"; const w = tip.offsetWidth, h = tip.offsetHeight; let x = ev.clientX + 14, y = ev.clientY + 14; if (x + w > innerWidth - 8) x = ev.clientX - w - 14; if (y + h > innerHeight - 8) y = ev.clientY - h - 14; tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px"; }
+const hideTip = () => tip.style.display = "none";
+function hover(node, html) { node.addEventListener("mousemove", e => showTip(e, typeof html === "function" ? html() : html)); node.addEventListener("mouseleave", hideTip); }
+
+/* ---- derived numbers ---- */
+const tRoll = sum(S, s => s.ro), tUpd = sum(S, s => s.up), tLoop = S[N - 1].el, tOther = J.elapsed_s - tRoll - tUpd;
+const gpuH = J.gpus * J.elapsed_s / 3600, perGpu = A.questions_per_gpu * A.group, perStep = perGpu * J.gpus;
+const tokens = sum(S, s => s.tok * perStep);
+const nodeUtil = s => { const v = s.util.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+const utilAvg = G.util_avg.reduce((a, b) => a + b, 0) / G.util_avg.length;
+const conv = S.find(s => s.acc >= 0.985), zeroMixed = S.filter(s => s.mixed === 0).length;
+const after20 = tLoop - S[19].el, gpuH20 = J.gpus * (S[19].el + tOther) / 3600;
+const dAcc = (F.overall.accuracy - B.overall.accuracy) * 100;
+
+/* ---- tiles ---- */
+const tile = (k, v, d) => `<div class="card tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+$("#tiles").innerHTML =
+  tile("Benchmark accuracy", `${fmt(B.overall.accuracy * 100, 2)}% <small>to</small> ${fmt(F.overall.accuracy * 100, 2)}%`, `+${fmt(dAcc, 2)} points on 600 held-out questions`) +
+  tile("Tokens per answer", `${fmt(B.overall.mean_tokens)} <small>to</small> ${fmt(F.overall.mean_tokens)}`, `${fmt((F.overall.mean_tokens / B.overall.mean_tokens - 1) * 100)}% on the benchmark`) +
+  tile("GPUs", `${J.gpus} <small>on ${J.nodes.length} nodes</small>`, `4 Vera Rubin GPUs per node, ${J.gpu_gb} GB each`) +
+  tile("Job time", `${fmt(J.elapsed_s / 60)} min`, `${fmt(gpuH, 1)} GPU-hours, ${J.start} to ${J.end}`) +
+  tile("Rollouts", fmt(N * perStep), `${fmt(perStep)} per step for ${N} steps, ${fmt(tokens / 1e6, 1)}M tokens generated`) +
+  tile("Measured GPU utilisation", `${fmt(utilAvg)}%`, `average of the 4 sampled GPUs on ${G.sampled_node}`);
+$("#how").textContent = `Every step ran on all ${J.gpus} GPUs at once. Each GPU held its own copy of the model, answered ${A.questions_per_gpu} questions ${A.group} times each (${perGpu} answers), then computed gradients on its own answers. The gradients were averaged across all ${J.gpus} GPUs into one update. Press Replay to watch the ${N} steps.`;
+$("#gridnote").textContent = `Each GPU tile is split by how that step's time was divided between rollouts and the update. The percentage on ${G.sampled_node} is measured utilisation during that step; W&B sampled only that node, so the other 28 GPUs show no number. All GPUs ran the same workload in lockstep.`;
+
+/* ---- cluster map ---- */
+const nodesEl = $("#nodes"), cells = [];
+J.nodes.forEach((n, i) => {
+  const d = document.createElement("div"); d.className = "node";
+  d.innerHTML = `<div class="nm"><span>${n}</span><span>GPUs ${i * 4}-${i * 4 + 3}</span></div><div class="gp"></div>`;
+  for (let g = 0; g < 4; g++) {
+    const c = document.createElement("div"); c.className = "gpu";
+    c.innerHTML = `<div class="ph"><b class="r"></b><b class="u"></b></div><span></span>`;
+    d.lastChild.appendChild(c);
+    const cell = { c, r: c.querySelector(".r"), u: c.querySelector(".u"), t: c.querySelector("span"), node: n, idx: i * 4 + g, sampled: n === G.sampled_node, g };
+    hover(c, () => { const s = S[curStep() - 1]; return `<b>${n}, GPU ${g}</b> (process ${cell.idx})<br>Step ${s.s}: ${perGpu} answers<br>Rollouts ${fmt(s.ro, 1)} s, update ${fmt(s.up, 1)} s` + (cell.sampled && s.util[g] != null ? `<br>Measured utilisation ${fmt(s.util[g])}%` : `<br>Utilisation not sampled on this node`); });
+    cells.push(cell);
+  }
+  nodesEl.appendChild(d);
+});
+
+/* ---- step charts ---- */
+const W = 520, M = { l: 44, r: 12, t: 10, b: 24 }, charts = [];
+function stepChart(id, H, y0, y1, yt, yf, body, band) {
+  const svg = $(id); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img");
+  const iw = W - M.l - M.r, ih = H - M.t - M.b, bw = iw / N;
+  const X = band ? s => M.l + (s - 0.5) * bw : s => M.l + (s - 1) / (N - 1) * iw;
+  const Y = v => M.t + (1 - (v - y0) / (y1 - y0)) * ih;
+  yt.forEach(v => { svg.appendChild(el("line", { x1: M.l, x2: W - M.r, y1: Y(v), y2: Y(v), stroke: "var(--grid)" })); svg.appendChild(el("text", { x: M.l - 6, y: Y(v) + 4, "text-anchor": "end" }, yf(v))); });
+  [1, 20, 40, 60, 80, 100].forEach(s => svg.appendChild(el("text", { x: X(s), y: H - 6, "text-anchor": "middle" }, s === 1 ? "step 1" : s)));
+  const cid = id.slice(1) + "clip", cp = el("clipPath", { id: cid }), cr = el("rect", { x: 0, y: 0, width: W, height: H });
+  cp.appendChild(cr); svg.appendChild(cp);
+  const g = el("g", { "clip-path": `url(#${cid})` }); svg.appendChild(g);
+  body(g, X, Y, bw);
+  const cur = el("line", { y1: M.t, y2: M.t + ih, stroke: "var(--text2)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 }); svg.appendChild(cur);
+  const hv = el("line", { y1: M.t, y2: M.t + ih, stroke: "var(--muted)", "stroke-width": 1, opacity: 0 }); svg.appendChild(hv);
+  const ov = el("rect", { x: M.l, y: M.t, width: iw, height: ih, fill: "transparent" }); svg.appendChild(ov);
+  ov.addEventListener("mousemove", e => { const b = ov.getBoundingClientRect(), f = (e.clientX - b.left) / b.width; const s = Math.max(1, Math.min(N, band ? Math.ceil(f * N) : Math.round(1 + f * (N - 1)))); hv.setAttribute("x1", X(s)); hv.setAttribute("x2", X(s)); hv.setAttribute("opacity", 1); showTip(e, stepTip(S[s - 1])); });
+  ov.addEventListener("mouseleave", () => { hv.setAttribute("opacity", 0); hideTip(); });
+  charts.push(c => { const x = band ? M.l + c * bw : X(c); cr.setAttribute("width", x + 1); cur.setAttribute("x1", x); cur.setAttribute("x2", x); cur.setAttribute("opacity", c >= N ? 0 : 1); });
+}
+const stepTip = s => `<b>Step ${s.s}</b><br>Accuracy ${pct(s.acc)}<br>Tokens ${fmt(s.tok)}, cut off ${pct(s.cut)}<br>Mixed questions ${pct(s.mixed)}<br>Rollouts ${fmt(s.ro, 1)} s, update ${fmt(s.up, 1)} s` + (nodeUtil(s) != null ? `<br>GPU utilisation ${fmt(nodeUtil(s))}% (4 sampled)` : "");
+const line = (key, color) => (g, X, Y) => g.appendChild(el("path", { d: S.map((s, i) => (i ? "L" : "M") + X(s.s).toFixed(1) + " " + Y(key(s)).toFixed(1)).join(""), fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round" }));
+stepChart("#cAcc", 210, 70, 100, [70, 80, 90, 100], v => v + "%", line(s => s.acc * 100, "var(--s1)"));
+stepChart("#cTok", 210, 0, 700, [0, 175, 350, 525, 700], v => fmt(v), line(s => s.tok, "var(--s1)"));
+stepChart("#cMix", 210, 0, 70, [0, 20, 40, 60], v => v + "%", line(s => s.mixed * 100, "var(--s1)"));
+stepChart("#cUtil", 210, 0, 100, [0, 25, 50, 75, 100], v => v + "%", line(s => nodeUtil(s) ?? 0, "var(--s1)"));
+const TMAX = 180;
+stepChart("#cTime", 250, 0, TMAX, [0, 60, 120, 180], v => v + " s", (g, X, Y, bw) => {
+  const w = Math.max(1.5, bw - 1.2);
+  S.forEach(s => {
+    const ro = Math.min(s.ro, TMAX), up = Math.min(s.up, TMAX - ro), x = X(s.s) - w / 2;
+    g.appendChild(el("rect", { x, y: Y(ro), width: w, height: Y(0) - Y(ro), fill: "var(--s1)" }));
+    if (up > 0) g.appendChild(el("rect", { x, y: Y(ro + up), width: w, height: Math.max(0, Y(ro) - Y(ro + up) - 1), fill: "var(--s2)" }));
+  });
+}, true);
+$("#stepNote").textContent = `Step 1 took ${fmt(S[0].st)} s (it includes one-time compilation and the longest answers) and is clipped at ${TMAX} s. The last ten steps averaged ${fmt(sum(S.slice(-10), s => s.st) / 10)} s.`;
+$("#utilNote").textContent = `Mean of the 4 GPUs on ${G.sampled_node}, one reading every ${G.interval_s} s, averaged per step`;
+
+/* ---- time budget and memory ---- */
+const parts = [["Rollouts", tRoll, "var(--s1)"], ["Updates", tUpd, "var(--s2)"], ["Start-up, checkpoints, shutdown", tOther, "var(--base)"]];
+$("#budget").innerHTML = parts.map(p => `<div style="width:${p[1] / J.elapsed_s * 100}%;background:${p[2]}"></div>`).join("");
+[...$("#budget").children].forEach((d, i) => hover(d, `<b>${parts[i][0]}</b><br>${fmt(parts[i][1] / 60, 1)} min (${pct(parts[i][1] / J.elapsed_s)})`));
+$("#budgetLegend").innerHTML = parts.map(p => `<span><i style="background:${p[2]}"></i>${p[0]}: ${fmt(p[1] / 60, 1)} min (${pct(p[1] / J.elapsed_s, 0)})</span>`).join("");
+$("#budgetNote").textContent = `${fmt(J.elapsed_s / 60)} minutes of wall time on ${J.gpus} GPUs`;
+$("#memNote").textContent = `The 4 sampled GPUs, out of ${J.gpu_gb} GB each`;
+$("#mem").innerHTML = G.mem_peak_gb.map((v, i) => `<span>GPU ${i}</span><div class="tr" data-i="${i}"><div style="width:${v / J.gpu_gb * 100}%"></div></div><span class="n">${fmt(v)} GB</span>`).join("");
+document.querySelectorAll("#mem .tr").forEach(t => { const i = +t.dataset.i; hover(t, `<b>${G.sampled_node}, GPU ${i}</b><br>Peak ${fmt(G.mem_peak_gb[i], 1)} GB (${pct(G.mem_peak_gb[i] / J.gpu_gb, 0)})<br>Average ${fmt(G.mem_avg_gb[i], 1)} GB`); });
+
+/* ---- benchmark dumbbells ---- */
+const TYPES = [["overall", "Overall"], ["run_rate", "Run rate"], ["chase_rate", "Chase rate"], ["milestone", "Milestone"]];
+function dumbbell(id, key, x0, x1, xt, xf, vf) {
+  const svg = $(id), H = 40 + TYPES.length * 40, l = 86, r = 20; svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img");
+  const X = v => l + (v - x0) / (x1 - x0) * (W - l - r);
+  xt.forEach(v => { svg.appendChild(el("line", { x1: X(v), x2: X(v), y1: 8, y2: H - 26, stroke: "var(--grid)" })); svg.appendChild(el("text", { x: X(v), y: H - 8, "text-anchor": "middle" }, xf(v))); });
+  TYPES.forEach(([t, name], i) => {
+    const y = 28 + i * 40, b = B[t][key], f = F[t][key];
+    svg.appendChild(el("text", { x: l - 10, y: y + 4, "text-anchor": "end", class: "lab" }, name));
+    svg.appendChild(el("line", { x1: X(b), x2: X(f), y1: y, y2: y, stroke: "var(--muted)", "stroke-width": 2 }));
+    svg.appendChild(el("circle", { cx: X(b), cy: y, r: 6, fill: "var(--base)", stroke: "var(--surface)", "stroke-width": 2 }));
+    svg.appendChild(el("circle", { cx: X(f), cy: y, r: 6, fill: "var(--s3)", stroke: "var(--surface)", "stroke-width": 2 }));
+    svg.appendChild(el("text", { x: X(f) + (f >= b ? 11 : -11), y: y - 9, "text-anchor": f >= b ? "end" : "start", class: "lab" }, vf(f)));
+    const hit = el("rect", { x: l, y: y - 18, width: W - l - r, height: 36, fill: "transparent" }); svg.appendChild(hit);
+    hover(hit, `<b>${name}</b><br>Before ${vf(b)}<br>After ${vf(f)}<br>Samples ${fmt(F[t].samples)}`);
+  });
+}
+dumbbell("#bAcc", "accuracy", 0.92, 1, [0.92, 0.94, 0.96, 0.98, 1], v => fmt(v * 100) + "%", v => fmt(v * 100, 2) + "%");
+dumbbell("#bTok", "mean_tokens", 0, 1000, [0, 250, 500, 750, 1000], v => fmt(v), v => fmt(v));
+
+/* ---- verdict ---- */
+const li = a => a.map(x => `<li>${x}</li>`).join("");
+$("#good").innerHTML = li([
+  `<b>All ${J.gpus} GPUs worked on every step.</b> Rollouts and gradients both ran on every GPU in parallel, so each update saw ${fmt(perStep)} fresh answers.`,
+  `<b>Fast turnaround.</b> ${fmt(N * perStep)} rollouts and ${N} updates finished in ${fmt(J.elapsed_s / 60)} minutes, using ${pct(J.elapsed_s / 3600 / J.limit_h, 0)} of the ${J.limit_h}-hour allocation. Only ${fmt(tOther / 60, 1)} minutes went to start-up, checkpoints and shutdown.`,
+  `<b>The large memory was put to work.</b> The sampled GPUs peaked at ${fmt(Math.min(...G.mem_peak_gb))} to ${fmt(Math.max(...G.mem_peak_gb))} GB of ${J.gpu_gb} GB, which is what let each GPU generate ${perGpu} answers in one batch.`,
+  `<b>The result held up on the benchmark.</b> Accuracy rose ${fmt(dAcc, 2)} points and answers became ${fmt((1 - F.overall.mean_tokens / B.overall.mean_tokens) * 100)}% shorter.`]);
+$("#bad").innerHTML = li([
+  `<b>Most of the run came after the model had converged.</b> Rollout accuracy passed 98.5% at step ${conv.s}. Steps 21 to ${N} took ${fmt(after20 / 60)} minutes (${pct(after20 / J.elapsed_s, 0)} of the job) while accuracy stayed at 99% or higher.`,
+  `<b>Little left to learn from.</b> In ${zeroMixed} of ${N} steps, every question had all 8 answers correct, so the only signal was the small length bonus.`,
+  `<b>Updates cost more than rollouts.</b> Updates took ${pct(tUpd / (tRoll + tUpd), 0)} of step time. Once answers shrank to about 100 tokens, a rollout phase took about ${fmt(sum(S.slice(-10), s => s.ro) / 10)} s and the update about ${fmt(sum(S.slice(-10), s => s.up) / 10)} s.`,
+  `<b>The GPUs were not saturated.</b> Measured utilisation averaged ${fmt(utilAvg)}% on the sampled node (about ${fmt(G.util_rollout)}% in rollouts and ${fmt(G.util_update)}% in updates), and power averaged ${fmt(G.power_avg_w)} W against a ${fmt(G.power_peak_w)} W peak.`,
+  `<b>A shorter run would likely have cost about a third.</b> Stopping at step 20 would have used about ${fmt(gpuH20)} GPU-hours instead of ${fmt(gpuH)}.`]);
+$("#caveat").textContent = `Limits of this data: utilisation, memory and power were sampled on ${G.sampled_node} only (4 of ${J.gpus} GPUs, every ${G.interval_s} s), and the rollout/update split of utilisation is approximate at that sampling rate. Only the final adapter was benchmarked, so the benchmark score at step 20 is not known.`;
+
+/* ---- table ---- */
+$("#tbl").innerHTML = "<tr><th>Step</th><th>Accuracy</th><th>Tokens</th><th>Cut off</th><th>Mixed questions</th><th>Rollouts (s)</th><th>Update (s)</th><th>GPU utilisation</th></tr>" +
+  S.map(s => `<tr><td>${s.s}</td><td>${pct(s.acc)}</td><td>${fmt(s.tok)}</td><td>${pct(s.cut)}</td><td>${pct(s.mixed)}</td><td>${fmt(s.ro, 1)}</td><td>${fmt(s.up, 1)}</td><td>${nodeUtil(s) == null ? "" : fmt(nodeUtil(s)) + "%"}</td></tr>`).join("");
+
+/* ---- replay ---- */
+let cur = N, playing = false, last = 0;
+const curStep = () => Math.max(1, Math.min(N, Math.ceil(cur)));
+function draw(c) {
+  cur = Math.max(0.001, Math.min(N, c));
+  const s = S[curStep() - 1], f = cur - (s.s - 1), share = s.ro / (s.ro + s.up), inRoll = f < share;
+  charts.forEach(fn => fn(cur));
+  $("#scrub").value = s.s;
+  $("#readout").innerHTML = [["Step", `${s.s} / ${N}`], ["Rollout accuracy", pct(s.acc)], ["Tokens per answer", fmt(s.tok)], ["Step time", fmt(s.st) + " s"], ["Answers so far", fmt(s.s * perStep)], ["Elapsed", fmt(s.el / 60, 1) + " min"]]
+    .map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  cells.forEach(x => {
+    x.r.style.width = share * 100 + "%"; x.u.style.width = (1 - share) * 100 + "%";
+    x.r.style.opacity = playing && !inRoll ? 0.25 : 1; x.u.style.opacity = playing && inRoll ? 0.25 : 1;
+    x.t.textContent = x.sampled && s.util[x.g] != null ? fmt(s.util[x.g]) + "%" : "";
+  });
+  $("#phase").innerHTML = playing
+    ? (inRoll ? `<b>Step ${s.s}: rollouts.</b> Each GPU is writing ${perGpu} answers (${fmt(perStep)} in total).` : `<b>Step ${s.s}: update.</b> Each GPU scores its answers and computes gradients, which are averaged across all ${J.gpus}.`)
+    : `<b>Step ${s.s}.</b> Rollouts took ${fmt(s.ro, 1)} s and the update ${fmt(s.up, 1)} s. Drag the slider or press Replay.`;
+}
+function tick(t) { if (!playing) return; const dt = Math.min(100, t - last); last = t; const c = cur + dt / 1000 * 5 * +$("#speed").value; if (c >= N) { playing = false; $("#play").textContent = "Replay"; draw(N); return; } draw(c); requestAnimationFrame(tick); }
+$("#play").addEventListener("click", () => { if (playing) { playing = false; $("#play").textContent = "Resume"; draw(cur); return; } if (cur >= N) cur = 0.001; playing = true; $("#play").textContent = "Pause"; last = performance.now(); requestAnimationFrame(tick); });
+$("#scrub").addEventListener("input", e => { playing = false; $("#play").textContent = "Replay"; draw(+e.target.value); });
+draw(N);
+</script>
+</body>
+</html>
